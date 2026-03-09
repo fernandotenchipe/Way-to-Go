@@ -1,36 +1,227 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Way to Go - Sistema de Trackeo de Flotas
 
-## Getting Started
+Sistema completo de monitoreo y tracking de flotas de camiones con GPS y video en tiempo real.
 
-First, run the development server:
+![Dashboard](https://img.shields.io/badge/Status-In_Development-yellow)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![Node.js](https://img.shields.io/badge/Node.js-18+-green)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue)
 
+## 📋 Características
+
+### Backend
+- ✅ **API REST** completa con Node.js + Express
+- ✅ **WebSocket** para actualizaciones en tiempo real
+- ✅ **PostgreSQL + PostGIS** para datos geoespaciales
+- ✅ **JWT Authentication** para seguridad
+- ✅ **Gestión de camiones**, GPS devices, cámaras y alertas
+- ✅ **Historial de rutas** y posiciones
+
+### Frontend
+- ✅ **Dashboard interactivo** con Next.js 16
+- ✅ **Mapa en tiempo real** con Leaflet
+- ✅ **Vista de tracking** con tarjetas de camiones
+- ✅ **Filtros avanzados** por estado y categoría
+- ✅ **Interfaz responsive** con Tailwind CSS
+- ✅ **Actualización en tiempo real** vía WebSocket
+
+## 🚀 Inicio Rápido
+
+### Requisitos Previos
+
+- **Node.js** 18+ 
+- **PostgreSQL** 14+ con PostGIS
+- **npm** o **yarn**
+
+### Instalación
+
+#### 1. Clonar el repositorio
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/tu-usuario/way-to-go.git
+cd way-to-go
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+#### 2. Configurar Backend
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd backend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Instalar dependencias
+npm install
 
-## Learn More
+# Configurar base de datos
+createdb fleet_tracking
+psql fleet_tracking -c "CREATE EXTENSION postgis;"
+psql fleet_tracking < src/database/schema.sql
 
-To learn more about Next.js, take a look at the following resources:
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus credenciales
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Iniciar servidor
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+El backend estará en `http://localhost:3001`
 
-## Deploy on Vercel
+#### 3. Configurar Frontend
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+cd ..  # volver al directorio raíz
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo
+npm run dev
+```
+
+El frontend estará en `http://localhost:3000`
+
+## 📁 Estructura del Proyecto
+
+```
+way-to-go/
+├── backend/                    # API Backend
+│   ├── src/
+│   │   ├── routes/            # Endpoints REST
+│   │   │   ├── trucks.js      # Gestión de camiones
+│   │   │   ├── gps.js         # Posiciones GPS
+│   │   │   ├── alerts.js      # Sistema de alertas
+│   │   │   └── auth.js        # Autenticación
+│   │   ├── database/          # DB config y schemas
+│   │   ├── websocket/         # WebSocket server
+│   │   └── index.js           # Entry point
+│   └── package.json
+│
+├── app/                        # Frontend Next.js 16
+│   ├── tracking/              # Página de tracking
+│   ├── ui/                    # Componentes UI
+│   │   ├── Sidebar.tsx        # Navegación lateral
+│   │   ├── Header.tsx         # Cabecera
+│   │   ├── TruckCard.tsx      # Tarjeta de camión
+│   │   ├── Map.tsx            # Componente de mapa
+│   │   └── DashboardLayout.tsx
+│   ├── services/              # Servicios API/WS
+│   ├── config/                # Configuración
+│   ├── layout.tsx             # Layout principal
+│   └── page.tsx               # Home
+│
+└── README.md
+```
+
+## 🗄️ Base de Datos
+
+### Tablas Principales
+
+- **users** - Usuarios del sistema
+- **trucks** - Camiones de la flota
+- **gps_devices** - Dispositivos GPS
+- **cameras** - Cámaras en camiones
+- **gps_positions** - Historial de posiciones (PostGIS)
+- **alerts** - Alertas del sistema
+- **routes** - Rutas planificadas
+
+## 📡 API Endpoints
+
+### Autenticación
+```
+POST /api/auth/login       - Iniciar sesión
+POST /api/auth/register    - Registrar usuario
+```
+
+### Camiones
+```
+GET    /api/trucks              - Listar camiones
+GET    /api/trucks/:id          - Obtener camión
+POST   /api/trucks              - Crear camión
+PUT    /api/trucks/:id          - Actualizar camión
+GET    /api/trucks/:id/location - Ubicación actual
+GET    /api/trucks/:id/history  - Historial
+```
+
+### GPS
+```
+POST /api/gps/position          - Recibir posición
+GET  /api/gps/positions         - Posiciones recientes
+GET  /api/gps/latest-positions  - Últimas de todos
+```
+
+### Alertas
+```
+GET /api/alerts               - Listar alertas
+POST /api/alerts              - Crear alerta
+PUT /api/alerts/:id/resolve   - Resolver alerta
+```
+
+## 🔌 WebSocket
+
+Endpoint: `ws://localhost:3001/ws`
+
+### Eventos del Servidor
+- `gps_update` - Nueva posición GPS
+- `new_alert` - Nueva alerta
+- `connection` - Confirmación
+
+### Comandos del Cliente
+```json
+{ "type": "ping" }
+{ "type": "subscribe", "truckIds": [1, 2, 3] }
+```
+
+## 🎨 Capturas de Pantalla
+
+### Dashboard de Tracking
+Vista principal con mapa interactivo y lista de camiones en tiempo real.
+
+### Vista de Camión Individual
+Detalles completos: ubicación, velocidad, conductor, capacidad de carga.
+
+## 🛠️ Tecnologías
+
+### Backend
+- Node.js + Express
+- PostgreSQL + PostGIS
+- WebSocket (ws)
+- JWT
+- bcryptjs
+
+### Frontend
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+- Leaflet
+- Heroicons
+
+## 📊 Escalamiento Futuro
+
+Para mayor escala, considera:
+
+- **Kafka/MQTT** para ingesta de GPS
+- **Redis** para cache de posiciones
+- **TimescaleDB** para históricos
+- **Media Server** (Janus/Ant Media) para video
+- **Microservicios** independientes
+- **Kubernetes** para orquestación
+
+## 🔐 Seguridad
+
+- Autenticación JWT
+- Contraseñas hasheadas con bcrypt
+- CORS configurado
+- Validación de inputs
+- Prepared statements (SQL injection)
+
+## 🤝 Contribuir
+
+1. Fork el proyecto
+2. Crea tu Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push al Branch (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📝 Licencia
+
+Este proyecto está bajo la Licencia MIT.
+
