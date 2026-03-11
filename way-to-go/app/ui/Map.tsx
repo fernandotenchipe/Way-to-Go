@@ -24,7 +24,7 @@ export default function MapComponent({ trucks, selectedTruckId, onTruckClick }: 
       import('leaflet').then((L) => {
         import('leaflet/dist/leaflet.css');
         
-        if (mapRef.current && !mapRef.current.hasChildNodes()) {
+        if (mapRef.current && !mapRef.current.hasChildNodes()) { 
           const map = L.map(mapRef.current).setView([51.505, -0.09], 13);
           
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
