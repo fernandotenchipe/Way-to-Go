@@ -37,7 +37,7 @@ export default function MapComponent({ trucks, selectedTruckId, onTruckClick }: 
               className: 'custom-truck-marker',
               html: `
                 <div class="${selectedTruckId === truck.id ? 'selected' : ''}" style="
-                  background: ${truck.status === 'active' ? '#ec4899' : '#9ca3af'};
+                  background: ${truck.status === 'active' ? '#f4c430' : '#94a3b8'};
                   width: 32px;
                   height: 32px;
                   border-radius: 50%;
@@ -47,7 +47,7 @@ export default function MapComponent({ trucks, selectedTruckId, onTruckClick }: 
                   color: white;
                   font-weight: bold;
                   font-size: 12px;
-                  border: 3px solid ${selectedTruckId === truck.id ? '#be185d' : 'white'};
+                  border: 3px solid ${selectedTruckId === truck.id ? '#0b1f3b' : 'white'};
                   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                   cursor: pointer;
                 ">
@@ -106,7 +106,7 @@ export default function MapComponent({ trucks, selectedTruckId, onTruckClick }: 
         <h3 className="text-sm font-semibold text-gray-900 mb-2">Estado</h3>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-pink-500"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
             <span className="text-xs text-gray-600">Activo</span>
           </div>
           <div className="flex items-center gap-2">

@@ -8,19 +8,37 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Source Sans 3", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
+
+/* WayToGo brand language: navy, warm yellow, generous white space and compact geometry. */
+h1, h2, h3, h4, h5, h6, button, th {
+  font-family: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
+}
+
+/* Keep the prototype's existing semantic classes while aligning them to the public brand. */
+.bg-pink-50 { background-color: #fff9df !important; }
+.bg-pink-100 { background-color: #fff0a8 !important; }
+.bg-pink-500, .bg-pink-600 { background-color: #f4c430 !important; }
+.text-pink-500, .text-pink-600, .text-pink-700 { color: #0b1f3b !important; }
+.border-pink-200, .border-pink-300, .border-pink-500 { border-color: #f4c430 !important; }
+.from-pink-500, .to-rose-600 { --tw-gradient-from: #f4c430 var(--tw-gradient-from-position); --tw-gradient-to: rgb(244 196 48 / 0) var(--tw-gradient-to-position); }
+.from-violet-500 { --tw-gradient-from: #0b1f3b var(--tw-gradient-from-position); --tw-gradient-to: rgb(11 31 59 / 0) var(--tw-gradient-to-position); }
+.to-pink-500 { --tw-gradient-to: #f4c430 var(--tw-gradient-to-position); }
+.bg-pink-600.text-white, .bg-gradient-to-br.from-pink-500.text-white { color: #0b1f3b !important; }
+.bg-violet-50 { background-color: #eef3f8 !important; }
+.bg-violet-100 { background-color: #dbe6f0 !important; }
+.bg-violet-500, .bg-violet-600 { background-color: #0b1f3b !important; }
+.text-violet-500, .text-violet-600, .text-violet-700 { color: #0b1f3b !important; }
+.border-violet-100, .border-violet-200 { border-color: #d7e0e8 !important; }
+.rounded-3xl { border-radius: 16px !important; }
+.rounded-2xl { border-radius: 10px !important; }
+.rounded-xl { border-radius: 8px !important; }
+.shadow-pink-200 { --tw-shadow-color: rgb(244 196 48 / 0.25) !important; }

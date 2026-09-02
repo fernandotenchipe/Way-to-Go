@@ -1,23 +1,5 @@
 'use client';
-
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-
-export default function Home() {
-  const router = useRouter();
-  
-  useEffect(() => {
-    // Redirigir automáticamente a tracking
-    router.push('/tracking');
-  }, [router]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Cargando Way to Go...</p>
-      </div>
-    </div>
-  );
-}
-
+import Link from 'next/link';
+import { ArrowRightIcon, BanknotesIcon, MapIcon, TruckIcon } from '@heroicons/react/24/outline';
+export default function Home() { return <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-6 py-16"><div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-pink-100/60 blur-3xl" /><div className="pointer-events-none absolute -bottom-40 -right-20 h-96 w-96 rounded-full bg-violet-100/60 blur-3xl" /><div className="relative w-full max-w-5xl"><div className="mx-auto mb-12 max-w-2xl text-center"><div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg shadow-pink-200"><TruckIcon className="h-8 w-8" /></div><p className="text-sm font-bold uppercase tracking-[0.25em] text-pink-600">Way to Go</p><h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">Tu operación, en un solo portal</h1><p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-500">Selecciona el área que deseas utilizar para continuar con tu operación.</p></div><div className="grid gap-6 md:grid-cols-2"><ModuleCard href="/transporte/dashboard" title="Transporte" description="Operación, rastreo y seguimiento de servicios." icon={<MapIcon className="h-8 w-8" />} accent="pink" items={['Unidades y viajes', 'Entregas y evidencias', 'Alertas operativas']} /><ModuleCard href="/finanzas/dashboard" title="Finanzas" description="Facturación, documentos, validaciones y pagos." icon={<BanknotesIcon className="h-8 w-8" />} accent="violet" items={['Documentos y comprobantes', 'Validaciones y correcciones', 'Pagos y proveedores']} /></div><p className="mt-10 text-center text-xs text-slate-400">Puedes cambiar de módulo en cualquier momento desde el menú lateral.</p></div></main>; }
+function ModuleCard({ href, title, description, icon, accent, items }: { href: string; title: string; description: string; icon: React.ReactNode; accent: 'pink' | 'violet'; items: string[] }) { const pink = accent === 'pink'; return <Link href={href} className="group rounded-3xl border border-slate-200 bg-white p-8 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-pink-200 hover:shadow-xl hover:shadow-slate-200/60"><div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${pink ? 'bg-pink-50 text-pink-600' : 'bg-violet-50 text-violet-600'}`}>{icon}</div><div className="mt-8 flex items-start justify-between gap-4"><div><h2 className="text-2xl font-bold text-slate-950">{title}</h2><p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">{description}</p></div><ArrowRightIcon className={`mt-1 h-6 w-6 shrink-0 transition group-hover:translate-x-1 ${pink ? 'text-pink-500' : 'text-violet-500'}`} /></div><ul className="mt-7 space-y-3 border-t border-slate-100 pt-5">{items.map(item => <li key={item} className="flex items-center gap-2 text-sm text-slate-600"><span className={`h-1.5 w-1.5 rounded-full ${pink ? 'bg-pink-500' : 'bg-violet-500'}`} />{item}</li>)}</ul><span className={`mt-8 inline-flex rounded-xl px-4 py-2.5 text-sm font-semibold text-white ${pink ? 'bg-pink-600' : 'bg-violet-600'}`}>Entrar a {title}</span></Link>; }

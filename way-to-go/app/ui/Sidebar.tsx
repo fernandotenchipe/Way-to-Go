@@ -1,148 +1,26 @@
 'use client';
-
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  HomeIcon, 
-  TruckIcon, 
-  MapPinIcon, 
-  ChatBubbleLeftRightIcon,
-  DocumentMagnifyingGlassIcon,
-  ClockIcon,
-  ChartBarIcon,
-  UserGroupIcon,
-  FolderIcon
-} from '@heroicons/react/24/outline';
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Tracking', href: '/tracking', icon: MapPinIcon, badge: 6 },
-  { name: 'Chats', href: '/chats', icon: ChatBubbleLeftRightIcon, badge: 3 },
-];
-
-const requestMenu = [
-  { name: 'Trucks', href: '/request/trucks', icon: TruckIcon },
-  { name: 'Order', href: '/request/order', icon: DocumentMagnifyingGlassIcon, badge: 1 },
-  { name: 'Repair', href: '/request/repair', icon: FolderIcon },
-  { name: 'Drivers', href: '/request/drivers', icon: UserGroupIcon },
-  { name: 'Reports', href: '/request/reports', icon: FolderIcon },
-];
-
-export default function Sidebar() {
-  const pathname = usePathname();
-
-  return (
-    <div className="flex flex-col w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
-        <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-red-500 rounded-full flex items-center justify-center">
-          <TruckIcon className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">Way to Go</h1>
-          <p className="text-xs text-gray-500">george.davidson@email.com</p>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
-        <div className="px-3 mb-6">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`
-                  flex items-center justify-between px-3 py-2.5 rounded-lg mb-1 transition-colors
-                  ${isActive 
-                    ? 'bg-pink-50 text-pink-600' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                  }
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium text-sm">{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="bg-pink-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Request Section */}
-        <div className="px-3">
-          <div className="flex items-center justify-between px-3 mb-2">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Request
-            </h2>
-            <button className="text-pink-500 hover:text-pink-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-          {requestMenu.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`
-                  flex items-center justify-between px-3 py-2.5 rounded-lg mb-1 transition-colors
-                  ${isActive 
-                    ? 'bg-pink-50 text-pink-600' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                  }
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium text-sm">{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="bg-pink-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Analysis & History */}
-        <div className="px-3 mt-6">
-          <Link
-            href="/analysis"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 mb-1"
-          >
-            <ChartBarIcon className="w-5 h-5" />
-            <span className="font-medium text-sm">Analysis</span>
-            <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </Link>
-          <Link
-            href="/history"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50"
-          >
-            <ClockIcon className="w-5 h-5" />
-            <span className="font-medium text-sm">History</span>
-          </Link>
-        </div>
-      </nav>
-
-      {/* Create New Request Button */}
-      <div className="p-4 border-t border-gray-200">
-        <button className="w-full bg-gradient-to-r from-pink-500 to-red-500 text-white font-semibold py-3 rounded-lg hover:shadow-lg transition-shadow">
-          Create new request
-        </button>
-      </div>
-    </div>
-  );
+import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { ArrowLeftIcon, BanknotesIcon, BellAlertIcon, ChartBarIcon, ChevronDownIcon, ClipboardDocumentCheckIcon, ClockIcon, DocumentTextIcon, HomeIcon, MapIcon, MapPinIcon, TruckIcon, UserGroupIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+export type PortalModule = 'transporte' | 'finanzas';
+type NavItem = { name: string; href: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; badge?: string };
+const menus: Record<PortalModule, NavItem[]> = {
+  transporte: [
+    { name: 'Dashboard', href: '/transporte/dashboard', icon: HomeIcon }, { name: 'Rastreo en vivo', href: '/transporte/tracking', icon: MapPinIcon }, { name: 'Viajes', href: '/transporte/viajes', icon: MapIcon }, { name: 'Órdenes', href: '/transporte/ordenes', icon: ClipboardDocumentCheckIcon }, { name: 'Alertas', href: '/transporte/alertas', icon: BellAlertIcon, badge: '3' }, { name: 'Evidencias y POD', href: '/transporte/evidencias', icon: DocumentTextIcon }, { name: 'Reportes', href: '/transporte/reportes', icon: ChartBarIcon },
+  ],
+  finanzas: [
+    { name: 'Dashboard', href: '/finanzas/dashboard', icon: HomeIcon }, { name: 'Servicios por facturar', href: '/finanzas/servicios', icon: ClipboardDocumentCheckIcon, badge: '12' }, { name: 'Órdenes de compra', href: '/finanzas/ordenes-compra', icon: DocumentTextIcon }, { name: 'Comprobantes', href: '/finanzas/comprobantes', icon: DocumentTextIcon }, { name: 'Validaciones', href: '/finanzas/validaciones', icon: ClipboardDocumentCheckIcon, badge: '5' }, { name: 'Correcciones', href: '/finanzas/correcciones', icon: WrenchScrewdriverIcon, badge: '2' }, { name: 'Pagos', href: '/finanzas/pagos', icon: BanknotesIcon }, { name: 'Aclaraciones', href: '/finanzas/aclaraciones', icon: BellAlertIcon }, { name: 'Expediente digital', href: '/finanzas/expediente', icon: UserGroupIcon },
+  ],
+};
+export default function Sidebar({ module }: { module: PortalModule }) {
+  const pathname = usePathname(); const router = useRouter(); const [open, setOpen] = useState(false); const isTransport = module === 'transporte';
+  return <aside className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r bg-white ${isTransport ? 'border-slate-200' : 'border-violet-100'}`}>
+    <div className="border-b border-slate-100 px-6 pb-5 pt-6"><Link href="/" className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-sm"><TruckIcon className="h-6 w-6" /></div><div><p className="text-base font-bold tracking-tight text-slate-950">Way to Go</p><p className="text-xs text-slate-500">Portal de operaciones</p></div></Link>
+      <div className="relative mt-6"><button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left transition hover:border-slate-300 hover:bg-white"><div><p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Módulo actual</p><p className="mt-0.5 text-sm font-semibold text-slate-800">{isTransport ? 'Transporte' : 'Finanzas'}</p></div><ChevronDownIcon className={`h-4 w-4 text-slate-500 transition ${open ? 'rotate-180' : ''}`} /></button>
+        {open && <div className="absolute left-0 right-0 top-full z-40 mt-2 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Cambiar módulo</p><button onClick={() => router.push('/transporte/dashboard')} className={`flex w-full rounded-lg px-2 py-2 text-sm ${isTransport ? 'bg-pink-50 font-semibold text-pink-700' : 'text-slate-600 hover:bg-slate-50'}`}>Transporte</button><button onClick={() => router.push('/finanzas/dashboard')} className={`flex w-full rounded-lg px-2 py-2 text-sm ${!isTransport ? 'bg-violet-50 font-semibold text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>Finanzas</button><div className="my-2 border-t border-slate-100" /><button onClick={() => router.push('/')} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-600 hover:bg-slate-50"><ArrowLeftIcon className="h-4 w-4" />Volver al inicio</button></div>}
+      </div></div>
+    <nav className="flex-1 overflow-y-auto px-4 py-5"><p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">{isTransport ? 'Operación' : 'Gestión financiera'}</p><div className="space-y-1">{menus[module].map((item) => { const active = pathname === item.href; return <Link key={item.href} href={item.href} className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition ${active ? (isTransport ? 'bg-pink-50 font-semibold text-pink-700' : 'bg-violet-50 font-semibold text-violet-700') : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}><span className="flex items-center gap-3"><item.icon className="h-5 w-5" />{item.name}</span>{item.badge && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isTransport ? 'bg-pink-100 text-pink-700' : 'bg-violet-100 text-violet-700'}`}>{item.badge}</span>}</Link>; })}</div></nav>
+    <div className="border-t border-slate-100 p-4"><Link href="/" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"><ClockIcon className="h-4 w-4" />Selector de módulos</Link><div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">GD</div><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">George Davidson</p><p className="truncate text-[11px] text-slate-500">Administrador</p></div></div></div>
+  </aside>;
 }

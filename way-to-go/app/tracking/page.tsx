@@ -131,7 +131,7 @@ export default function TrackingPage() {
     }));
 
   return (
-    <DashboardLayout title="Tracking" subtitle="Filter by Partners">
+    <DashboardLayout module="transporte" title="Rastreo en vivo" subtitle="Monitorea la ubicación de tus unidades">
       <div className="h-full flex">
         {/* Left Panel - Truck List */}
         <div className="w-96 bg-white border-r border-gray-200 flex flex-col">

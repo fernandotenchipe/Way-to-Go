@@ -1,25 +1,5 @@
 'use client';
-
 import { ReactNode } from 'react';
-import Sidebar from './Sidebar';
 import Header from './Header';
-
-interface DashboardLayoutProps {
-  children: ReactNode;
-  title: string;
-  subtitle?: string;
-}
-
-export default function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 ml-64 flex flex-col overflow-hidden">
-        <Header title={title} subtitle={subtitle} />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-}
+import Sidebar, { PortalModule } from './Sidebar';
+export default function DashboardLayout({ children, title, subtitle, module }: { children: ReactNode; title: string; subtitle?: string; module: PortalModule }) { return <div className="min-h-screen bg-slate-50"><Sidebar module={module} /><div className="ml-72 flex min-h-screen flex-col"><Header title={title} subtitle={subtitle} module={module} /><main className="flex-1">{children}</main></div></div>; }
