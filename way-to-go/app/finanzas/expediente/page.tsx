@@ -1,1 +1,1 @@
-import ComingSoon from '../../ui/ComingSoon'; export default function Page(){return <ComingSoon module="finanzas" title="Expediente digital" />;}
+import { ProviderFileScreen } from '../../ui/FinanceOperationalScreens'; export default ProviderFileScreen;

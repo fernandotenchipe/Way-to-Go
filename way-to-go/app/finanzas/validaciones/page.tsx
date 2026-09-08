@@ -1,1 +1,1 @@
-import ComingSoon from '../../ui/ComingSoon'; export default function Page(){return <ComingSoon module="finanzas" title="Validaciones" />;}
+import { ValidationScreen } from '../../ui/FinanceOperationalScreens'; export default ValidationScreen;

@@ -1,1 +1,1 @@
-import ComingSoon from '../../ui/ComingSoon'; export default function Page(){return <ComingSoon module="finanzas" title="Servicios por facturar" />;}
+import { ServicesScreen } from '../../ui/FinanceOperationalScreens'; export default ServicesScreen;

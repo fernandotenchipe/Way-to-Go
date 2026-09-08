@@ -1,1 +1,1 @@
-import ComingSoon from '../../ui/ComingSoon'; export default function Page(){return <ComingSoon module="finanzas" title="Correcciones" />;}
+import { CorrectionsScreen } from '../../ui/FinanceOperationalScreens'; export default CorrectionsScreen;
