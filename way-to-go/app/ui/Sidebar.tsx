@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ArrowLeftIcon, BanknotesIcon, BellAlertIcon, ChartBarIcon, ChevronDownIcon, ClipboardDocumentCheckIcon, ClockIcon, DocumentTextIcon, HomeIcon, MapIcon, MapPinIcon, TruckIcon, UserGroupIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BanknotesIcon, BellAlertIcon, ChartBarIcon, ChevronDownIcon, ClipboardDocumentCheckIcon, ClockIcon, DocumentTextIcon, HomeIcon, MapIcon, MapPinIcon, TruckIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 export type PortalModule = 'transporte' | 'finanzas';
 type NavItem = { name: string; href: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; badge?: string };
 const menus: Record<PortalModule, NavItem[]> = {
@@ -10,7 +10,7 @@ const menus: Record<PortalModule, NavItem[]> = {
     { name: 'Dashboard', href: '/transporte/dashboard', icon: HomeIcon }, { name: 'Rastreo en vivo', href: '/transporte/tracking', icon: MapPinIcon }, { name: 'Viajes', href: '/transporte/viajes', icon: MapIcon }, { name: 'Órdenes', href: '/transporte/ordenes', icon: ClipboardDocumentCheckIcon }, { name: 'Alertas', href: '/transporte/alertas', icon: BellAlertIcon, badge: '3' }, { name: 'Evidencias y POD', href: '/transporte/evidencias', icon: DocumentTextIcon }, { name: 'Reportes', href: '/transporte/reportes', icon: ChartBarIcon },
   ],
   finanzas: [
-    { name: 'Dashboard', href: '/finanzas/dashboard', icon: HomeIcon }, { name: 'Servicios por facturar', href: '/finanzas/servicios', icon: ClipboardDocumentCheckIcon, badge: '12' }, { name: 'Órdenes de compra', href: '/finanzas/ordenes-compra', icon: DocumentTextIcon }, { name: 'Comprobantes', href: '/finanzas/comprobantes', icon: DocumentTextIcon }, { name: 'Validaciones', href: '/finanzas/validaciones', icon: ClipboardDocumentCheckIcon, badge: '5' }, { name: 'Correcciones', href: '/finanzas/correcciones', icon: WrenchScrewdriverIcon, badge: '2' }, { name: 'Pagos', href: '/finanzas/pagos', icon: BanknotesIcon }, { name: 'Aclaraciones', href: '/finanzas/aclaraciones', icon: BellAlertIcon }, { name: 'Expediente digital', href: '/finanzas/expediente', icon: UserGroupIcon },
+    { name: 'Dashboard', href: '/finanzas/dashboard', icon: HomeIcon }, { name: 'Ventas / Cuentas por cobrar', href: '/finanzas/ventas', icon: ChartBarIcon }, { name: 'Órdenes de venta', href: '/finanzas/ordenes-venta', icon: ClipboardDocumentCheckIcon }, { name: 'Facturas de clientes', href: '/finanzas/facturas-clientes', icon: DocumentTextIcon, badge: '8' }, { name: 'Pagos recibidos', href: '/finanzas/pagos-recibidos', icon: BanknotesIcon }, { name: 'Compras / Cuentas por pagar', href: '/finanzas/compras', icon: ChartBarIcon }, { name: 'Órdenes de compra', href: '/finanzas/ordenes-compra', icon: ClipboardDocumentCheckIcon }, { name: 'Facturas de proveedores', href: '/finanzas/facturas-proveedor', icon: DocumentTextIcon, badge: '5' }, { name: 'Pagos realizados', href: '/finanzas/pagos-realizados', icon: BanknotesIcon }, { name: 'Expediente digital', href: '/finanzas/expediente', icon: UserGroupIcon },
   ],
 };
 export default function Sidebar({ module }: { module: PortalModule }) {

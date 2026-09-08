@@ -1,0 +1,26 @@
+'use client';
+
+import Link from 'next/link';
+import { useState } from 'react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import DashboardLayout from './DashboardLayout';
+import { Panel, StatusPill } from './DashboardWidgets';
+export { Panel, StatusPill } from './DashboardWidgets';
+
+export const salesInvoices = [
+  { folio: 'FV-001', client: 'Empresa ABC', order: 'OV-102', date: '08/09/26', total: '$45,000', status: 'Pendiente' },
+  { folio: 'FV-002', client: 'Empresa XYZ', order: '—', date: '08/09/26', total: '$12,500', status: 'Pagada' },
+  { folio: 'FV-003', client: 'Empresa Norte', order: 'OV-104', date: '07/09/26', total: '$8,900', status: 'Parcial' },
+];
+export const supplierInvoices = [
+  { folio: 'FP-123', supplier: 'Proveedor A', order: 'OC-001', date: '08/09/26', total: '$18,500', status: 'Por pagar' },
+  { folio: 'FP-124', supplier: 'Proveedor B', order: 'OC-002', date: '07/09/26', total: '$7,800', status: 'Pagada' },
+  { folio: 'FP-125', supplier: 'Proveedor C', order: '—', date: '06/09/26', total: '$32,000', status: 'En revisión' },
+];
+
+export function FinancePage({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) { return <DashboardLayout module="finanzas" title={title} subtitle={subtitle}><div className="space-y-6 p-8">{children}</div></DashboardLayout>; }
+export function FinanceTabs({ active, items }: { active: string; items: { label: string; href: string }[] }) { return <div className="flex flex-wrap gap-1 border-b border-slate-200">{items.map(item => <Link key={item.href} href={item.href} className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${active === item.label ? 'border-[#f4c430] text-[#0b1f3b]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{item.label}</Link>)}</div>; }
+export function FinanceTable({ title, action, rows, kind }: { title: string; action?: string; rows: typeof salesInvoices | typeof supplierInvoices; kind: 'sales' | 'supplier' }) { return <Panel title={title} action={action}><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead><tr className="text-[11px] uppercase tracking-wider text-slate-400"><th className="pb-3 font-semibold">Folio</th><th className="pb-3 font-semibold">{kind === 'sales' ? 'Cliente' : 'Proveedor'}</th><th className="pb-3 font-semibold">Orden</th><th className="pb-3 font-semibold">Fecha</th><th className="pb-3 font-semibold">Total</th><th className="pb-3 font-semibold">Estado</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.folio} className="group"><td className="py-4"><Link href={kind === 'sales' ? `/finanzas/facturas-clientes/${row.folio}` : `/finanzas/facturas-proveedor/${row.folio}`} className="text-sm font-bold text-[#0b1f3b] hover:underline">{row.folio}</Link></td><td className="py-4 text-sm text-slate-700">{'client' in row ? row.client : row.supplier}</td><td className="py-4 text-sm text-slate-500">{row.order}</td><td className="py-4 text-sm text-slate-500">{row.date}</td><td className="py-4 text-sm font-bold text-slate-800">{row.total}</td><td className="py-4"><StatusPill tone={row.status === 'Pagada' ? 'green' : row.status === 'En revisión' ? 'violet' : 'amber'}>{row.status}</StatusPill></td></tr>)}</tbody></table></div></Panel>; }
+export function PaymentModal({ invoice, onClose }: { invoice: string; onClose: () => void }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1f3b]/30 p-6"><div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-slate-400">Registrar pago</p><h2 className="mt-1 text-xl font-bold text-[#0b1f3b]">Nuevo pago</h2></div><button onClick={onClose} aria-label="Cerrar" className="rounded-lg p-2 text-slate-400 hover:bg-slate-50"><XMarkIcon className="h-5 w-5" /></button></div><div className="mt-6 space-y-4"><Field label="Factura" value={invoice} /><Field label="Monto" value="$____________" /><Field label="Tipo de pago" value="Transferencia ▼" /><Field label="Fecha" value="08/09/2026" /></div><div className="mt-7 flex justify-end gap-3"><button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Cancelar</button><button onClick={onClose} className="rounded-lg bg-[#f4c430] px-4 py-2.5 text-sm font-bold text-[#0b1f3b]">Registrar pago</button></div></div></div>; }
+function Field({ label, value }: { label: string; value: string }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-500">{label}</span><div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">{value}</div></label>; }
+export function PaymentButton({ invoice }: { invoice: string }) { const [open, setOpen] = useState(false); return <><button onClick={() => setOpen(true)} className="rounded-lg bg-[#f4c430] px-4 py-2.5 text-sm font-bold text-[#0b1f3b]">Registrar pago</button>{open && <PaymentModal invoice={invoice} onClose={() => setOpen(false)} />}</>; }
