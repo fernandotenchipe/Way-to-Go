@@ -5,18 +5,8 @@ import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import DashboardLayout from './DashboardLayout';
 import { Panel, StatusPill } from './DashboardWidgets';
+import { salesInvoices, supplierInvoices } from './finance-data';
 export { Panel, StatusPill } from './DashboardWidgets';
-
-export const salesInvoices = [
-  { folio: 'FV-001', client: 'Empresa ABC', order: 'OV-102', date: '08/09/26', total: '$45,000', status: 'Pendiente' },
-  { folio: 'FV-002', client: 'Empresa XYZ', order: '—', date: '08/09/26', total: '$12,500', status: 'Pagada' },
-  { folio: 'FV-003', client: 'Empresa Norte', order: 'OV-104', date: '07/09/26', total: '$8,900', status: 'Parcial' },
-];
-export const supplierInvoices = [
-  { folio: 'FP-123', supplier: 'Proveedor A', order: 'OC-001', date: '08/09/26', total: '$18,500', status: 'Por pagar' },
-  { folio: 'FP-124', supplier: 'Proveedor B', order: 'OC-002', date: '07/09/26', total: '$7,800', status: 'Pagada' },
-  { folio: 'FP-125', supplier: 'Proveedor C', order: '—', date: '06/09/26', total: '$32,000', status: 'En revisión' },
-];
 
 export function FinancePage({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) { return <DashboardLayout module="finanzas" title={title} subtitle={subtitle}><div className="space-y-6 p-8">{children}</div></DashboardLayout>; }
 export function FinanceTabs({ active, items }: { active: string; items: { label: string; href: string }[] }) { return <div className="flex flex-wrap gap-1 border-b border-slate-200">{items.map(item => <Link key={item.href} href={item.href} className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${active === item.label ? 'border-[#f4c430] text-[#0b1f3b]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{item.label}</Link>)}</div>; }
