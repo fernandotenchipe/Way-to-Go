@@ -1,5 +1,5 @@
 import express from 'express';
-import { query } from '../database/db.js';
+import { query } from '../../../shared/database/db.js';
 
 const router = express.Router();
 

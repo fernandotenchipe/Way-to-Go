@@ -1,120 +1,31 @@
-# Fleet Tracking Backend
+# Way to Go API
 
-Backend API para sistema de trackeo de camiones con GPS y video en tiempo real.
+El backend comparte servidor y PostgreSQL, con rutas y tablas separadas por módulo:
 
-## 🚀 Características
+```text
+backend/src/
+├── index.js                 # servidor y montaje de módulos
+├── shared/database/         # conexión PostgreSQL compartida
+└── modules/
+    ├── rastreo/             # GPS, camiones, alertas y WebSocket existentes
+    ├── logistica/           # API TMS, permisos y esquema nuevos
+    └── finanzas/            # espacio reservado, aún sin lógica
+```
 
-- **API REST** completa para gestión de camiones, GPS y alertas
-- **WebSocket** para actualizaciones en tiempo real
-- **PostgreSQL + PostGIS** para datos geoespaciales
-- **JWT** para autenticación
-- **CORS** configurado para frontend
+Rastreo conserva sus rutas históricas (`/api/trucks`, `/api/gps`, `/api/alerts`). Logística usa `/api/logistica`. Finanzas queda separada para trabajo posterior.
 
-## 📋 Requisitos
+## Iniciar
 
-- Node.js 18+
-- PostgreSQL 14+ con extensión PostGIS
-- npm o yarn
-
-## 🛠️ Instalación
-
-1. Instalar dependencias:
 ```bash
 cd backend
 npm install
-```
-
-2. Configurar base de datos PostgreSQL:
-```bash
-# Crear base de datos
-createdb fleet_tracking
-
-# Habilitar PostGIS
-psql fleet_tracking -c "CREATE EXTENSION postgis;"
-
-# Ejecutar schema
-psql fleet_tracking < src/database/schema.sql
-```
-
-3. Configurar variables de entorno:
-```bash
-cp .env.example .env
-# Editar .env con tus credenciales
-```
-
-4. Iniciar servidor:
-```bash
 npm run dev
 ```
 
-El servidor estará disponible en `http://localhost:3001`
+Configura las variables de `backend/.env.example` en `backend/.env`. El servidor utiliza PostgreSQL y escucha en `http://localhost:3001` por defecto. El SQL TMS es una instalación inicial de una sola ejecución; no lo ejecutes sobre tablas existentes. En este trabajo quedó copiado como referencia, pero no se aplicó a ninguna base.
 
-## 📡 API Endpoints
+## Next.js
 
-### Autenticación
-- `POST /api/auth/login` - Iniciar sesión
-- `POST /api/auth/register` - Registrar usuario
+La aplicación Next expone un proxy en `/api/logistica/*` que reenvía al backend Express. Por defecto usa `http://localhost:3001`; puedes cambiarlo con `LOGISTICA_BACKEND_URL` en el entorno del servidor Next. Rastreo conserva su conexión actual por `NEXT_PUBLIC_API_URL` y `NEXT_PUBLIC_WS_URL`.
 
-### Camiones
-- `GET /api/trucks` - Listar todos los camiones
-- `GET /api/trucks/:id` - Obtener un camión
-- `POST /api/trucks` - Crear camión
-- `PUT /api/trucks/:id` - Actualizar camión
-- `GET /api/trucks/:id/location` - Ubicación actual
-- `GET /api/trucks/:id/history` - Historial de ubicaciones
-
-### GPS
-- `POST /api/gps/position` - Recibir posición GPS
-- `GET /api/gps/positions` - Obtener posiciones recientes
-- `GET /api/gps/latest-positions` - Últimas posiciones de todos
-
-### Alertas
-- `GET /api/alerts` - Listar alertas
-- `POST /api/alerts` - Crear alerta
-- `PUT /api/alerts/:id/resolve` - Resolver alerta
-
-## 🔌 WebSocket
-
-Conectar a: `ws://localhost:3001/ws`
-
-### Eventos enviados:
-- `gps_update` - Nueva posición GPS
-- `new_alert` - Nueva alerta creada
-- `connection` - Confirmación de conexión
-
-### Comandos del cliente:
-```json
-{ "type": "ping" }
-{ "type": "subscribe", "truckIds": [1, 2, 3] }
-```
-
-## 🗄️ Estructura de Base de Datos
-
-- **users** - Usuarios del sistema
-- **trucks** - Camiones de la flota
-- **gps_devices** - Dispositivos GPS
-- **cameras** - Cámaras en camiones
-- **gps_positions** - Historial de posiciones (con PostGIS)
-- **alerts** - Alertas del sistema
-- **routes** - Rutas planificadas
-
-## 🔐 Autenticación
-
-Usar JWT en header Authorization:
-```
-Authorization: Bearer <token>
-```
-
-Usuario por defecto:
-- Email: `admin@example.com`
-- Password: `admin123` (hash en DB)
-
-## 📦 Dependencias Principales
-
-- **express** - Framework web
-- **pg** - Cliente PostgreSQL
-- **ws** - WebSocket
-- **bcryptjs** - Hash de contraseñas
-- **jsonwebtoken** - JWT
-- **cors** - CORS middleware
-- **dotenv** - Variables de entorno
+Consulta [modules/logistica/README.md](src/modules/logistica/README.md) para rutas, evidencias y permisos. Rastreo GPS continúa separado y no comparte tablas con el esquema `tms`.

@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '../database/db.js';
+import { query } from '../../../shared/database/db.js';
 
 const router = express.Router();
 

@@ -1,0 +1,220 @@
+WAYTOGO — Diseño de tablas Logística / TMS v1
+Fecha: 7 de octubre de 2026
+Fuente: WTG_MASTER_LOGISTICA_TMS_MVP_v1.md
+Estado: propuesta de diseño. No aplicada a una base de datos.
+
+1. ALCANCE Y SUPUESTOS
+
+Una empresa operadora WAYTOGO con múltiples clientes y proveedores. No es un
+SaaS multiempresa: si distintas empresas operadoras compartirán esta base,
+agregar empresa_id, claves compuestas y aislamiento antes de implementar.
+PostgreSQL 15 o superior. UUID para identificadores; folio numérico generado
+por secuencia (puede tener huecos y NO es un folio fiscal). Importes numeric,
+fechas de eventos timestamptz y vencimientos date. La interfaz convierte las
+fechas a la zona de la dirección correspondiente.
+MXN y USD como monedas iniciales propuestas; ampliar si se requiere.
+No contiene contabilidad, emisión CFDI, GPS, aplicación móvil ni WhatsApp.
+El SQL es una migración inicial de una sola ejecución para un esquema nuevo.
+No usarlo como actualización sobre tablas existentes.
+
+2. MAPA DE LAS 40 TABLAS
+
+Acceso (5): usuarios, roles, permisos, usuario_roles, rol_permisos.
+Clientes (5): clientes, cliente_contactos, cliente_direcciones,
+cliente_convenios, cliente_usuarios.
+Proveedores (3): proveedores, proveedor_contactos, proveedor_usuarios.
+Flota y personas (6): operadores, unidades, cajas, unidad_documentos,
+caja_documentos, operador_documentos.
+Catálogos y plantillas (5): tipos_servicio, tipos_evidencia, tipos_costo,
+tipos_extra, servicio_evidencias.
+Archivos (1): archivos.
+Expediente (13): viajes, viaje_comercial, viaje_tiempos, viaje_carga,
+viaje_eventos, viaje_evidencias, evidencia_entregas, viaje_costos,
+viaje_extras, viaje_incidencias, viaje_mensajes,
+viaje_facturacion_operativa, viaje_referencias_finanzas.
+Avisos (2): viaje_alertas, notificaciones.
+
+El diccionario adjunto describe todas las columnas, tipos, claves y checks.
+
+3. RELACIONES CENTRALES
+
+clientes 1 -> N viajes
+clientes 1 -> N direcciones / contactos / convenios
+clientes N <-> N usuarios mediante cliente_usuarios
+proveedores N <-> N usuarios mediante proveedor_usuarios
+operadores 0..1 -> usuario de acceso
+viajes 1 -> 0..1 comercial / tiempos / carga / facturacion_operativa
+viajes 1 -> N eventos / evidencias / costos / extras / incidencias / mensajes
+viaje_evidencias 1 -> N evidencia_entregas
+evidencia_entregas N -> 1 archivos
+viajes 1 -> N referencias_finanzas / alertas
+
+Las tablas 0..1 usan viaje_id como PK: no necesitan otro UUID independiente.
+La aplicación crea los registros complementarios en una sola transacción;
+la FK por sí sola no exige que cada viaje ya tenga todos sus complementos.
+
+4. CAMBIOS RESPECTO AL ESQUEMA CONCEPTUAL DEL MAESTRO
+
+4.1 Estados separados
+viajes.estado_operativo indica dónde está el servicio. Termina en ENTREGADO
+o CANCELADO. cerrado_at/cerrado_por registran el cierre administrativo.
+POD_RECIBIDO se obtiene del checklist; LISTO_PARA_FACTURAR de una vista.
+ENVIADO, FACTURADO y PAGADO pertenecen a viaje_facturacion_operativa.
+Las alertas son registros coexistentes, no estados que borran el avance.
+La interfaz puede presentar una línea de progreso unificada del maestro.
+
+4.2 Datos históricos y privados
+origen_snapshot/destino_snapshot conservan domicilio, contacto, instrucciones
+y zona horaria al programar. Son objetos JSON con estructura que el servicio
+debe validar. Cambiar el catálogo no debe reescribir un viaje histórico.
+viaje_comercial conserva la tarifa, moneda y condiciones pactadas al viaje;
+no deben recalcularse por cambios posteriores al convenio.
+Los importes se separan de viajes para facilitar respuestas externas sin
+datos comerciales. Las notas privadas se guardan en viaje_mensajes.
+
+4.3 Checklist y entregas
+servicio_evidencias contiene plantillas. Al preparar un viaje se copian a
+viaje_evidencias; cambiar la plantilla no cambia expedientes anteriores.
+Un requisito admite varias entregas (varias fotos o reenvíos). Cada entrega
+conserva archivo, autor, estado de revisión y motivo. Una entrega válida
+satisface el requisito aunque existan intentos rechazados anteriores.
+Para retirar una validación, marcar esa entrega RECHAZADA con actor/motivo
+y registrar el cambio en viaje_eventos. Una nueva entrega no anula la previa.
+El SQL permite exenciones justificadas; solo un usuario autorizado debe
+otorgarlas. En esta propuesta el POD nunca se satisface mediante exención.
+checklist_confirmado_at evita declarar listo un expediente cuyo checklist
+obligatorio todavía no fue configurado. Confirmarlo exige validar la plantilla.
+
+4.4 Disponibilidad
+Las reservas usan un intervalo [inicio, fin) y una exclusión por unidad,
+caja y operador. Dos reservas de un recurso no pueden traslaparse, incluso
+ante solicitudes concurrentes. Dos viajes consecutivos sí pueden coexistir.
+El rango debe incluir preparación/traslado necesarios, no solo cita y entrega.
+La aplicación mantiene el rango ante retrasos y resuelve los conflictos;
+la restricción no detecta automáticamente retrasos en la operación real.
+recursos_liberados_at libera la reserva al terminar la operación. El recurso
+no permanece bloqueado esperando la cobranza. No usar un booleano manual
+"disponible" como única fuente de disponibilidad.
+
+4.5 Finanzas, moneda y totales
+Los extras usan la misma moneda de viaje_comercial, garantizada con FK.
+Los costos pueden usar otra moneda y guardan tipo_cambio_a_viaje:
+monto_real * tipo_cambio_a_viaje = costo expresado en moneda del viaje.
+Si las monedas coinciden, el servicio exige tipo_cambio_a_viaje = 1.
+No sumar costos estimados como si fueran costos reales.
+v_listo_facturar devuelve subtotal sin impuestos. Impuestos, notas de crédito,
+facturación parcial y saldos definitivos son responsabilidad de Finanzas.
+viaje_referencias_finanzas permite varias facturas/pagos por viaje y que una
+factura consolide varios viajes, guardando el monto aplicado a cada uno.
+El identificador externo no es una FK a una tabla financiera inexistente.
+Cuando se conozca el módulo de Finanzas, integrar con su clave real o contrato.
+envio_snapshot conserva importes y evidencia del envío. Los reenvíos y
+devoluciones deben conservarse también como eventos; no borrar su historial.
+
+5. QUÉ GARANTIZA EL SQL
+
+- PK, FK, unicidad, montos no negativos y estados acotados en tablas de negocio.
+- Direcciones, contactos y convenios del mismo cliente mediante FK compuestas.
+- Reservas sin traslapes; no cascadas destructivas sobre el expediente.
+- Correos únicos sin distinguir mayúsculas; un contacto principal activo.
+- Actores y fechas requeridos para validaciones, exenciones y cierres declarados.
+- Notas internas y mensajes de Finanzas sin visibilidad externa.
+- Historial de eventos sin UPDATE/DELETE mediante trigger; correcciones nuevas.
+- updated_at automático, índices de consulta y relaciones.
+- Vistas de evidencia y diagnóstico de preparación para facturar.
+- RLS habilitada sin políticas y privilegios PUBLIC revocados.
+
+Los propietarios de tablas y roles con BYPASSRLS pueden omitir RLS. Este archivo
+no define acceso funcional para los portales ni pretende hacerlo.
+
+6. QUÉ DEBE IMPLEMENTAR EL SERVICIO ANTES DE PRODUCCIÓN
+
+Estas reglas NO están implementadas como procedimientos en este diseño:
+
+Crear/programar viaje:
+- Verificar usuario, cliente activo, convenio vigente, direcciones y catálogos.
+- Verificar documentos vigentes, unidad/caja activas, operador habilitado,
+  capacidades, restricciones y compatibilidad con proveedor asignado.
+- Exigir operador para unidad propia si aplica, ingreso pactado y checklist.
+- Crear snapshots y registros complementarios, y registrar evento en transacción.
+
+Cambio de estado:
+- Bloquear viaje con SELECT ... FOR UPDATE, validar transición y permisos.
+- Actualizar viaje, tiempos y evento juntos; aceptar reintentos por
+  idempotency_key y no duplicar eventos.
+- Usar estados válidos también en estado_anterior/nuevo del historial;
+  estos campos de auditoría son texto y se validan en el servicio.
+- Prohibir edición libre de viajes cerrados, cambios de cliente en expedientes
+  programados y modificación de snapshots históricos sin corrección auditada.
+
+Facturación:
+- Todas las escrituras de evidencia, extra, incidencia y costo deben tomar
+  primero el mismo bloqueo de viaje. De lo contrario, una validación y una
+  modificación concurrente podrían producir un envío inconsistente.
+- Enviar solo si v_listo_facturar.listo es true, volver a comprobar dentro
+  de la transacción y guardar envio_snapshot e historial de envío.
+- La vista es diagnóstico; por sí sola NO impide escribir estado ENVIADO.
+- Después del envío, congelar cambios económicos/obligatorios o usar devolución
+  controlada y nuevo envío. Recalcular preparación tras cualquier cambio.
+- Confirmar FACTURADO/PAGADO desde Finanzas, no desde el portal externo.
+- Definir quién cierra y condiciones finales según la sección 21 del maestro.
+
+Acceso y archivos:
+- usuarios.auth_subject representa la identidad del proveedor de autenticación;
+  no se almacenan contraseñas. Si se usa Supabase, añadir FK a auth.users(id)
+  en una migración específica y establecer el alta/baja de perfiles.
+- Un rol no basta: cliente_usuarios/proveedor_usuarios y operadores.usuario_id
+  determinan el alcance. No permitir autoasignación de roles ni membresías.
+- CLIENTE consulta solo sus viajes; OPERADOR solo los asignados; PROVEEDOR
+  solo los de su empresa. Resolver la visibilidad del nombre del cliente.
+- Crear políticas RLS y permisos explícitos, o servir mediante backend privado
+  con autorización por operación. No exponer credenciales privilegiadas al cliente.
+- RLS filtra filas, no oculta columnas. Usar proyecciones de campos autorizados
+  para clientes y externos; las vistas financieras son exclusivamente internas.
+- Storage privado: validar tamaño, MIME/contenido y estado DISPONIBLE; emitir
+  enlaces temporales solo tras comprobar acceso al expediente y visibilidad.
+  Acceso a archivos de costos/documentos no se concede por compartir viaje.
+- No se incluyen políticas de storage.objects ni gestión de objetos remotos.
+
+Alertas y correos:
+- Un proceso periódico calcula retrasos y crea/resuelve alertas sin duplicarlas.
+- Configurar umbral por fase/ruta; el valor inicial de 6h es solo propuesta.
+- Entregar correos mediante worker con reintentos, dedupe_key y registro de error.
+- Una estadía automática genera un extra PENDIENTE; nunca aprueba ni cobra sola.
+
+7. DECISIONES ABIERTAS
+
+Se conservan las preguntas de la sección 21 del maestro. En particular:
+evidencias obligatorias por servicio, exenciones, horas libres, permisos de
+Tráfico, quién autoriza extras y quién cierra. No se cargan tipos de servicio
+inventados ni concesiones rol-permiso sin una matriz aprobada.
+Supuestos propuestos: POD para todos los viajes, MXN/USD, una empresa operadora,
+un origen y un destino, un operador y una unidad por viaje. Para viajes con
+múltiples paradas o relevos simultáneos se requerirán tablas adicionales.
+
+8. FASE POSTERIOR: RENDIMIENTO Y LIQUIDACIÓN
+
+Se difieren según 19.2 del maestro; no se crean tablas vacías que aparenten
+un proceso terminado. Diseño previsto:
+- viaje_rendimiento (viaje_id PK/FK, km_cargados, km_vacios, litros,
+  combustible_importe, moneda, rendimiento_esperado). km_totales y km/l calculados
+  con protección de división por cero; registrar la fuente de combustible.
+- liquidaciones (id, viaje_id FK, operador_id o proveedor_id, moneda, estado,
+  autorizado_por/at, referencia_pago_finanzas).
+- liquidacion_conceptos (id, liquidacion_id FK, tipo, importe, comprobante_id FK).
+Usar varias liquidaciones si un viaje paga a más de un beneficiario, sin forzar
+un único registro que mezcle pagos de operador y proveedor.
+
+9. REVISIÓN Y APLICACIÓN
+
+Entregables: WTG_TMS_esquema_v1.sql y WTG_TMS_diccionario_tablas.txt.
+Validación realizada: generación y revisión estructural local de tablas,
+referencias y archivos. No ejecutado contra PostgreSQL ni Supabase.
+Antes de convertirlo en migración aprobada: ejecutar en base de prueba, probar
+conflictos de reservas, integridad entre clientes, criterios de evidencia,
+concurrencia del envío y acceso cruzado cliente/proveedor con usuarios reales.
+La extensión btree_gist requiere permisos y debe estar en public o extensions.
+
+Referencias técnicas consultadas:
+https://www.postgresql.org/docs/current/ddl-constraints.html
+https://www.postgresql.org/docs/current/ddl-rowsecurity.html

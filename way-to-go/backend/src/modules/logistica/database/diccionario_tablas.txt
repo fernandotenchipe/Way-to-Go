@@ -1,0 +1,485 @@
+WAYTOGO TMS - Diccionario de tablas v1
+PK: PRIMARY KEY; FK: REFERENCES; UNIQUE: no admite duplicados.
+Todas las fechas de eventos usan timestamptz. Importes sin impuestos.
+Los nombres y restricciones corresponden exactamente al SQL adjunto.
+
+01. usuarios
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+auth_subject uuid UNIQUE,
+nombre text NOT NULL CHECK (btrim(nombre) <> ''),
+email text NOT NULL CHECK (btrim(email) <> ''),
+telefono text,
+activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+02. roles
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+codigo text NOT NULL UNIQUE, descripcion text,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+03. permisos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+codigo text NOT NULL UNIQUE, descripcion text,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+04. usuario_roles
+============================================================
+usuario_id uuid NOT NULL REFERENCES tms.usuarios(id),
+rol_id uuid NOT NULL REFERENCES tms.roles(id), PRIMARY KEY(usuario_id, rol_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+05. rol_permisos
+============================================================
+rol_id uuid NOT NULL REFERENCES tms.roles(id),
+permiso_id uuid NOT NULL REFERENCES tms.permisos(id), PRIMARY KEY(rol_id, permiso_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+06. clientes
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+razon_social text NOT NULL, nombre_comercial text, rfc text,
+activo boolean NOT NULL DEFAULT true, uso_cfdi text, forma_pago text, metodo_pago text,
+condiciones_pago text,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+07. cliente_contactos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+cliente_id uuid NOT NULL REFERENCES tms.clientes(id),
+nombre text NOT NULL, puesto text, email text, telefono text, tipo_contacto text,
+principal boolean NOT NULL DEFAULT false, activo boolean NOT NULL DEFAULT true,
+UNIQUE(id, cliente_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+08. cliente_direcciones
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+cliente_id uuid NOT NULL REFERENCES tms.clientes(id),
+nombre text NOT NULL, calle text NOT NULL, ciudad text NOT NULL, estado text NOT NULL,
+pais char(2) NOT NULL DEFAULT 'MX', codigo_postal text,
+latitud numeric(9,6) CHECK(latitud BETWEEN -90 AND 90),
+longitud numeric(9,6) CHECK(longitud BETWEEN -180 AND 180),
+zona_horaria text NOT NULL DEFAULT 'America/Mexico_City', horario text, instrucciones text,
+requiere_cita boolean NOT NULL DEFAULT false, contacto_id uuid,
+activo boolean NOT NULL DEFAULT true, UNIQUE(id, cliente_id),
+FOREIGN KEY(contacto_id, cliente_id) REFERENCES tms.cliente_contactos(id, cliente_id),
+CHECK ((latitud IS NULL) = (longitud IS NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+09. tipos_servicio
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+codigo text NOT NULL UNIQUE, nombre text NOT NULL, activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+10. tipos_evidencia
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+codigo text NOT NULL UNIQUE, nombre text NOT NULL, activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+11. tipos_costo
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+codigo text NOT NULL UNIQUE, nombre text NOT NULL, activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+12. tipos_extra
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+codigo text NOT NULL UNIQUE, nombre text NOT NULL, activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+13. cliente_convenios
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+cliente_id uuid NOT NULL REFERENCES tms.clientes(id),
+nombre text NOT NULL, origen_id uuid, destino_id uuid,
+tipo_servicio_id uuid REFERENCES tms.tipos_servicio(id), tipo_unidad text, tipo_carga text,
+tarifa_base numeric(18,2) NOT NULL CHECK(tarifa_base >= 0),
+moneda char(3) NOT NULL DEFAULT 'MXN' CHECK(moneda IN ('MXN','USD')),
+horas_libres_carga numeric(8,2) CHECK(horas_libres_carga >= 0),
+horas_libres_descarga numeric(8,2) CHECK(horas_libres_descarga >= 0),
+tarifa_estadia_hora numeric(18,2) CHECK(tarifa_estadia_hora >= 0),
+vigente_desde date NOT NULL, vigente_hasta date, condiciones text,
+activo boolean NOT NULL DEFAULT true, UNIQUE(id, cliente_id),
+FOREIGN KEY(origen_id, cliente_id) REFERENCES tms.cliente_direcciones(id, cliente_id),
+FOREIGN KEY(destino_id, cliente_id) REFERENCES tms.cliente_direcciones(id, cliente_id),
+CHECK(vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+14. proveedores
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+razon_social text NOT NULL, nombre_comercial text, rfc text,
+tipo text NOT NULL DEFAULT 'TRANSPORTISTA', condiciones_pago text,
+activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+15. proveedor_contactos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+proveedor_id uuid NOT NULL REFERENCES tms.proveedores(id),
+nombre text NOT NULL, puesto text, email text, telefono text,
+principal boolean NOT NULL DEFAULT false, activo boolean NOT NULL DEFAULT true,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+16. cliente_usuarios
+============================================================
+cliente_id uuid NOT NULL REFERENCES tms.clientes(id),
+usuario_id uuid NOT NULL REFERENCES tms.usuarios(id), activo boolean NOT NULL DEFAULT true,
+PRIMARY KEY(cliente_id, usuario_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+17. proveedor_usuarios
+============================================================
+proveedor_id uuid NOT NULL REFERENCES tms.proveedores(id),
+usuario_id uuid NOT NULL REFERENCES tms.usuarios(id), activo boolean NOT NULL DEFAULT true,
+PRIMARY KEY(proveedor_id, usuario_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+18. operadores
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+usuario_id uuid UNIQUE REFERENCES tms.usuarios(id),
+proveedor_id uuid REFERENCES tms.proveedores(id), nombre text NOT NULL, telefono text,
+email text, tipo text NOT NULL CHECK(tipo IN ('PROPIO','PROVEEDOR')),
+activo boolean NOT NULL DEFAULT true,
+CHECK((tipo = 'PROPIO' AND proveedor_id IS NULL) OR (tipo = 'PROVEEDOR' AND proveedor_id IS NOT NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+19. unidades
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+numero_economico text NOT NULL UNIQUE, placas text, tipo_unidad text NOT NULL,
+marca text, modelo text, anio smallint CHECK(anio BETWEEN 1900 AND 2200),
+capacidad_kg numeric(12,3) CHECK(capacidad_kg > 0), capacidad_pallets integer CHECK(capacidad_pallets > 0),
+hazmat boolean NOT NULL DEFAULT false, refrigerada boolean NOT NULL DEFAULT false,
+proveedor_id uuid REFERENCES tms.proveedores(id),
+estatus text NOT NULL DEFAULT 'ACTIVA' CHECK(estatus IN ('ACTIVA','MANTENIMIENTO','BAJA')),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+20. cajas
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+numero_caja text NOT NULL UNIQUE, placas text, tipo_caja text NOT NULL,
+largo_m numeric(6,2) CHECK(largo_m > 0), capacidad_kg numeric(12,3) CHECK(capacidad_kg > 0),
+hazmat boolean NOT NULL DEFAULT false, refrigerada boolean NOT NULL DEFAULT false,
+proveedor_id uuid REFERENCES tms.proveedores(id),
+estatus text NOT NULL DEFAULT 'ACTIVA' CHECK(estatus IN ('ACTIVA','MANTENIMIENTO','BAJA')),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+21. archivos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+bucket text NOT NULL, storage_path text NOT NULL,
+nombre_original text NOT NULL, mime_type text NOT NULL, size_bytes bigint NOT NULL CHECK(size_bytes > 0),
+sha256 text CHECK(sha256 ~ '^[0-9a-f]{64}$'),
+estado text NOT NULL DEFAULT 'PENDIENTE' CHECK(estado IN ('PENDIENTE','DISPONIBLE','RECHAZADO')),
+subido_por uuid NOT NULL REFERENCES tms.usuarios(id), UNIQUE(bucket, storage_path),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+22. unidad_documentos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+unidad_id uuid NOT NULL REFERENCES tms.unidades(id),
+tipo text NOT NULL, folio text, archivo_id uuid NOT NULL REFERENCES tms.archivos(id),
+emitido_el date, vence_el date, validado_por uuid REFERENCES tms.usuarios(id), validado_at timestamptz,
+CHECK(emitido_el IS NULL OR vence_el IS NULL OR vence_el >= emitido_el),
+CHECK((validado_por IS NULL) = (validado_at IS NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+23. caja_documentos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+caja_id uuid NOT NULL REFERENCES tms.cajas(id),
+tipo text NOT NULL, folio text, archivo_id uuid NOT NULL REFERENCES tms.archivos(id),
+emitido_el date, vence_el date, validado_por uuid REFERENCES tms.usuarios(id), validado_at timestamptz,
+CHECK(emitido_el IS NULL OR vence_el IS NULL OR vence_el >= emitido_el),
+CHECK((validado_por IS NULL) = (validado_at IS NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+24. operador_documentos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+operador_id uuid NOT NULL REFERENCES tms.operadores(id),
+tipo text NOT NULL, folio text, archivo_id uuid NOT NULL REFERENCES tms.archivos(id),
+emitido_el date, vence_el date, validado_por uuid REFERENCES tms.usuarios(id), validado_at timestamptz,
+CHECK(emitido_el IS NULL OR vence_el IS NULL OR vence_el >= emitido_el),
+CHECK((validado_por IS NULL) = (validado_at IS NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+25. viajes
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+folio bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
+cliente_id uuid NOT NULL REFERENCES tms.clientes(id), convenio_id uuid,
+origen_id uuid, destino_id uuid,
+origen_snapshot jsonb, destino_snapshot jsonb,
+tipo_servicio_id uuid REFERENCES tms.tipos_servicio(id), tipo_carga text,
+unidad_id uuid REFERENCES tms.unidades(id), caja_id uuid REFERENCES tms.cajas(id),
+operador_id uuid REFERENCES tms.operadores(id), proveedor_id uuid REFERENCES tms.proveedores(id),
+estado_operativo text NOT NULL DEFAULT 'BORRADOR' CHECK(estado_operativo IN
+('BORRADOR','PROGRAMADO','EN_CAMINO_A_CARGA','LLEGO_A_CARGA','EN_CARGA',
+'SALIO_CARGADO_EN_RUTA','LLEGO_A_DESTINO','EN_DESCARGA','ENTREGADO','CANCELADO')),
+cita_carga_at timestamptz, entrega_estimada_at timestamptz,
+reserva_desde timestamptz, reserva_hasta timestamptz,
+recursos_liberados_at timestamptz,
+ultima_actualizacion_operativa_at timestamptz,
+umbral_sin_actualizacion interval NOT NULL DEFAULT interval '6 hours' CHECK(umbral_sin_actualizacion > interval '0'),
+instrucciones text, restricciones_ruta text,
+creado_por uuid NOT NULL REFERENCES tms.usuarios(id),
+responsable_id uuid REFERENCES tms.usuarios(id),
+cancelado_at timestamptz, motivo_cancelacion text,
+cerrado_at timestamptz, cerrado_por uuid REFERENCES tms.usuarios(id),
+FOREIGN KEY(origen_id, cliente_id) REFERENCES tms.cliente_direcciones(id, cliente_id),
+FOREIGN KEY(destino_id, cliente_id) REFERENCES tms.cliente_direcciones(id, cliente_id),
+FOREIGN KEY(convenio_id, cliente_id) REFERENCES tms.cliente_convenios(id, cliente_id),
+CHECK(entrega_estimada_at >= cita_carga_at),
+CHECK((reserva_desde IS NULL) = (reserva_hasta IS NULL)),
+CHECK(reserva_hasta > reserva_desde),
+CHECK((cerrado_at IS NULL) = (cerrado_por IS NULL)),
+CHECK(estado_operativo <> 'CANCELADO' OR (cancelado_at IS NOT NULL AND motivo_cancelacion IS NOT NULL)),
+CHECK(estado_operativo IN ('BORRADOR','CANCELADO') OR
+ (origen_id IS NOT NULL AND destino_id IS NOT NULL AND origen_snapshot IS NOT NULL AND destino_snapshot IS NOT NULL
+ AND tipo_servicio_id IS NOT NULL AND tipo_carga IS NOT NULL
+ AND cita_carga_at IS NOT NULL AND entrega_estimada_at IS NOT NULL
+ AND reserva_desde IS NOT NULL AND reserva_hasta IS NOT NULL
+ AND (unidad_id IS NOT NULL OR proveedor_id IS NOT NULL))),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+26. viaje_comercial
+============================================================
+viaje_id uuid PRIMARY KEY REFERENCES tms.viajes(id),
+flete_base numeric(18,2) NOT NULL CHECK(flete_base >= 0),
+moneda char(3) NOT NULL DEFAULT 'MXN' CHECK(moneda IN ('MXN','USD')),
+horas_libres_carga numeric(8,2) CHECK(horas_libres_carga >= 0),
+horas_libres_descarga numeric(8,2) CHECK(horas_libres_descarga >= 0),
+tarifa_estadia_hora numeric(18,2) CHECK(tarifa_estadia_hora >= 0),
+condiciones_snapshot text,
+checklist_confirmado_por uuid REFERENCES tms.usuarios(id), checklist_confirmado_at timestamptz,
+costos_requeridos boolean NOT NULL DEFAULT false,
+costos_completos_por uuid REFERENCES tms.usuarios(id), costos_completos_at timestamptz,
+CHECK((costos_completos_por IS NULL) = (costos_completos_at IS NULL)),
+CHECK((checklist_confirmado_por IS NULL) = (checklist_confirmado_at IS NULL)),
+UNIQUE(viaje_id, moneda),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+27. viaje_tiempos
+============================================================
+viaje_id uuid PRIMARY KEY REFERENCES tms.viajes(id),
+salida_programada_at timestamptz, descarga_programada_at timestamptz,
+llegada_carga_at timestamptz, inicio_carga_at timestamptz, salida_cargado_at timestamptz,
+llegada_destino_at timestamptz, inicio_descarga_at timestamptz, fin_descarga_at timestamptz,
+entregado_at timestamptz,
+CHECK(inicio_carga_at >= llegada_carga_at), CHECK(salida_cargado_at >= inicio_carga_at),
+CHECK(llegada_destino_at >= salida_cargado_at), CHECK(inicio_descarga_at >= llegada_destino_at),
+CHECK(fin_descarga_at >= inicio_descarga_at), CHECK(entregado_at >= fin_descarga_at),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+28. viaje_carga
+============================================================
+viaje_id uuid PRIMARY KEY REFERENCES tms.viajes(id),
+descripcion text, mercancia text, hazmat boolean NOT NULL DEFAULT false,
+refrigerada boolean NOT NULL DEFAULT false, temperatura_min_c numeric(6,2), temperatura_max_c numeric(6,2),
+peso_kg numeric(12,3) CHECK(peso_kg >= 0), pallets integer CHECK(pallets >= 0),
+volumen_m3 numeric(12,3) CHECK(volumen_m3 >= 0), embalaje text,
+CHECK(temperatura_max_c >= temperatura_min_c),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+29. viaje_eventos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+tipo text NOT NULL CHECK(tipo IN ('CREACION','ESTATUS','ASIGNACION','TIEMPO','CIERRE','CANCELACION','CORRECCION','COMENTARIO')),
+estado_anterior text, estado_nuevo text, datos jsonb NOT NULL DEFAULT '{}',
+ocurrido_at timestamptz NOT NULL, registrado_por uuid NOT NULL REFERENCES tms.usuarios(id),
+origen text NOT NULL CHECK(origen IN ('INTERNO','CLIENTE','OPERADOR','PROVEEDOR','SISTEMA')),
+comentario text, archivo_id uuid REFERENCES tms.archivos(id),
+latitud numeric(9,6) CHECK(latitud BETWEEN -90 AND 90),
+longitud numeric(9,6) CHECK(longitud BETWEEN -180 AND 180),
+visible_cliente boolean NOT NULL DEFAULT false,
+visible_externo boolean NOT NULL DEFAULT false,
+idempotency_key uuid NOT NULL UNIQUE,
+CHECK((latitud IS NULL) = (longitud IS NULL)),
+CHECK(tipo <> 'ESTATUS' OR (estado_anterior IS NOT NULL AND estado_nuevo IS NOT NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+30. servicio_evidencias
+============================================================
+tipo_servicio_id uuid NOT NULL REFERENCES tms.tipos_servicio(id),
+tipo_evidencia_id uuid NOT NULL REFERENCES tms.tipos_evidencia(id),
+obligatoria_facturar boolean NOT NULL DEFAULT false,
+requiere_validacion boolean NOT NULL DEFAULT true,
+visible_cliente boolean NOT NULL DEFAULT false,
+PRIMARY KEY(tipo_servicio_id, tipo_evidencia_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+31. viaje_evidencias
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+tipo_evidencia_id uuid NOT NULL REFERENCES tms.tipos_evidencia(id),
+obligatoria_facturar boolean NOT NULL DEFAULT false,
+requiere_validacion boolean NOT NULL DEFAULT true,
+visible_cliente boolean NOT NULL DEFAULT false,
+no_aplica boolean NOT NULL DEFAULT false,
+exencion_motivo text, exencion_por uuid REFERENCES tms.usuarios(id), exencion_at timestamptz,
+UNIQUE(viaje_id, tipo_evidencia_id),
+CHECK(NOT no_aplica OR (exencion_motivo IS NOT NULL AND exencion_por IS NOT NULL AND exencion_at IS NOT NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+32. evidencia_entregas
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+evidencia_id uuid NOT NULL REFERENCES tms.viaje_evidencias(id),
+archivo_id uuid NOT NULL REFERENCES tms.archivos(id),
+estado text NOT NULL DEFAULT 'RECIBIDA' CHECK(estado IN ('RECIBIDA','RECHAZADA','VALIDADA')),
+subida_por uuid NOT NULL REFERENCES tms.usuarios(id),
+revisada_por uuid REFERENCES tms.usuarios(id), revisada_at timestamptz, motivo_revision text,
+UNIQUE(evidencia_id, archivo_id),
+CHECK(estado = 'RECIBIDA' OR (revisada_por IS NOT NULL AND revisada_at IS NOT NULL)),
+CHECK(estado <> 'RECHAZADA' OR motivo_revision IS NOT NULL),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+33. viaje_costos
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+tipo_costo_id uuid NOT NULL REFERENCES tms.tipos_costo(id), descripcion text NOT NULL,
+monto_estimado numeric(18,2) CHECK(monto_estimado >= 0), monto_real numeric(18,2) CHECK(monto_real >= 0),
+moneda char(3) NOT NULL CHECK(moneda IN ('MXN','USD')),
+tipo_cambio_a_viaje numeric(18,8) NOT NULL CHECK(tipo_cambio_a_viaje > 0),
+comprobante_id uuid REFERENCES tms.archivos(id), proveedor_id uuid REFERENCES tms.proveedores(id),
+creado_por uuid NOT NULL REFERENCES tms.usuarios(id),
+anulado_at timestamptz, motivo_anulacion text,
+CHECK(monto_estimado IS NOT NULL OR monto_real IS NOT NULL),
+CHECK(anulado_at IS NULL OR motivo_anulacion IS NOT NULL),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+34. viaje_extras
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+tipo_extra_id uuid NOT NULL REFERENCES tms.tipos_extra(id), descripcion text NOT NULL,
+monto numeric(18,2) NOT NULL CHECK(monto >= 0), moneda char(3) NOT NULL,
+se_cobra_cliente boolean NOT NULL DEFAULT false, se_agrega_factura boolean NOT NULL DEFAULT false,
+estado text NOT NULL DEFAULT 'PENDIENTE' CHECK(estado IN ('PENDIENTE','VALIDADO','RECHAZADO','CANCELADO')),
+origen text NOT NULL DEFAULT 'MANUAL' CHECK(origen IN ('MANUAL','SUGERENCIA_ESTADIA')),
+requiere_comprobante boolean NOT NULL DEFAULT false,
+comprobante_id uuid REFERENCES tms.archivos(id), creado_por uuid NOT NULL REFERENCES tms.usuarios(id),
+revisado_por uuid REFERENCES tms.usuarios(id), revisado_at timestamptz, motivo_revision text,
+FOREIGN KEY(viaje_id, moneda) REFERENCES tms.viaje_comercial(viaje_id, moneda),
+CHECK(NOT se_agrega_factura OR se_cobra_cliente),
+CHECK(estado = 'PENDIENTE' OR (revisado_por IS NOT NULL AND revisado_at IS NOT NULL)),
+CHECK(estado <> 'VALIDADO' OR NOT requiere_comprobante OR comprobante_id IS NOT NULL),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+35. viaje_incidencias
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id), tipo text NOT NULL,
+severidad text NOT NULL CHECK(severidad IN ('BAJA','MEDIA','ALTA','CRITICA')),
+descripcion text NOT NULL, estado text NOT NULL DEFAULT 'ABIERTA' CHECK(estado IN ('ABIERTA','EN_ATENCION','CERRADA')),
+bloquea_facturacion boolean NOT NULL DEFAULT false, visible_cliente boolean NOT NULL DEFAULT false,
+visible_externo boolean NOT NULL DEFAULT false,
+reportada_por uuid NOT NULL REFERENCES tms.usuarios(id), responsable_id uuid REFERENCES tms.usuarios(id),
+cerrada_por uuid REFERENCES tms.usuarios(id), cerrada_at timestamptz, solucion text,
+CHECK(estado <> 'CERRADA' OR (cerrada_por IS NOT NULL AND cerrada_at IS NOT NULL AND solucion IS NOT NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+36. viaje_mensajes
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+autor_id uuid NOT NULL REFERENCES tms.usuarios(id),
+tipo text NOT NULL CHECK(tipo IN ('CLIENTE','NOTA_INTERNA','SISTEMA','OPERADOR_PROVEEDOR','FINANZAS')),
+mensaje text NOT NULL CHECK(btrim(mensaje) <> ''), archivo_id uuid REFERENCES tms.archivos(id),
+visible_cliente boolean NOT NULL DEFAULT false, visible_externo boolean NOT NULL DEFAULT false,
+CHECK(tipo NOT IN ('NOTA_INTERNA','FINANZAS') OR (NOT visible_cliente AND NOT visible_externo)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+37. viaje_facturacion_operativa
+============================================================
+viaje_id uuid PRIMARY KEY REFERENCES tms.viajes(id),
+estado text NOT NULL DEFAULT 'NO_ENVIADO' CHECK(estado IN ('NO_ENVIADO','ENVIADO','DEVUELTO','FACTURADO','PAGADO','CANCELADO')),
+enviado_por uuid REFERENCES tms.usuarios(id), enviado_at timestamptz,
+envio_snapshot jsonb, observaciones text,
+CHECK(estado NOT IN ('ENVIADO','FACTURADO','PAGADO') OR
+ (enviado_por IS NOT NULL AND enviado_at IS NOT NULL AND envio_snapshot IS NOT NULL)),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+38. viaje_referencias_finanzas
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+sistema text NOT NULL, documento_externo_id text NOT NULL,
+tipo text NOT NULL CHECK(tipo IN ('FACTURA','NOTA_CREDITO','PAGO')),
+folio text, moneda char(3) NOT NULL CHECK(moneda IN ('MXN','USD')),
+monto_aplicado numeric(18,2) NOT NULL CHECK(monto_aplicado >= 0),
+cancelado boolean NOT NULL DEFAULT false, sincronizado_at timestamptz NOT NULL DEFAULT now(),
+UNIQUE(viaje_id, sistema, tipo, documento_externo_id),
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+39. viaje_alertas
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+viaje_id uuid NOT NULL REFERENCES tms.viajes(id),
+tipo text NOT NULL CHECK(tipo IN ('SIN_ACTUALIZACION','PENDIENTE_POD','PENDIENTE_EVIDENCIA','PENDIENTE_EXTRA','INCIDENCIA')),
+mensaje text NOT NULL, resuelta_at timestamptz,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+
+40. notificaciones
+============================================================
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+usuario_id uuid NOT NULL REFERENCES tms.usuarios(id),
+viaje_id uuid REFERENCES tms.viajes(id), tipo text NOT NULL, titulo text NOT NULL, mensaje text NOT NULL,
+leida_at timestamptz, email_estado text NOT NULL DEFAULT 'NO_REQUERIDO'
+CHECK(email_estado IN ('NO_REQUERIDO','PENDIENTE','ENVIADO','ERROR')),
+email_intentos integer NOT NULL DEFAULT 0 CHECK(email_intentos >= 0),
+email_enviado_at timestamptz, email_ultimo_error text,
+dedupe_key text NOT NULL UNIQUE,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()

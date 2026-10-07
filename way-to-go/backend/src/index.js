@@ -2,13 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
-import { setupWebSocket } from './websocket/wsServer.js';
+import { setupWebSocket } from './modules/rastreo/websocket/wsServer.js';
 
 // Import routes
-import trucksRouter from './routes/trucks.js';
-import gpsRouter from './routes/gps.js';
-import alertsRouter from './routes/alerts.js';
-import authRouter from './routes/auth.js';
+import trucksRouter from './modules/rastreo/routes/trucks.js';
+import gpsRouter from './modules/rastreo/routes/gps.js';
+import alertsRouter from './modules/rastreo/routes/alerts.js';
+import authRouter from './modules/rastreo/routes/auth.js';
+import logisticsRouter from './modules/logistica/routes/index.js';
 
 dotenv.config();
 
@@ -34,7 +35,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    service: 'fleet-tracking-api'
+    service: 'way-to-go-api',
+    modules: ['rastreo', 'logistica', 'finanzas']
   });
 });
 
@@ -43,6 +45,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/trucks', trucksRouter);
 app.use('/api/gps', gpsRouter);
 app.use('/api/alerts', alertsRouter);
+app.use('/api/logistica', logisticsRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -71,7 +74,7 @@ setupWebSocket(server);
 server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════╗
-║   Fleet Tracking API Server                ║
+║   WAY TO GO API Server                     ║
 ║   Running on port ${PORT}                  ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}             ║
 ║                                            ║
