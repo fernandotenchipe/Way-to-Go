@@ -1,1 +1,2 @@
-export { default } from '../../tracking/page';
+import { redirect } from 'next/navigation';
+export default function Page(){redirect('/rastreo/en-vivo');}

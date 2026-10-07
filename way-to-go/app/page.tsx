@@ -5,13 +5,22 @@ import { ArrowRightIcon, BellAlertIcon, BanknotesIcon, ClipboardDocumentCheckIco
 
 const workspaces = [
   {
-    href: '/transporte/dashboard',
-    name: 'Transporte',
-    description: 'Consulta el estado de las unidades, viajes y entregas.',
-    icon: TruckIcon,
+    href: '/rastreo/dashboard',
+    name: 'Rastreo GPS',
+    description: 'Monitorea ubicación, actividad y alertas de tus unidades.',
+    icon: MapPinIcon,
     accent: 'yellow',
     status: '24 unidades en ruta',
-    tasks: [{ label: '3 alertas requieren atención', icon: BellAlertIcon }, { label: '18 viajes activos', icon: MapPinIcon }],
+    tasks: [{ label: '3 alertas requieren atención', icon: BellAlertIcon }, { label: '24 unidades en ruta', icon: TruckIcon }],
+  },
+  {
+    href: '/logistica/dashboard',
+    name: 'Logística / TMS',
+    description: 'Prepara viajes, reúne evidencias y coordina entregas.',
+    icon: TruckIcon,
+    accent: 'blue',
+    status: '18 viajes activos',
+    tasks: [{ label: '6 POD pendientes', icon: ClipboardDocumentCheckIcon }, { label: '9 servicios por facturar', icon: BanknotesIcon }],
   },
   {
     href: '/finanzas/dashboard',
@@ -37,7 +46,7 @@ export default function Home() {
 
       <div className="mx-auto max-w-6xl px-6 py-12 sm:px-10 lg:py-16">
         <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#c79d00]">Centro de trabajo</p><h1 className="mt-3 text-4xl font-bold tracking-tight text-[#0b1f3b] sm:text-5xl">Buenos días, George</h1><p className="mt-4 text-lg leading-7 text-slate-500">Continúa con tus tareas y consulta la operación desde un solo lugar.</p></div>
-        <div className="mt-12 grid gap-5 lg:grid-cols-2">
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {workspaces.map((workspace) => <WorkspaceCard key={workspace.name} {...workspace} />)}
         </div>
         <div className="mt-8 flex items-center gap-3 border-t border-slate-200 pt-6 text-sm text-slate-500"><span className="h-2 w-2 rounded-full bg-emerald-500" />Última actualización del portal: hoy a las 10:32</div>
