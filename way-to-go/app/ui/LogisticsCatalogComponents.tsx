@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 const card = 'rounded-xl border border-slate-200 bg-white shadow-sm';
+export const logisticsFieldClassName = 'mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#c79d00] focus:ring-2 focus:ring-amber-100';
 
 export function CatalogPageHeader({
   eyebrow,
@@ -79,4 +80,28 @@ export function CatalogTable({
       </table>
     </div>
   );
+}
+
+export function LogisticsFormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-[#0b1f3b]">{title}</h2>
+        <p className="mt-1 text-xs text-slate-500">{description}</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+export function LogisticsFormField({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="block text-sm font-semibold text-slate-700">{label}{children}</label>;
 }
