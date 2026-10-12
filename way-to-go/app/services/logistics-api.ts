@@ -29,6 +29,38 @@ export interface LogisticsResponse<T> {
   error?: string;
 }
 
+export interface LogisticsCustomer {
+  id: string;
+  razon_social: string;
+  nombre_comercial: string | null;
+  rfc: string | null;
+  activo: boolean;
+  direcciones_activas?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LogisticsAddress {
+  id: string;
+  cliente_id: string;
+  nombre: string;
+  calle: string;
+  ciudad: string;
+  estado: string;
+  pais: string;
+  codigo_postal: string | null;
+  zona_horaria: string;
+  horario: string | null;
+  instrucciones: string | null;
+  requiere_cita: boolean;
+  activo: boolean;
+}
+
+export interface LogisticsCustomerDetail extends LogisticsCustomer {
+  direcciones: LogisticsAddress[];
+  contactos: Array<{ id: string; nombre: string; email: string | null; telefono: string | null; puesto: string | null; principal: boolean }>;
+}
+
 class LogisticsApi {
   private async request<T>(path: string, init: RequestInit = {}): Promise<LogisticsResponse<T>> {
     const token = typeof window === 'undefined' ? null : localStorage.getItem('auth_token');
@@ -43,6 +75,24 @@ class LogisticsApi {
 
   getDashboard() {
     return this.request<{ summary: Record<string, number>; recent_trips: LogisticsTrip[] }>('dashboard');
+  }
+
+  getCustomers(q = '') {
+    const search = new URLSearchParams();
+    if (q.trim()) search.set('q', q.trim());
+    return this.request<LogisticsCustomer[]>(`customers${search.size ? `?${search}` : ''}`);
+  }
+
+  getCustomer(id: string) {
+    return this.request<LogisticsCustomerDetail>(`customers/${encodeURIComponent(id)}`);
+  }
+
+  createCustomer(input: { razon_social: string; nombre_comercial?: string; rfc?: string }) {
+    return this.request<LogisticsCustomer>('customers', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  addCustomerAddress(id: string, input: Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>) {
+    return this.request<LogisticsAddress>(`customers/${encodeURIComponent(id)}/addresses`, { method: 'POST', body: JSON.stringify(input) });
   }
 
   getTrips(filters: { estado?: LogisticsTripStatus; cliente_id?: string; q?: string; limit?: number; offset?: number } = {}) {

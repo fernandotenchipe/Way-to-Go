@@ -1,3 +1,6 @@
 import DashboardLayout from '../../ui/DashboardLayout';
-import { CatalogScreen } from '../../ui/LogisticsScreens';
-export default function Page(){return <DashboardLayout module="logistica" title="Clientes y convenios"><CatalogScreen kind="clientes"/></DashboardLayout>;}
+import ClientsScreen from '../../ui/ClientsScreen';
+
+export default function Page() {
+  return <DashboardLayout module="logistica" title="Clientes y direcciones"><ClientsScreen /></DashboardLayout>;
+}

@@ -21,6 +21,9 @@ El esquema usa UUID, folio de viaje generado por secuencia, estados operativos s
 | GET | `/api/logistica/trips/:folio/events` | Consultar bitácora |
 | GET, POST | `/api/logistica/trips/:folio/evidence` | Consultar checklist y subir entregas |
 | GET | `/api/logistica/customers`, `/units`, `/operators`, `/providers`, `/catalogs` | Consultar catálogos |
+| POST | `/api/logistica/customers` | Crear cliente |
+| GET | `/api/logistica/customers/:id` | Consultar ficha, direcciones y contactos |
+| POST | `/api/logistica/customers/:id/addresses` | Agregar dirección |
 
 Para crear un viaje deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
 
@@ -31,3 +34,5 @@ Los archivos de evidencia se guardan localmente en `backend/uploads/logistica`. 
 Configura las variables PostgreSQL y `JWT_SECRET` en `backend/.env`. La API valida el JWT actual por correo y busca el perfil TMS activo y permisos en la base. El backend debe conectarse con una cuenta PostgreSQL administrada y no exponer credenciales privilegiadas al navegador.
 
 El diseño aún deja pendientes las políticas RLS, la matriz de permisos, el alcance de cuentas externas y el almacenamiento de archivos. Este módulo no implementa GPS, CFDI ni la contabilidad del módulo Finanzas.
+
+`database/demo_clientes.sql` contiene tres clientes ficticios y cuatro direcciones de prueba, con nombres marcados `DEMO`. El archivo es repetible y solo debe ejecutarse en el esquema TMS de desarrollo o prueba. No se pudo cargar desde esta sesión porque la conexión a PostgreSQL agotó el tiempo de espera.

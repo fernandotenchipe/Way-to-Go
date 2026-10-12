@@ -23,6 +23,7 @@ const transitions = {
 };
 const fail = (res, status, error) => res.status(status).json({ success: false, error });
 const safeLimit = (value, fallback = 50) => Math.min(Math.max(Number.parseInt(value, 10) || fallback, 1), 100);
+const isUuid = (value) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const wrap = (handler) => async (req, res) => {
   try { await handler(req, res); }
   catch (error) {
@@ -234,11 +235,45 @@ router.get('/evidence/:id/download', requireTripRead, wrap(async (req, res) => {
   return res.type(file.mime_type).download(filepath, path.basename(file.nombre_original));
 }));
 
-router.get('/customers', requireTripRead, wrap(async (_req, res) => {
-  const { rows } = await query(`SELECT c.*, count(DISTINCT d.id)::int AS direcciones_activas
+router.get('/customers', requireTripRead, wrap(async (req, res) => {
+  const search = req.query.q ? `%${String(req.query.q).trim().slice(0, 100)}%` : null;
+  const { rows } = await query(`SELECT c.*, count(DISTINCT d.id)::int AS direcciones_activas,
+      (SELECT concat_ws(', ', x.ciudad, x.estado) FROM tms.cliente_direcciones x
+       WHERE x.cliente_id=c.id AND x.activo ORDER BY x.nombre LIMIT 1) AS address_preview
     FROM tms.clientes c LEFT JOIN tms.cliente_direcciones d ON d.cliente_id=c.id AND d.activo
-    GROUP BY c.id ORDER BY c.razon_social`);
+    WHERE ($1::text IS NULL OR c.razon_social ILIKE $1 OR c.nombre_comercial ILIKE $1 OR c.rfc ILIKE $1
+      OR EXISTS (SELECT 1 FROM tms.cliente_direcciones x WHERE x.cliente_id=c.id AND x.activo AND (x.nombre ILIKE $1 OR x.ciudad ILIKE $1 OR x.estado ILIKE $1)))
+    GROUP BY c.id ORDER BY c.razon_social`, [search]);
   res.json({ success: true, data: rows });
+}));
+router.post('/customers', requireTripEdit, wrap(async (req, res) => {
+  const { razon_social: legalName, nombre_comercial: tradeName, rfc } = req.body || {};
+  if (typeof legalName !== 'string' || !legalName.trim()) return fail(res, 400, 'La razón social es obligatoria');
+  if (rfc != null && (typeof rfc !== 'string' || rfc.trim().length > 13)) return fail(res, 400, 'El RFC debe tener como máximo 13 caracteres');
+  const { rows: [customer] } = await query(`INSERT INTO tms.clientes (razon_social,nombre_comercial,rfc)
+    VALUES ($1,$2,$3) RETURNING *`, [legalName.trim(), typeof tradeName === 'string' && tradeName.trim() ? tradeName.trim() : null, rfc?.trim().toUpperCase() || null]);
+  res.status(201).json({ success: true, data: { ...customer, direcciones_activas: 0 } });
+}));
+router.get('/customers/:id', requireTripRead, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
+  const { rows: [customer] } = await query(`SELECT * FROM tms.clientes WHERE id=$1`, [req.params.id]);
+  if (!customer) return fail(res, 404, 'Cliente no encontrado');
+  const [addresses, contacts] = await Promise.all([
+    query(`SELECT * FROM tms.cliente_direcciones WHERE cliente_id=$1 AND activo ORDER BY nombre`, [req.params.id]),
+    query(`SELECT id,nombre,puesto,email,telefono,principal FROM tms.cliente_contactos WHERE cliente_id=$1 AND activo ORDER BY principal DESC,nombre`, [req.params.id]),
+  ]);
+  res.json({ success: true, data: { ...customer, direcciones: addresses.rows, contactos: contacts.rows } });
+}));
+router.post('/customers/:id/addresses', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
+  const { nombre, calle, ciudad, estado, pais = 'MX', codigo_postal: postalCode, zona_horaria: timezone = 'America/Mexico_City', horario, instrucciones, requiere_cita: appointment = false } = req.body || {};
+  if (![nombre, calle, ciudad, estado].every((value) => typeof value === 'string' && value.trim())) return fail(res, 400, 'Nombre, calle, ciudad y estado son obligatorios');
+  const { rows: [address] } = await query(`INSERT INTO tms.cliente_direcciones
+    (cliente_id,nombre,calle,ciudad,estado,pais,codigo_postal,zona_horaria,horario,instrucciones,requiere_cita)
+    SELECT id,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11 FROM tms.clientes WHERE id=$1 AND activo RETURNING *`,
+  [req.params.id, nombre.trim(), calle.trim(), ciudad.trim(), estado.trim(), String(pais).slice(0, 2).toUpperCase(), postalCode || null, timezone, horario || null, instrucciones || null, Boolean(appointment)]);
+  if (!address) return fail(res, 404, 'Cliente no encontrado o inactivo');
+  res.status(201).json({ success: true, data: address });
 }));
 router.get('/units', requireTripRead, wrap(async (_req, res) => { const { rows } = await query(`SELECT u.*,p.razon_social AS proveedor FROM tms.unidades u LEFT JOIN tms.proveedores p ON p.id=u.proveedor_id ORDER BY u.numero_economico`); res.json({ success: true, data: rows }); }));
 router.get('/operators', requireTripRead, wrap(async (_req, res) => { const { rows } = await query(`SELECT o.*,p.razon_social AS proveedor FROM tms.operadores o LEFT JOIN tms.proveedores p ON p.id=o.proveedor_id ORDER BY o.nombre`); res.json({ success: true, data: rows }); }));

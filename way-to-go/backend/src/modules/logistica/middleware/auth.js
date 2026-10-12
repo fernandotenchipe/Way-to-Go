@@ -1,7 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { query } from '../../../shared/database/db.js';
 
+// Solo permite omitir la sesión en desarrollo local; en producción el bypass nunca se activa.
+const isLocalAuthDisabled = () =>
+  process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true';
+
 export async function requireLogisticsUser(req, res, next) {
+  if (isLocalAuthDisabled()) {
+    req.user = { id: 'local-dev', name: 'Desarrollo local', roles: ['local-dev'], permissions: [] };
+    return next();
+  }
+
   const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!token) return res.status(401).json({ success: false, error: 'Se requiere iniciar sesión' });
 
@@ -42,6 +51,7 @@ export async function requireLogisticsUser(req, res, next) {
 
 function requirePermission(permission, message) {
   return (req, res, next) => {
+    if (isLocalAuthDisabled()) return next();
     if (!req.user?.permissions?.includes(permission)) {
       return res.status(403).json({ success: false, error: message });
     }

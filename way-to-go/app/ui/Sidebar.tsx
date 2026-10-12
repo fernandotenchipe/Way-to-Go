@@ -19,7 +19,7 @@ const menus: Record<PortalModule, NavItem[]> = {
     { name: 'Evidencias y POD', href: '/logistica/evidencias', icon: DocumentTextIcon },
     { name: 'Facturación operativa', href: '/logistica/facturacion', icon: BanknotesIcon },
     { name: 'Costos y extras', href: '/logistica/costos', icon: CurrencyDollarIcon },
-    { name: 'Clientes y convenios', href: '/logistica/clientes', icon: BuildingOffice2Icon },
+    { name: 'Clientes y direcciones', href: '/logistica/clientes', icon: BuildingOffice2Icon },
     { name: 'Flota', href: '/logistica/flota', icon: TruckIcon },
     { name: 'Operadores', href: '/logistica/operadores', icon: UserGroupIcon },
     { name: 'Reportes', href: '/logistica/reportes', icon: ChartBarIcon },
