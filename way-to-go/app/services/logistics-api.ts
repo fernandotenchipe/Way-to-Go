@@ -34,6 +34,10 @@ export interface LogisticsCustomer {
   razon_social: string;
   nombre_comercial: string | null;
   rfc: string | null;
+  uso_cfdi?: string | null;
+  forma_pago?: string | null;
+  metodo_pago?: string | null;
+  condiciones_pago?: string | null;
   activo: boolean;
   direcciones_activas?: number;
   created_at: string;
@@ -58,7 +62,19 @@ export interface LogisticsAddress {
 
 export interface LogisticsCustomerDetail extends LogisticsCustomer {
   direcciones: LogisticsAddress[];
-  contactos: Array<{ id: string; nombre: string; email: string | null; telefono: string | null; puesto: string | null; principal: boolean }>;
+  contactos: Array<{ id: string; nombre: string; email: string | null; telefono: string | null; puesto: string | null; tipo_contacto: string | null; principal: boolean }>;
+}
+
+export interface LogisticsCustomerCreateInput {
+  razon_social: string;
+  nombre_comercial?: string;
+  rfc?: string;
+  uso_cfdi?: string;
+  forma_pago?: string;
+  metodo_pago?: string;
+  condiciones_pago?: string;
+  contacto?: { nombre?: string; puesto?: string; email?: string; telefono?: string; tipo_contacto?: string };
+  direccion?: Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>;
 }
 
 class LogisticsApi {
@@ -87,7 +103,7 @@ class LogisticsApi {
     return this.request<LogisticsCustomerDetail>(`customers/${encodeURIComponent(id)}`);
   }
 
-  createCustomer(input: { razon_social: string; nombre_comercial?: string; rfc?: string }) {
+  createCustomer(input: LogisticsCustomerCreateInput) {
     return this.request<LogisticsCustomer>('customers', { method: 'POST', body: JSON.stringify(input) });
   }
 

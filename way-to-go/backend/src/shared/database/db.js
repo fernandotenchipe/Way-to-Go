@@ -17,8 +17,9 @@ const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // pg-pool ya retira la conexión dañada; mantenemos el proceso vivo para que
+  // las siguientes peticiones puedan volver a intentar conectarse.
+  console.error('Conexión PostgreSQL inactiva cerrada:', err.message);
 });
 
 export const query = (text, params) => pool.query(text, params);

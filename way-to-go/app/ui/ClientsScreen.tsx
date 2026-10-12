@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, MagnifyingGlassIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsCustomerDetail } from '../services/logistics-api';
 
-type ClientRow = LogisticsCustomer & { address_preview?: string | null; demo_addresses?: LogisticsAddress[] };
+type ClientContact = LogisticsCustomerDetail['contactos'][number];
+type ClientRow = LogisticsCustomer & { address_preview?: string | null; demo_addresses?: LogisticsAddress[]; demo_contacts?: ClientContact[] };
 type Mode = 'loading' | 'live' | 'demo';
 
 const demoClients: ClientRow[] = [
@@ -56,7 +57,7 @@ export default function ClientsScreen() {
     if (!selectedId) { setDetail(null); return; }
     const client = clients.find((item) => item.id === selectedId);
     if (mode === 'demo') {
-      if (client) setDetail({ ...client, direcciones: client.demo_addresses ?? [], contactos: [] });
+      if (client) setDetail({ ...client, direcciones: client.demo_addresses ?? [], contactos: client.demo_contacts ?? [] });
       return;
     }
     logisticsApi.getCustomer(selectedId).then((response) => setDetail(response.data)).catch(() => setDetail(null));
@@ -71,17 +72,36 @@ export default function ClientsScreen() {
   async function submitClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setFormError('');
     const form = new FormData(event.currentTarget);
-    const input = { razon_social: String(form.get('razon_social')).trim(), nombre_comercial: String(form.get('nombre_comercial')).trim(), rfc: String(form.get('rfc')).trim() };
+    const value = (key: string) => String(form.get(key) ?? '').trim();
+    const input = {
+      razon_social: value('razon_social'), nombre_comercial: value('nombre_comercial'), rfc: value('rfc'),
+      uso_cfdi: value('uso_cfdi'), forma_pago: value('forma_pago'), metodo_pago: value('metodo_pago'), condiciones_pago: value('condiciones_pago'),
+      contacto: { nombre: value('contacto_nombre'), puesto: value('contacto_puesto'), tipo_contacto: value('contacto_tipo') || 'OPERACIONES', email: value('contacto_email'), telefono: value('contacto_telefono') },
+      direccion: {
+        nombre: value('direccion_nombre'), calle: value('direccion_calle'), ciudad: value('direccion_ciudad'), estado: value('direccion_estado'), pais: 'MX',
+        codigo_postal: value('direccion_cp'), zona_horaria: value('direccion_zona') || 'America/Mexico_City',
+        horario: value('direccion_horario'), instrucciones: value('direccion_instrucciones'), requiere_cita: form.get('direccion_cita') === 'on',
+      },
+    };
+    const hasContact = [input.contacto.nombre, input.contacto.puesto, input.contacto.email, input.contacto.telefono].some(Boolean);
+    const hasAddress = [input.direccion.nombre, input.direccion.calle, input.direccion.ciudad, input.direccion.estado, input.direccion.codigo_postal, input.direccion.horario, input.direccion.instrucciones].some(Boolean);
+    if (hasContact && !input.contacto.nombre) { setFormError('Escribe el nombre del contacto o deja vacía toda esa sección.'); setSaving(false); return; }
+    if (hasAddress && ![input.direccion.nombre, input.direccion.calle, input.direccion.ciudad, input.direccion.estado].every(Boolean)) { setFormError('Para guardar la dirección necesitamos nombre, calle, ciudad y estado.'); setSaving(false); return; }
+    if (!hasContact) delete (input as { contacto?: typeof input.contacto }).contacto;
+    if (!hasAddress) delete (input as { direccion?: typeof input.direccion }).direccion;
     try {
       if (mode === 'live') {
         const response = await logisticsApi.createCustomer(input);
         await loadClients(search);
         setSelectedId(response.data.id);
-        setNotice('Cliente guardado en la base de datos.');
+        setNotice('Cliente y datos proporcionados guardados en la base de datos.');
       } else {
-        const created: ClientRow = { id: `demo-${crypto.randomUUID()}`, ...input, rfc: input.rfc || null, nombre_comercial: input.nombre_comercial || null, activo: true, direcciones_activas: 0, created_at: '', updated_at: '', demo_addresses: [] };
+        const id = `demo-${crypto.randomUUID()}`;
+        const demoContact: ClientContact | undefined = hasContact ? { id: `demo-${crypto.randomUUID()}`, nombre: input.contacto!.nombre!, puesto: input.contacto!.puesto || null, email: input.contacto!.email || null, telefono: input.contacto!.telefono || null, tipo_contacto: input.contacto!.tipo_contacto || 'OPERACIONES', principal: true } : undefined;
+        const demoAddress: LogisticsAddress | undefined = hasAddress ? { id: `demo-${crypto.randomUUID()}`, cliente_id: id, nombre: input.direccion!.nombre, calle: input.direccion!.calle, ciudad: input.direccion!.ciudad, estado: input.direccion!.estado, pais: input.direccion!.pais, codigo_postal: input.direccion!.codigo_postal || null, zona_horaria: input.direccion!.zona_horaria, horario: input.direccion!.horario || null, instrucciones: input.direccion!.instrucciones || null, requiere_cita: input.direccion!.requiere_cita, activo: true } : undefined;
+        const created: ClientRow = { id, razon_social: input.razon_social, nombre_comercial: input.nombre_comercial || null, rfc: input.rfc || null, uso_cfdi: input.uso_cfdi || null, forma_pago: input.forma_pago || null, metodo_pago: input.metodo_pago || null, condiciones_pago: input.condiciones_pago || null, activo: true, direcciones_activas: demoAddress ? 1 : 0, created_at: '', updated_at: '', demo_addresses: demoAddress ? [demoAddress] : [], demo_contacts: demoContact ? [demoContact] : [], address_preview: demoAddress ? `${demoAddress.ciudad}, ${demoAddress.estado}` : null };
         setClients((current) => [created, ...current]); setSelectedId(created.id);
-        setNotice('Cliente agregado solo a esta vista de demostración; no se guardó en la base.');
+        setNotice('Cliente agregado solo a esta vista de demostración; los cambios no se guardaron en la base.');
       }
       setModal(null);
     } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo guardar el cliente.'); }
@@ -145,6 +165,7 @@ export default function ClientsScreen() {
       <section className={`${card} overflow-hidden`}>
         {detail ? <>
           <div className="border-b border-slate-100 p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[#0b1f3b]"><BuildingOffice2Icon className="h-5 w-5"/></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ficha del cliente</p><h2 className="mt-0.5 truncate font-bold text-[#0b1f3b]">{detail.nombre_comercial || detail.razon_social}</h2></div></div><button onClick={() => setSelectedId(null)} aria-label="Cerrar detalle" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-4 w-4"/></button></div><p className="mt-3 text-xs text-slate-500">{detail.razon_social}</p><p className="mt-1 text-xs text-slate-400">RFC · {detail.rfc || 'Sin capturar'}</p></div>
+          <div className="border-b border-slate-100 p-5"><h3 className="text-sm font-bold text-[#0b1f3b]">Contacto principal</h3>{detail.contactos.length ? detail.contactos.map((contact) => <div key={contact.id} className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-700">{contact.nombre}{contact.puesto ? ` · ${contact.puesto}` : ''}</p><p className="mt-1 text-xs text-slate-500">{contact.email || 'Sin correo'}{contact.telefono ? ` · ${contact.telefono}` : ''}</p><p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{contact.tipo_contacto || 'Contacto'}</p></div>) : <p className="mt-2 text-xs text-slate-500">Aún no hay contactos registrados.</p>}</div>
           <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Direcciones</h3><p className="mt-0.5 text-xs text-slate-500">Puntos de operación del cliente</p></div><button onClick={() => { setFormError(''); setModal('address'); }} aria-label="Agregar dirección" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button></div>
             <div className="space-y-3">{detail.direcciones.length ? detail.direcciones.map((address) => <article key={address.id} className="rounded-lg border border-slate-100 bg-slate-50/70 p-3"><div className="flex items-start gap-2.5"><MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b28b00]"/><div className="min-w-0"><p className="text-sm font-semibold text-slate-800">{address.nombre}</p><p className="mt-1 text-xs leading-5 text-slate-500">{address.calle}<br/>{address.ciudad}, {address.estado}{address.codigo_postal ? ` · C.P. ${address.codigo_postal}` : ''}</p><p className="mt-2 text-[11px] text-slate-400">{address.requiere_cita ? 'Requiere cita' : 'Sin cita requerida'}{address.horario ? ` · ${address.horario}` : ''}</p></div></div></article>) : <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center"><MapPinIcon className="mx-auto h-6 w-6 text-slate-300"/><p className="mt-2 text-sm font-medium text-slate-600">Aún no hay direcciones</p><p className="mt-1 text-xs text-slate-400">Agrega un punto de carga o entrega.</p></div>}</div>
             <button onClick={() => { setFormError(''); setModal('address'); }} className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><PlusIcon className="mr-1.5 inline h-4 w-4"/>Agregar dirección</button>
@@ -153,13 +174,50 @@ export default function ClientsScreen() {
       </section>
     </div>
 
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setModal(null)}><section role="dialog" aria-modal="true" aria-labelledby="client-modal-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-      <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><h2 id="client-modal-title" className="text-xl font-bold text-[#0b1f3b]">{modal === 'client' ? 'Agregar cliente' : 'Agregar dirección'}</h2><p className="mt-1 text-sm text-slate-500">{modal === 'client' ? 'Registra los datos principales de la empresa.' : `Nueva ubicación para ${detail?.nombre_comercial || detail?.razon_social || 'el cliente'}.`}</p></div><button onClick={() => setModal(null)} aria-label="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-5 w-5"/></button></div>
-      <form onSubmit={modal === 'client' ? submitClient : submitAddress} className="space-y-4 px-6 py-5">
-        {modal === 'client' ? <><label className="block text-sm font-semibold text-slate-700">Razón social *<input name="razon_social" required maxLength={180} className={field} placeholder="Empresa, S.A. de C.V."/></label><label className="block text-sm font-semibold text-slate-700">Nombre comercial<input name="nombre_comercial" maxLength={180} className={field} placeholder="Nombre corto para identificarla"/></label><label className="block text-sm font-semibold text-slate-700">RFC<input name="rfc" maxLength={13} className={field} placeholder="12 o 13 caracteres"/></label></> : <><label className="block text-sm font-semibold text-slate-700">Nombre de la ubicación *<input name="nombre" required maxLength={120} className={field} placeholder="Planta, CEDIS o sucursal"/></label><label className="block text-sm font-semibold text-slate-700">Calle y número *<input name="calle" required maxLength={200} className={field} placeholder="Av. Industrial 100"/></label><div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-semibold text-slate-700">Ciudad *<input name="ciudad" required maxLength={100} className={field} placeholder="Monterrey"/></label><label className="block text-sm font-semibold text-slate-700">Estado *<input name="estado" required maxLength={100} className={field} placeholder="Nuevo León"/></label><label className="block text-sm font-semibold text-slate-700">Código postal<input name="codigo_postal" maxLength={12} className={field} placeholder="64000"/></label><label className="block text-sm font-semibold text-slate-700">Horario de atención<input name="horario" maxLength={120} className={field} placeholder="Lun–Vie 08:00–17:00"/></label></div><label className="block text-sm font-semibold text-slate-700">Zona horaria<select name="zona_horaria" className={field}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></label><label className="flex items-center gap-2 text-sm text-slate-600"><input name="requiere_cita" type="checkbox" className="accent-[#0b1f3b]"/>Esta ubicación requiere cita</label><label className="block text-sm font-semibold text-slate-700">Instrucciones<input name="instrucciones" maxLength={500} className={field} placeholder="Acceso, andén o indicaciones especiales"/></label></>}
+    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setModal(null)}><section role="dialog" aria-modal="true" aria-labelledby="client-modal-title" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+      <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white px-6 py-5"><div><h2 id="client-modal-title" className="text-xl font-bold text-[#0b1f3b]">{modal === 'client' ? 'Registrar cliente' : 'Agregar dirección'}</h2><p className="mt-1 text-sm text-slate-500">{modal === 'client' ? 'Guarda la empresa y, si ya los tienes, sus datos de contacto y primera ubicación.' : `Nueva ubicación para ${detail?.nombre_comercial || detail?.razon_social || 'el cliente'}.`}</p></div><button onClick={() => setModal(null)} aria-label="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-5 w-5"/></button></div>
+      <form onSubmit={modal === 'client' ? submitClient : submitAddress} className="space-y-5 px-6 py-5">
+        {modal === 'client' ? <>
+          <FormBlock title="Datos de la empresa" description="La razón social es el único dato obligatorio para crear el registro.">
+            <FormField label="Razón social *"><input name="razon_social" required maxLength={180} className={field} placeholder="Empresa, S.A. de C.V."/></FormField>
+            <FormField label="Nombre comercial"><input name="nombre_comercial" maxLength={180} className={field} placeholder="Nombre con el que la identifican"/></FormField>
+            <FormField label="RFC"><input name="rfc" maxLength={13} className={field} placeholder="RFC de la empresa"/></FormField>
+          </FormBlock>
+          <FormBlock title="Contacto principal" description="Puedes completar esta sección ahora o agregar contactos después.">
+            <FormField label="Nombre"><input name="contacto_nombre" maxLength={160} className={field} placeholder="Persona responsable"/></FormField>
+            <FormField label="Área"><select name="contacto_tipo" className={field}><option value="OPERACIONES">Operaciones</option><option value="FACTURACION">Facturación</option><option value="COMPRAS">Compras</option><option value="OTRO">Otro</option></select></FormField>
+            <FormField label="Puesto"><input name="contacto_puesto" maxLength={100} className={field} placeholder="Coordinación logística"/></FormField>
+            <FormField label="Teléfono"><input name="contacto_telefono" type="tel" maxLength={30} className={field} placeholder="Teléfono directo"/></FormField>
+            <FormField label="Correo"><input name="contacto_email" type="email" maxLength={180} className={field} placeholder="nombre@empresa.com"/></FormField>
+          </FormBlock>
+          <FormBlock title="Primera ubicación" description="Agrega una planta, CEDIS o sucursal. Puedes añadir más después.">
+            <FormField label="Nombre de la ubicación"><input name="direccion_nombre" maxLength={120} className={field} placeholder="Planta Apodaca"/></FormField>
+            <FormField label="Calle y número"><input name="direccion_calle" maxLength={200} className={field} placeholder="Av. Industrial 100"/></FormField>
+            <FormField label="Ciudad"><input name="direccion_ciudad" maxLength={100} className={field} placeholder="Monterrey"/></FormField>
+            <FormField label="Estado"><input name="direccion_estado" maxLength={100} className={field} placeholder="Nuevo León"/></FormField>
+            <FormField label="Código postal"><input name="direccion_cp" maxLength={12} className={field} placeholder="64000"/></FormField>
+            <FormField label="Horario de atención"><input name="direccion_horario" maxLength={120} className={field} placeholder="Lun–Vie 08:00–17:00"/></FormField>
+            <FormField label="Zona horaria"><select name="direccion_zona" className={field}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></FormField>
+            <FormField label="Instrucciones de acceso"><input name="direccion_instrucciones" maxLength={500} className={field} placeholder="Andén, acceso o indicaciones"/></FormField>
+            <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-600"><input name="direccion_cita" type="checkbox" className="accent-[#0b1f3b]"/>Requiere cita</label>
+          </FormBlock>
+          <FormBlock title="Datos de facturación y pago" description="Opcionales; puedes agregarlos cuando el cliente confirme sus condiciones.">
+            <FormField label="Uso CFDI"><input name="uso_cfdi" maxLength={40} className={field} placeholder="Clave o descripción"/></FormField>
+            <FormField label="Forma de pago"><input name="forma_pago" maxLength={60} className={field} placeholder="Forma acordada"/></FormField>
+            <FormField label="Método de pago"><input name="metodo_pago" maxLength={60} className={field} placeholder="Método acordado"/></FormField>
+            <FormField label="Condiciones de pago"><input name="condiciones_pago" maxLength={500} className={field} placeholder="Plazo o notas de crédito"/></FormField>
+          </FormBlock>
+        </> : <>
+          <FormField label="Nombre de la ubicación *"><input name="nombre" required maxLength={120} className={field} placeholder="Planta, CEDIS o sucursal"/></FormField>
+          <FormField label="Calle y número *"><input name="calle" required maxLength={200} className={field} placeholder="Av. Industrial 100"/></FormField>
+          <div className="grid gap-4 sm:grid-cols-2"><FormField label="Ciudad *"><input name="ciudad" required maxLength={100} className={field} placeholder="Monterrey"/></FormField><FormField label="Estado *"><input name="estado" required maxLength={100} className={field} placeholder="Nuevo León"/></FormField><FormField label="Código postal"><input name="codigo_postal" maxLength={12} className={field} placeholder="64000"/></FormField><FormField label="Horario de atención"><input name="horario" maxLength={120} className={field} placeholder="Lun–Vie 08:00–17:00"/></FormField></div>
+          <FormField label="Zona horaria"><select name="zona_horaria" className={field}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></FormField>
+          <label className="flex items-center gap-2 text-sm text-slate-600"><input name="requiere_cita" type="checkbox" className="accent-[#0b1f3b]"/>Esta ubicación requiere cita</label>
+          <FormField label="Instrucciones"><input name="instrucciones" maxLength={500} className={field} placeholder="Acceso, andén o indicaciones especiales"/></FormField>
+        </>}
         {mode === 'demo' && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Modo demo: este registro será temporal y no llegará a la base de datos.</p>}
         {formError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p>}
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setModal(null)} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving} type="submit" className={`${primaryButton} disabled:cursor-wait disabled:opacity-60`}>{saving ? 'Guardando…' : 'Guardar'}</button></div>
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-4"><button type="button" onClick={() => setModal(null)} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving} type="submit" className={`${primaryButton} disabled:cursor-wait disabled:opacity-60`}>{saving ? 'Guardando…' : modal === 'client' ? 'Guardar cliente' : 'Guardar dirección'}</button></div>
       </form>
     </section></div>}
   </div>;
@@ -167,4 +225,12 @@ export default function ClientsScreen() {
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return <div className={`${card} p-5`}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-[#0b1f3b]">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></div>;
+}
+
+function FormBlock({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return <section className="rounded-xl border border-slate-200 p-4 sm:p-5"><div className="mb-4"><h3 className="text-sm font-bold text-[#0b1f3b]">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div><div className="grid gap-4 sm:grid-cols-2">{children}</div></section>;
+}
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block text-sm font-semibold text-slate-700">{label}{children}</label>;
 }
