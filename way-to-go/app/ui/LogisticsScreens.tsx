@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDownTrayIcon, ArrowLeftIcon, ArrowUpTrayIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, DocumentTextIcon, MagnifyingGlassIcon, PlusIcon, TruckIcon } from '@heroicons/react/24/outline';
+import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
 
 type Trip = { folio: string; client: string; route: string; unit: string; driver: string; status: string; update: string; eta: string; evidence: string; amount: string };
 const trips: Trip[] = [
@@ -62,7 +63,20 @@ const pageData: Record<string,{eyebrow:string;title:string;desc:string;headings:
 };
 export function CatalogScreen({ kind }: {kind:keyof typeof pageData}) {
  const data=pageData[kind]; const [query,setQuery]=useState(''); const [notice,setNotice]=useState(''); const rows=data.rows.filter(r=>r.join(' ').toLowerCase().includes(query.toLowerCase()));
- return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow={data.eyebrow} title={data.title} description={data.desc} action={<button onClick={()=>setNotice(kind==='reportes'?'Reporte listo para descargar.':`Formulario de ${data.title.toLowerCase()} disponible en esta demo.`)} className={button}><PlusIcon className="h-4 w-4"/>{kind==='reportes'?'Exportar reporte':'Agregar registro'}</button>}/>{notice&&<div role="status" className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{notice}</div>}<div className="grid gap-4 sm:grid-cols-3"><Kpi label={kind==='facturacion'?'Listos para facturar':kind==='evidencias'?'Expedientes completos':'Registros activos'} value={kind==='facturacion'?'9':kind==='evidencias'?'24':'18'} note={kind==='facturacion'?'$184,600 MXN estimados':'Actualizado hoy'}/><Kpi label={kind==='facturacion'?'Expedientes pendientes':'Requieren atención'} value={kind==='facturacion'?'6':'3'} note="Revisión recomendada"/><Kpi label="En operación" value="12" note="Sin bloqueo activo"/></div><label className="relative block"><MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder={`Buscar en ${data.title.toLowerCase()}`} className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#c79d00]"/></label><Table headings={data.headings}>{rows.map((r,i)=><tr key={`${r[0]}-${i}`} className="hover:bg-slate-50/80">{r.map((v,j)=><td key={j} className="px-5 py-4 text-sm text-slate-600">{j===0?<span className="font-bold text-[#0b1f3b]">{v}</span>:j===data.headings.length-2&&kind==='facturacion'?<Pill>{v}</Pill>:v}</td>)}</tr>)}</Table>{kind==='evidencias'&&<section className={`${cls} flex flex-col items-center border-dashed p-8 text-center`}><DocumentTextIcon className="h-8 w-8 text-slate-400"/><p className="mt-3 font-semibold text-[#0b1f3b]">Carga una evidencia al expediente</p><p className="mt-1 text-sm text-slate-500">POD, fotos de carga, tickets o comprobantes.</p><label className={`${subtle} mt-4 cursor-pointer`}><ArrowUpTrayIcon className="h-4 w-4"/>Seleccionar archivo<input type="file" className="sr-only" onChange={e=>e.target.files?.[0]&&setNotice(`${e.target.files[0].name} listo para adjuntar a un viaje.`)}/></label></section>}<p className="text-xs text-slate-400">Información de demostración para navegación del módulo TMS.</p></div>;
+ const metrics = [
+  { label: kind==='facturacion'?'Listos para facturar':kind==='evidencias'?'Expedientes completos':'Registros activos', value: kind==='facturacion'?'9':kind==='evidencias'?'24':'18', note: kind==='facturacion'?'$184,600 MXN estimados':'Actualizado hoy' },
+  { label: kind==='facturacion'?'Expedientes pendientes':'Requieren atención', value: kind==='facturacion'?'6':'3', note: 'Revisión recomendada' },
+  { label: 'En operación', value: '12', note: 'Sin bloqueo activo' },
+ ];
+ return <div className="space-y-6 p-6 lg:p-8">
+  <CatalogPageHeader eyebrow={data.eyebrow} title={data.title} description={data.desc} action={<button onClick={()=>setNotice(kind==='reportes'?'Reporte listo para descargar.':`Formulario de ${data.title.toLowerCase()} disponible en esta demo.`)} className={button}><PlusIcon className="h-4 w-4"/>{kind==='reportes'?'Exportar reporte':'Agregar registro'}</button>}/>
+  {notice&&<div role="status" className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{notice}</div>}
+  <div className="grid gap-4 sm:grid-cols-3">{metrics.map(metric=><CatalogMetric key={metric.label} {...metric}/>)}</div>
+  <CatalogSearch value={query} onChange={setQuery} placeholder={`Buscar en ${data.title.toLowerCase()}`}/>
+  <div className={`${cls} overflow-hidden`}><CatalogTable headings={data.headings}>{rows.map((r,i)=><tr key={`${r[0]}-${i}`} className="hover:bg-slate-50/80">{r.map((v,j)=><td key={j} className="px-5 py-4 text-sm text-slate-600">{j===0?<span className="font-bold text-[#0b1f3b]">{v}</span>:j===data.headings.length-2&&kind==='facturacion'?<Pill>{v}</Pill>:v}</td>)}</tr>)}</CatalogTable></div>
+  {kind==='evidencias'&&<section className={`${cls} flex flex-col items-center border-dashed p-8 text-center`}><DocumentTextIcon className="h-8 w-8 text-slate-400"/><p className="mt-3 font-semibold text-[#0b1f3b]">Carga una evidencia al expediente</p><p className="mt-1 text-sm text-slate-500">POD, fotos de carga, tickets o comprobantes.</p><label className={`${subtle} mt-4 cursor-pointer`}><ArrowUpTrayIcon className="h-4 w-4"/>Seleccionar archivo<input type="file" className="sr-only" onChange={e=>e.target.files?.[0]&&setNotice(`${e.target.files[0].name} listo para adjuntar a un viaje.`)}/></label></section>}
+  <p className="text-xs text-slate-400">Información de demostración para navegación del módulo TMS.</p>
+ </div>;
 }
 
 export function ExternalPortal({ role }: {role:'cliente'|'operador'}) {

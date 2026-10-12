@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, MagnifyingGlassIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsCustomerDetail } from '../services/logistics-api';
+import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
 
 type ClientContact = LogisticsCustomerDetail['contactos'][number];
 type ClientRow = LogisticsCustomer & { address_preview?: string | null; demo_addresses?: LogisticsAddress[]; demo_contacts?: ClientContact[] };
@@ -137,28 +138,30 @@ export default function ClientsScreen() {
   }
 
   return <div className="space-y-6 p-6 lg:p-8">
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#b28b00]">Datos base · Logística</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-[#0b1f3b]">Clientes y direcciones</h1><p className="mt-1 max-w-2xl text-sm text-slate-500">Mantén los clientes y sus puntos de carga o entrega listos para programar viajes.</p></div>
-      <button onClick={() => { setFormError(''); setModal('client'); }} className={primaryButton}><PlusIcon className="h-4 w-4"/>Agregar cliente</button>
-    </header>
+    <CatalogPageHeader
+      eyebrow="Datos base · Logística"
+      title="Clientes y direcciones"
+      description="Mantén los clientes y sus puntos de carga o entrega listos para programar viajes."
+      action={<button onClick={() => { setFormError(''); setModal('client'); }} className={primaryButton}><PlusIcon className="h-4 w-4"/>Agregar cliente</button>}
+    />
 
     {mode === 'demo' && <div role="status" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"><BuildingOffice2Icon className="mt-0.5 h-5 w-5 shrink-0 text-amber-700"/><div><p className="font-semibold">Vista de demostración · sin conexión a la base</p><p className="mt-0.5 text-amber-900/80">{connectionMessage}. Los registros DEMO y los cambios de esta vista son locales y no se guardan.</p></div></div>}
     {notice && <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircleIcon className="h-5 w-5"/>{notice}</div>}
 
     <div className="grid gap-4 sm:grid-cols-3">
-      <Metric label="Clientes registrados" value={mode === 'loading' ? '—' : String(clients.length)} note="En el módulo de Logística"/>
-      <Metric label="Clientes activos" value={mode === 'loading' ? '—' : String(activeCount)} note="Disponibles para programar"/>
-      <Metric label="Direcciones" value={mode === 'loading' ? '—' : String(locationsCount)} note="Puntos activos de carga y entrega"/>
+      <CatalogMetric label="Clientes registrados" value={mode === 'loading' ? '—' : String(clients.length)} note="En el módulo de Logística"/>
+      <CatalogMetric label="Clientes activos" value={mode === 'loading' ? '—' : String(activeCount)} note="Disponibles para programar"/>
+      <CatalogMetric label="Direcciones" value={mode === 'loading' ? '—' : String(locationsCount)} note="Puntos activos de carga y entrega"/>
     </div>
 
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
       <section className={`${card} overflow-hidden`}>
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold text-[#0b1f3b]">Cartera de clientes</h2><p className="mt-0.5 text-xs text-slate-500">Selecciona un cliente para consultar sus direcciones.</p></div><label className="relative block sm:w-72"><MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={(event) => { setSearch(event.target.value); if (mode === 'live') void loadClients(event.target.value); }} placeholder="Buscar cliente, RFC o ciudad" className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#c79d00]"/></label></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3.5">Cliente / RFC</th><th className="px-5 py-3.5">Ubicación principal</th><th className="px-5 py-3.5">Direcciones</th><th className="px-5 py-3.5">Estado</th><th className="px-3 py-3.5"/></tr></thead><tbody className="divide-y divide-slate-100">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold text-[#0b1f3b]">Cartera de clientes</h2><p className="mt-0.5 text-xs text-slate-500">Selecciona un cliente para consultar sus direcciones.</p></div><CatalogSearch value={search} onChange={(value) => { setSearch(value); if (mode === 'live') void loadClients(value); }} placeholder="Buscar cliente, RFC o ciudad" className="sm:w-72"/></div>
+        <CatalogTable headings={['Cliente / RFC', 'Ubicación principal', 'Direcciones', 'Estado', '']} minWidth="620px">
           {mode === 'loading' && <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-500">Consultando clientes…</td></tr>}
           {mode !== 'loading' && filtered.map((client) => <tr key={client.id} onClick={() => setSelectedId(client.id)} className={`cursor-pointer transition hover:bg-slate-50 ${selectedId === client.id ? 'bg-amber-50/70' : ''}`}><td className="px-5 py-4"><p className="font-semibold text-[#0b1f3b]">{client.razon_social}</p><p className="mt-1 text-xs text-slate-400">{client.rfc || 'RFC sin capturar'}</p></td><td className="px-5 py-4 text-slate-600">{client.address_preview || 'Sin dirección registrada'}</td><td className="px-5 py-4 text-slate-600">{client.direcciones_activas ?? client.demo_addresses?.length ?? 0}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${client.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{client.activo ? 'Activo' : 'Inactivo'}</span></td><td className="px-3 py-4 text-right"><ChevronRightIcon className="ml-auto h-4 w-4 text-slate-400"/></td></tr>)}
           {mode !== 'loading' && filtered.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-500">No hay clientes que coincidan con la búsqueda.</td></tr>}
-        </tbody></table></div>
+        </CatalogTable>
         <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">{filtered.length} {filtered.length === 1 ? 'cliente' : 'clientes'}</div>
       </section>
 
@@ -221,10 +224,6 @@ export default function ClientsScreen() {
       </form>
     </section></div>}
   </div>;
-}
-
-function Metric({ label, value, note }: { label: string; value: string; note: string }) {
-  return <div className={`${card} p-5`}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-[#0b1f3b]">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></div>;
 }
 
 function FormBlock({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
