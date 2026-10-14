@@ -300,12 +300,80 @@ router.post('/customers', requireTripEdit, wrap(async (req, res) => {
     throw error;
   } finally { client.release(); }
 }));
+router.patch('/customers/:id', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
+  const body = req.body || {};
+  const fields = [
+    ['razon_social', 'razon_social'], ['nombre_comercial', 'nombre_comercial'], ['rfc', 'rfc'],
+    ['uso_cfdi', 'uso_cfdi'], ['forma_pago', 'forma_pago'], ['metodo_pago', 'metodo_pago'], ['condiciones_pago', 'condiciones_pago'],
+  ];
+  const updates = [];
+  const values = [];
+  for (const [column, key] of fields) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const value = body[key];
+    if (key === 'razon_social' && (typeof value !== 'string' || !value.trim())) return fail(res, 400, 'La razón social es obligatoria');
+    if (value != null && typeof value !== 'string') return fail(res, 400, `El campo ${key} debe ser texto`);
+    if (key === 'rfc' && typeof value === 'string' && value.trim().length > 13) return fail(res, 400, 'El RFC debe tener como máximo 13 caracteres');
+    values.push(key === 'razon_social' ? value.trim() : key === 'rfc' ? value?.trim().toUpperCase() || null : value?.trim() || null);
+    updates.push(`${column}=$${values.length}`);
+  }
+  const hasContactUpdate = Object.prototype.hasOwnProperty.call(body, 'contacto');
+  const contact = body.contacto || {};
+  if (hasContactUpdate && (typeof contact !== 'object' || Array.isArray(contact))) return fail(res, 400, 'Los datos del contacto no son válidos');
+  if (hasContactUpdate && ['nombre', 'puesto', 'email', 'telefono', 'tipo_contacto'].some((key) => contact[key] != null && typeof contact[key] !== 'string')) return fail(res, 400, 'Los campos del contacto deben ser texto');
+  const hasContactData = [contact.nombre, contact.puesto, contact.email, contact.telefono].some((value) => typeof value === 'string' && value.trim());
+  if (hasContactUpdate && hasContactData && (typeof contact.nombre !== 'string' || !contact.nombre.trim())) return fail(res, 400, 'El nombre del contacto es obligatorio cuando agregas sus datos');
+  if (!updates.length && !hasContactUpdate) return fail(res, 400, 'No se recibieron campos para actualizar');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let customer;
+    if (updates.length) {
+      values.push(req.params.id);
+      const result = await client.query(`UPDATE tms.clientes SET ${updates.join(', ')}, updated_at=now() WHERE id=$${values.length} RETURNING *`, values);
+      [customer] = result.rows;
+    } else {
+      const result = await client.query('SELECT * FROM tms.clientes WHERE id=$1 FOR UPDATE', [req.params.id]);
+      [customer] = result.rows;
+    }
+    if (!customer) { await client.query('ROLLBACK'); return fail(res, 404, 'Cliente no encontrado'); }
+
+    if (hasContactUpdate && hasContactData) {
+      const { rows: [existingContact] } = await client.query('SELECT id FROM tms.cliente_contactos WHERE cliente_id=$1 AND principal AND activo FOR UPDATE', [req.params.id]);
+      const contactValues = [contact.nombre.trim(), contact.puesto?.trim() || null, contact.email?.trim() || null,
+        contact.telefono?.trim() || null, contact.tipo_contacto?.trim() || 'OPERACIONES'];
+      if (existingContact) {
+        await client.query(`UPDATE tms.cliente_contactos SET nombre=$2,puesto=$3,email=$4,telefono=$5,tipo_contacto=$6,updated_at=now() WHERE id=$1`, [existingContact.id, ...contactValues]);
+      } else {
+        await client.query(`INSERT INTO tms.cliente_contactos (cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal)
+          VALUES ($1,$2,$3,$4,$5,$6,true)`, [req.params.id, ...contactValues]);
+      }
+    } else if (hasContactUpdate) {
+      await client.query(`UPDATE tms.cliente_contactos SET activo=false,principal=false,updated_at=now()
+        WHERE cliente_id=$1 AND principal AND activo`, [req.params.id]);
+    }
+    await client.query('COMMIT');
+    res.json({ success: true, data: customer });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}));
+router.patch('/customers/:id/active', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
+  if (typeof req.body?.activo !== 'boolean') return fail(res, 400, 'El estado activo debe ser verdadero o falso');
+  const { rows: [customer] } = await query('UPDATE tms.clientes SET activo=$2, updated_at=now() WHERE id=$1 RETURNING *', [req.params.id, req.body.activo]);
+  if (!customer) return fail(res, 404, 'Cliente no encontrado');
+  res.json({ success: true, data: customer });
+}));
 router.get('/customers/:id', requireTripRead, wrap(async (req, res) => {
   if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
   const { rows: [customer] } = await query(`SELECT * FROM tms.clientes WHERE id=$1`, [req.params.id]);
   if (!customer) return fail(res, 404, 'Cliente no encontrado');
   const [addresses, contacts] = await Promise.all([
-    query(`SELECT * FROM tms.cliente_direcciones WHERE cliente_id=$1 AND activo ORDER BY nombre`, [req.params.id]),
+    query(`SELECT * FROM tms.cliente_direcciones WHERE cliente_id=$1 ORDER BY activo DESC,nombre`, [req.params.id]),
     query(`SELECT id,nombre,puesto,email,telefono,tipo_contacto,principal FROM tms.cliente_contactos WHERE cliente_id=$1 AND activo ORDER BY principal DESC,nombre`, [req.params.id]),
   ]);
   res.json({ success: true, data: { ...customer, direcciones: addresses.rows, contactos: contacts.rows } });
@@ -320,6 +388,49 @@ router.post('/customers/:id/addresses', requireTripEdit, wrap(async (req, res) =
   [req.params.id, nombre.trim(), calle.trim(), ciudad.trim(), estado.trim(), String(pais).slice(0, 2).toUpperCase(), postalCode || null, timezone, horario || null, instrucciones || null, Boolean(appointment)]);
   if (!address) return fail(res, 404, 'Cliente no encontrado o inactivo');
   res.status(201).json({ success: true, data: address });
+}));
+router.patch('/addresses/:id', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de dirección inválido');
+  const body = req.body || {};
+  const textFields = [
+    ['nombre', 'nombre', true], ['calle', 'calle', true], ['ciudad', 'ciudad', true], ['estado', 'estado', true],
+    ['pais', 'pais', false], ['codigo_postal', 'codigo_postal', false], ['zona_horaria', 'zona_horaria', false],
+    ['horario', 'horario', false], ['instrucciones', 'instrucciones', false],
+  ];
+  const updates = [];
+  const values = [];
+  const nullableFields = new Set(['codigo_postal', 'horario', 'instrucciones']);
+  for (const [column, key, required] of textFields) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const value = body[key];
+    if (value == null && nullableFields.has(key)) {
+      values.push(null);
+      updates.push(`${column}=$${values.length}`);
+      continue;
+    }
+    if (typeof value !== 'string' || (required && !value.trim())) return fail(res, 400, `${key} debe contener texto${required ? ' y no puede quedar vacío' : ''}`);
+    const normalized = value.trim();
+    if (key === 'pais' && normalized.length !== 2) return fail(res, 400, 'El país debe usar un código de dos letras');
+    values.push(key === 'pais' ? normalized.toUpperCase() : normalized || null);
+    updates.push(`${column}=$${values.length}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'requiere_cita')) {
+    if (typeof body.requiere_cita !== 'boolean') return fail(res, 400, 'requiere_cita debe ser verdadero o falso');
+    values.push(body.requiere_cita);
+    updates.push(`requiere_cita=$${values.length}`);
+  }
+  if (!updates.length) return fail(res, 400, 'No se recibieron campos para actualizar');
+  values.push(req.params.id);
+  const { rows: [address] } = await query(`UPDATE tms.cliente_direcciones SET ${updates.join(', ')}, updated_at=now() WHERE id=$${values.length} RETURNING *`, values);
+  if (!address) return fail(res, 404, 'Dirección no encontrada');
+  res.json({ success: true, data: address });
+}));
+router.patch('/addresses/:id/active', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de dirección inválido');
+  if (typeof req.body?.activo !== 'boolean') return fail(res, 400, 'El estado activo debe ser verdadero o falso');
+  const { rows: [address] } = await query('UPDATE tms.cliente_direcciones SET activo=$2, updated_at=now() WHERE id=$1 RETURNING *', [req.params.id, req.body.activo]);
+  if (!address) return fail(res, 404, 'Dirección no encontrada');
+  res.json({ success: true, data: address });
 }));
 router.get('/units', requireTripRead, wrap(async (_req, res) => { const { rows } = await query(`SELECT u.*,p.razon_social AS proveedor FROM tms.unidades u LEFT JOIN tms.proveedores p ON p.id=u.proveedor_id ORDER BY u.numero_economico`); res.json({ success: true, data: rows }); }));
 router.get('/operators', requireTripRead, wrap(async (_req, res) => { const { rows } = await query(`SELECT o.*,p.razon_social AS proveedor FROM tms.operadores o LEFT JOIN tms.proveedores p ON p.id=o.proveedor_id ORDER BY o.nombre`); res.json({ success: true, data: rows }); }));

@@ -22,8 +22,12 @@ El esquema usa UUID, folio de viaje generado por secuencia, estados operativos s
 | GET, POST | `/api/logistica/trips/:folio/evidence` | Consultar checklist y subir entregas |
 | GET | `/api/logistica/customers`, `/units`, `/operators`, `/providers`, `/catalogs` | Consultar catálogos |
 | POST | `/api/logistica/customers` | Crear cliente |
+| PATCH | `/api/logistica/customers/:id` | Editar datos y contacto principal |
+| PATCH | `/api/logistica/customers/:id/active` | Desactivar o reactivar cliente |
 | GET | `/api/logistica/customers/:id` | Consultar ficha, direcciones y contactos |
 | POST | `/api/logistica/customers/:id/addresses` | Agregar dirección |
+| PATCH | `/api/logistica/addresses/:id` | Editar dirección |
+| PATCH | `/api/logistica/addresses/:id/active` | Desactivar o reactivar dirección |
 
 Para crear un viaje deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
 

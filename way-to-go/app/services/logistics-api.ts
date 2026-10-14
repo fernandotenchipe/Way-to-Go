@@ -77,6 +77,9 @@ export interface LogisticsCustomerCreateInput {
   direccion?: Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>;
 }
 
+export type LogisticsCustomerUpdateInput = Partial<Omit<LogisticsCustomerCreateInput, 'direccion'>>;
+export type LogisticsAddressUpdateInput = Partial<Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>>;
+
 class LogisticsApi {
   private async request<T>(path: string, init: RequestInit = {}): Promise<LogisticsResponse<T>> {
     const token = typeof window === 'undefined' ? null : localStorage.getItem('auth_token');
@@ -107,8 +110,24 @@ class LogisticsApi {
     return this.request<LogisticsCustomer>('customers', { method: 'POST', body: JSON.stringify(input) });
   }
 
+  updateCustomer(id: string, input: LogisticsCustomerUpdateInput) {
+    return this.request<LogisticsCustomer>(`customers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
+  }
+
+  setCustomerActive(id: string, activo: boolean) {
+    return this.request<LogisticsCustomer>(`customers/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ activo }) });
+  }
+
   addCustomerAddress(id: string, input: Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>) {
     return this.request<LogisticsAddress>(`customers/${encodeURIComponent(id)}/addresses`, { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  updateCustomerAddress(id: string, input: LogisticsAddressUpdateInput) {
+    return this.request<LogisticsAddress>(`addresses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
+  }
+
+  setCustomerAddressActive(id: string, activo: boolean) {
+    return this.request<LogisticsAddress>(`addresses/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ activo }) });
   }
 
   getTrips(filters: { estado?: LogisticsTripStatus; cliente_id?: string; q?: string; limit?: number; offset?: number } = {}) {

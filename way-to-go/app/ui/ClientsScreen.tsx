@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, PencilSquareIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { logisticsApi, type LogisticsAddress, type LogisticsCustomerDetail } from '../services/logistics-api';
-import { getDemoLogisticsCustomers, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
-import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable, LogisticsFormField, LogisticsFormSection, logisticsFieldClassName } from './LogisticsCatalogComponents';
+import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
+import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
+import ClientRecordDialog, { type ClientEditorModal } from './ClientRecordDialog';
 
 type ClientRow = DemoLogisticsCustomer;
 type Mode = 'loading' | 'live' | 'demo';
@@ -26,7 +27,6 @@ const demoClients: ClientRow[] = [
 
 const card = 'rounded-xl border border-slate-200 bg-white shadow-sm';
 const primaryButton = 'inline-flex items-center gap-2 rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#183a64]';
-const field = logisticsFieldClassName;
 
 export default function ClientsScreen() {
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function ClientsScreen() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<LogisticsCustomerDetail | null>(null);
-  const [modal, setModal] = useState<'address' | null>(null);
+  const [modal, setModal] = useState<ClientEditorModal | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
@@ -50,7 +50,11 @@ export default function ClientsScreen() {
       setConnectionMessage('');
     } catch (error) {
       setMode('demo');
-      const availableDemoClients = [...getDemoLogisticsCustomers(), ...demoClients];
+      // Stored demo edits should replace their built-in seed row. The same ID
+      // can exist in both sources after a client has been edited offline.
+      const demoClientsById = new Map(demoClients.map((client) => [client.id, client]));
+      for (const client of getDemoLogisticsCustomers()) demoClientsById.set(client.id, client);
+      const availableDemoClients = [...demoClientsById.values()];
       setClients(availableDemoClients.filter((client) => `${client.razon_social} ${client.rfc ?? ''} ${client.address_preview ?? ''}`.toLowerCase().includes(query.toLowerCase())));
       setConnectionMessage(error instanceof Error ? error.message : 'No fue posible consultar la base de datos.');
     }
@@ -84,32 +88,187 @@ export default function ClientsScreen() {
   const activeCount = clients.filter((client) => client.activo).length;
   const locationsCount = clients.reduce((total, client) => total + Number(client.direcciones_activas ?? client.demo_addresses?.length ?? 0), 0);
 
-  async function submitAddress(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!selectedId) return;
-    setSaving(true); setFormError('');
+  function persistDemoCustomer(customer: ClientRow) {
+    saveDemoLogisticsCustomer(customer);
+    setClients((current) => current.map((item) => item.id === customer.id ? customer : item));
+    setDetail((current) => current?.id === customer.id ? {
+      ...current,
+      ...customer,
+      direcciones: customer.demo_addresses ?? current.direcciones,
+      contactos: customer.demo_contacts ?? current.contactos,
+    } : current);
+  }
+
+  async function submitClientEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!detail) return;
+    setSaving(true);
+    setFormError('');
     const form = new FormData(event.currentTarget);
-    const input = {
-      nombre: String(form.get('nombre')).trim(), calle: String(form.get('calle')).trim(),
-      ciudad: String(form.get('ciudad')).trim(), estado: String(form.get('estado')).trim(),
-      pais: 'MX', codigo_postal: String(form.get('codigo_postal')).trim() || null,
-      zona_horaria: String(form.get('zona_horaria') || 'America/Mexico_City'),
-      horario: String(form.get('horario')).trim() || null, instrucciones: String(form.get('instrucciones')).trim() || null,
-      requiere_cita: form.get('requiere_cita') === 'on',
+    const value = (key: string) => String(form.get(key) ?? '').trim();
+    const contact = {
+      nombre: value('contacto_nombre'),
+      puesto: value('contacto_puesto'),
+      tipo_contacto: value('contacto_tipo') || 'OPERACIONES',
+      email: value('contacto_email'),
+      telefono: value('contacto_telefono'),
+    };
+    const hasContactData = [contact.nombre, contact.puesto, contact.email, contact.telefono].some(Boolean);
+    if (hasContactData && !contact.nombre) {
+      setFormError('Escribe el nombre del contacto o deja vacía toda esa sección.');
+      setSaving(false);
+      return;
+    }
+    const customerInput = {
+      razon_social: value('razon_social'),
+      nombre_comercial: value('nombre_comercial'),
+      rfc: value('rfc'),
+      uso_cfdi: value('uso_cfdi'),
+      forma_pago: value('forma_pago'),
+      metodo_pago: value('metodo_pago'),
+      condiciones_pago: value('condiciones_pago'),
+      contacto: contact,
     };
     try {
       if (mode === 'live') {
-        await logisticsApi.addCustomerAddress(selectedId, input);
-        const response = await logisticsApi.getCustomer(selectedId); setDetail(response.data);
-        await loadClients(search);
-        setNotice('Dirección guardada en la base de datos.');
+        await logisticsApi.updateCustomer(detail.id, customerInput);
+        const [customerResponse] = await Promise.all([logisticsApi.getCustomer(detail.id), loadClients(search)]);
+        setDetail(customerResponse.data);
       } else {
-        const address: LogisticsAddress = { id: `demo-${crypto.randomUUID()}`, cliente_id: selectedId, activo: true, ...input };
-        setClients((current) => current.map((client) => client.id === selectedId ? { ...client, direcciones_activas: Number(client.direcciones_activas ?? 0) + 1, demo_addresses: [...(client.demo_addresses ?? []), address], address_preview: `${address.ciudad}, ${address.estado}` } : client));
-        setNotice('Dirección agregada solo a esta vista de demostración; no se guardó en la base.');
+        const oldContact = detail.contactos[0];
+        const contacts = hasContactData ? [{
+          id: oldContact?.id ?? `demo-contact-${crypto.randomUUID()}`,
+          ...contact,
+          puesto: contact.puesto || null,
+          email: contact.email || null,
+          telefono: contact.telefono || null,
+          principal: true,
+        }] : [];
+        const updated: ClientRow = {
+          ...(clients.find((client) => client.id === detail.id) ?? detail),
+          razon_social: customerInput.razon_social,
+          uso_cfdi: customerInput.uso_cfdi || null,
+          forma_pago: customerInput.forma_pago || null,
+          metodo_pago: customerInput.metodo_pago || null,
+          condiciones_pago: customerInput.condiciones_pago || null,
+          nombre_comercial: customerInput.nombre_comercial || null,
+          rfc: customerInput.rfc || null,
+          demo_contacts: contacts,
+          demo_addresses: detail.direcciones,
+        };
+        persistDemoCustomer(updated);
       }
+      setNotice(mode === 'live' ? 'Cliente actualizado en la base de datos.' : 'Cliente actualizado en los datos de demostración de este navegador.');
       setModal(null);
-    } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo guardar la dirección.'); }
-    finally { setSaving(false); }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'No se pudo actualizar el cliente.');
+    } finally { setSaving(false); }
+  }
+
+  async function submitAddress(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedId || modal?.kind !== 'address') return;
+    setSaving(true);
+    setFormError('');
+    const form = new FormData(event.currentTarget);
+    const input = {
+      nombre: String(form.get('nombre') ?? '').trim(),
+      calle: String(form.get('calle') ?? '').trim(),
+      ciudad: String(form.get('ciudad') ?? '').trim(),
+      estado: String(form.get('estado') ?? '').trim(),
+      pais: 'MX',
+      codigo_postal: String(form.get('codigo_postal') ?? '').trim() || null,
+      zona_horaria: String(form.get('zona_horaria') || 'America/Mexico_City'),
+      horario: String(form.get('horario') ?? '').trim() || null,
+      instrucciones: String(form.get('instrucciones') ?? '').trim() || null,
+      requiere_cita: form.get('requiere_cita') === 'on',
+    };
+    const editingAddress = modal.address;
+    try {
+      if (mode === 'live') {
+        if (editingAddress) await logisticsApi.updateCustomerAddress(editingAddress.id, input);
+        else await logisticsApi.addCustomerAddress(selectedId, input);
+        const [customerResponse] = await Promise.all([logisticsApi.getCustomer(selectedId), loadClients(search)]);
+        setDetail(customerResponse.data);
+      } else {
+        const customer = clients.find((client) => client.id === selectedId);
+        if (!customer) throw new Error('No se encontró el cliente seleccionado.');
+        const address: LogisticsAddress = editingAddress
+          ? { ...editingAddress, ...input }
+          : { id: `demo-${crypto.randomUUID()}`, cliente_id: selectedId, activo: true, ...input };
+        const addresses = editingAddress
+          ? (customer.demo_addresses ?? detail?.direcciones ?? []).map((item) => item.id === address.id ? address : item)
+          : [...(customer.demo_addresses ?? detail?.direcciones ?? []), address];
+        const updated: ClientRow = {
+          ...customer,
+          direcciones_activas: addresses.filter((item) => item.activo).length,
+          demo_addresses: addresses,
+          address_preview: addresses.find((item) => item.activo)?.ciudad
+            ? `${addresses.find((item) => item.activo)?.ciudad}, ${addresses.find((item) => item.activo)?.estado}`
+            : null,
+        };
+        persistDemoCustomer(updated);
+      }
+      setNotice(editingAddress
+        ? (mode === 'live' ? 'Dirección actualizada en la base de datos.' : 'Dirección actualizada en los datos de demostración.')
+        : (mode === 'live' ? 'Dirección guardada en la base de datos.' : 'Dirección agregada a los datos de demostración de este navegador.'));
+      setModal(null);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'No se pudo guardar la dirección.');
+    } finally { setSaving(false); }
+  }
+
+  async function toggleCustomerActive() {
+    if (!detail) return;
+    const nextActive = !detail.activo;
+    const action = nextActive ? 'reactivar' : 'desactivar';
+    if (!window.confirm(`¿Quieres ${action} a ${detail.nombre_comercial || detail.razon_social}?`)) return;
+    setSaving(true);
+    setFormError('');
+    try {
+      if (mode === 'live') {
+        const response = await logisticsApi.setCustomerActive(detail.id, nextActive);
+        setDetail((current) => current ? { ...current, ...response.data } : current);
+        setClients((current) => current.map((client) => client.id === detail.id ? { ...client, ...response.data } : client));
+      } else {
+        const updated = { ...(clients.find((client) => client.id === detail.id) ?? detail), activo: nextActive, demo_addresses: detail.direcciones, demo_contacts: detail.contactos };
+        persistDemoCustomer(updated);
+      }
+      setNotice(nextActive ? 'Cliente reactivado.' : 'Cliente desactivado; su historial se conserva.');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : `No se pudo ${action} al cliente.`);
+    } finally { setSaving(false); }
+  }
+
+  async function toggleAddressActive(address: LogisticsAddress) {
+    if (!detail) return;
+    const nextActive = !address.activo;
+    const action = nextActive ? 'reactivar' : 'desactivar';
+    if (!window.confirm(`¿Quieres ${action} la dirección “${address.nombre}”?`)) return;
+    setSaving(true);
+    setFormError('');
+    try {
+      if (mode === 'live') {
+        await logisticsApi.setCustomerAddressActive(address.id, nextActive);
+        const [customerResponse] = await Promise.all([logisticsApi.getCustomer(detail.id), loadClients(search)]);
+        setDetail(customerResponse.data);
+      } else {
+        const customer = clients.find((client) => client.id === detail.id);
+        if (!customer) throw new Error('No se encontró el cliente seleccionado.');
+        const addresses = (customer.demo_addresses ?? detail.direcciones).map((item) => item.id === address.id ? { ...item, activo: nextActive } : item);
+        const activeAddress = addresses.find((item) => item.activo);
+        persistDemoCustomer({
+          ...customer,
+          direcciones_activas: addresses.filter((item) => item.activo).length,
+          address_preview: activeAddress ? `${activeAddress.ciudad}, ${activeAddress.estado}` : null,
+          demo_addresses: addresses,
+          demo_contacts: detail.contactos,
+        });
+      }
+      setNotice(nextActive ? 'Dirección reactivada.' : 'Dirección desactivada; los viajes existentes conservan su historial.');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : `No se pudo ${action} la dirección.`);
+    } finally { setSaving(false); }
   }
 
   return <div className="space-y-6 p-6 lg:p-8">
@@ -142,34 +301,24 @@ export default function ClientsScreen() {
 
       <section className={`${card} overflow-hidden`}>
         {detail ? <>
-          <div className="border-b border-slate-100 p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[#0b1f3b]"><BuildingOffice2Icon className="h-5 w-5"/></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ficha del cliente</p><h2 className="mt-0.5 truncate font-bold text-[#0b1f3b]">{detail.nombre_comercial || detail.razon_social}</h2></div></div><button onClick={() => setSelectedId(null)} aria-label="Cerrar detalle" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-4 w-4"/></button></div><p className="mt-3 text-xs text-slate-500">{detail.razon_social}</p><p className="mt-1 text-xs text-slate-400">RFC · {detail.rfc || 'Sin capturar'}</p></div>
+          <div className="border-b border-slate-100 p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[#0b1f3b]"><BuildingOffice2Icon className="h-5 w-5"/></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ficha del cliente</p><h2 className="mt-0.5 truncate font-bold text-[#0b1f3b]">{detail.nombre_comercial || detail.razon_social}</h2></div></div><button onClick={() => setSelectedId(null)} aria-label="Cerrar detalle" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-4 w-4"/></button></div><p className="mt-3 text-xs text-slate-500">{detail.razon_social}</p><p className="mt-1 text-xs text-slate-400">RFC · {detail.rfc || 'Sin capturar'}</p><div className="mt-3 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${detail.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{detail.activo ? 'Activo' : 'Inactivo'}</span><button onClick={() => { setFormError(''); setModal({ kind: 'client' }); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar cliente</button><button disabled={saving} onClick={() => void toggleCustomerActive()} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{detail.activo ? 'Desactivar' : 'Reactivar'}</button></div></div>
           <div className="border-b border-slate-100 p-5"><h3 className="text-sm font-bold text-[#0b1f3b]">Contacto principal</h3>{detail.contactos.length ? detail.contactos.map((contact) => <div key={contact.id} className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-700">{contact.nombre}{contact.puesto ? ` · ${contact.puesto}` : ''}</p><p className="mt-1 text-xs text-slate-500">{contact.email || 'Sin correo'}{contact.telefono ? ` · ${contact.telefono}` : ''}</p><p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{contact.tipo_contacto || 'Contacto'}</p></div>) : <p className="mt-2 text-xs text-slate-500">Aún no hay contactos registrados.</p>}</div>
-          <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Direcciones</h3><p className="mt-0.5 text-xs text-slate-500">Puntos de operación del cliente</p></div><button onClick={() => { setFormError(''); setModal('address'); }} aria-label="Agregar dirección" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button></div>
-            <div className="space-y-3">{detail.direcciones.length ? detail.direcciones.map((address) => <article key={address.id} className="rounded-lg border border-slate-100 bg-slate-50/70 p-3"><div className="flex items-start gap-2.5"><MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b28b00]"/><div className="min-w-0"><p className="text-sm font-semibold text-slate-800">{address.nombre}</p><p className="mt-1 text-xs leading-5 text-slate-500">{address.calle}<br/>{address.ciudad}, {address.estado}{address.codigo_postal ? ` · C.P. ${address.codigo_postal}` : ''}</p><p className="mt-2 text-[11px] text-slate-400">{address.requiere_cita ? 'Requiere cita' : 'Sin cita requerida'}{address.horario ? ` · ${address.horario}` : ''}</p></div></div></article>) : <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center"><MapPinIcon className="mx-auto h-6 w-6 text-slate-300"/><p className="mt-2 text-sm font-medium text-slate-600">Aún no hay direcciones</p><p className="mt-1 text-xs text-slate-400">Agrega un punto de carga o entrega.</p></div>}</div>
-            <button onClick={() => { setFormError(''); setModal('address'); }} className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><PlusIcon className="mr-1.5 inline h-4 w-4"/>Agregar dirección</button>
+          <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Direcciones</h3><p className="mt-0.5 text-xs text-slate-500">Puntos de operación del cliente</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'address' }); }} aria-label="Agregar dirección" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>
+            <div className="space-y-3">{detail.direcciones.length ? detail.direcciones.map((address) => <article key={address.id} className={`rounded-lg border p-3 ${address.activo ? 'border-slate-100 bg-slate-50/70' : 'border-slate-200 bg-slate-100/70 opacity-75'}`}><div className="flex items-start gap-2.5"><MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b28b00]"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-800">{address.nombre}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${address.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{address.activo ? 'Activa' : 'Inactiva'}</span></div><p className="mt-1 text-xs leading-5 text-slate-500">{address.calle}<br/>{address.ciudad}, {address.estado}{address.codigo_postal ? ` · C.P. ${address.codigo_postal}` : ''}</p><p className="mt-2 text-[11px] text-slate-400">{address.requiere_cita ? 'Requiere cita' : 'Sin cita requerida'}{address.horario ? ` · ${address.horario}` : ''}</p><div className="mt-3 flex flex-wrap gap-2"><button onClick={() => { setFormError(''); setModal({ kind: 'address', address }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar</button><button disabled={saving} onClick={() => void toggleAddressActive(address)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{address.activo ? 'Desactivar' : 'Reactivar'}</button></div></div></div></article>) : <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center"><MapPinIcon className="mx-auto h-6 w-6 text-slate-300"/><p className="mt-2 text-sm font-medium text-slate-600">Aún no hay direcciones</p><p className="mt-1 text-xs text-slate-400">Agrega un punto de carga o entrega.</p></div>}</div>
+            {detail.activo ? <button onClick={() => { setFormError(''); setModal({ kind: 'address' }); }} className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><PlusIcon className="mr-1.5 inline h-4 w-4"/>Agregar dirección</button> : <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">Reactiva al cliente para agregar direcciones nuevas.</p>}
           </div>
         </> : <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400"><MapPinIcon className="h-6 w-6"/></div><h2 className="mt-4 font-bold text-[#0b1f3b]">Detalle del cliente</h2><p className="mt-1 max-w-xs text-sm text-slate-500">Selecciona un registro para ver sus direcciones y horarios de atención.</p></div>}
       </section>
     </div>
 
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setModal(null)}><section role="dialog" aria-modal="true" aria-labelledby="address-modal-title" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-      <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white px-6 py-5"><div><h2 id="address-modal-title" className="text-xl font-bold text-[#0b1f3b]">Agregar dirección</h2><p className="mt-1 text-sm text-slate-500">Nueva ubicación para {detail?.nombre_comercial || detail?.razon_social || 'el cliente'}.</p></div><button onClick={() => setModal(null)} aria-label="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-5 w-5"/></button></div>
-      <form onSubmit={submitAddress} className="space-y-4 px-6 py-5">
-        <LogisticsFormSection title="Datos de la ubicación" description="Captura el lugar de carga o entrega y sus instrucciones de acceso.">
-          <LogisticsFormField label="Nombre de la ubicación *"><input name="nombre" required maxLength={120} className={field} placeholder="Planta, CEDIS o sucursal"/></LogisticsFormField>
-          <LogisticsFormField label="Calle y número *"><input name="calle" required maxLength={200} className={field} placeholder="Av. Industrial 100"/></LogisticsFormField>
-          <LogisticsFormField label="Ciudad *"><input name="ciudad" required maxLength={100} className={field} placeholder="Monterrey"/></LogisticsFormField>
-          <LogisticsFormField label="Estado *"><input name="estado" required maxLength={100} className={field} placeholder="Nuevo León"/></LogisticsFormField>
-          <LogisticsFormField label="Código postal"><input name="codigo_postal" maxLength={12} className={field} placeholder="64000"/></LogisticsFormField>
-          <LogisticsFormField label="Horario de atención"><input name="horario" maxLength={120} className={field} placeholder="Lun–Vie 08:00–17:00"/></LogisticsFormField>
-          <LogisticsFormField label="Zona horaria"><select name="zona_horaria" className={field}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></LogisticsFormField>
-          <LogisticsFormField label="Instrucciones"><input name="instrucciones" maxLength={500} className={field} placeholder="Acceso, andén o indicaciones especiales"/></LogisticsFormField>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-600"><input name="requiere_cita" type="checkbox" className="accent-[#0b1f3b]"/>Esta ubicación requiere cita</label>
-        </LogisticsFormSection>
-        {mode === 'demo' && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Modo demo: la dirección solo estará disponible en esta vista.</p>}
-        {formError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p>}
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-4"><button type="button" onClick={() => setModal(null)} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving} type="submit" className={`${primaryButton} disabled:cursor-wait disabled:opacity-60`}>{saving ? 'Guardando…' : 'Guardar dirección'}</button></div>
-      </form>
-    </section></div>}
+    {modal && detail && <ClientRecordDialog
+      modal={modal}
+      customer={detail}
+      demo={mode === 'demo'}
+      saving={saving}
+      error={formError}
+      onClose={() => setModal(null)}
+      onSubmit={modal.kind === 'client' ? submitClientEdit : submitAddress}
+    />}
   </div>;
 }
