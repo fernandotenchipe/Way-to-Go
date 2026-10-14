@@ -76,7 +76,7 @@ latitud numeric(9,6) CHECK(latitud BETWEEN -90 AND 90),
 longitud numeric(9,6) CHECK(longitud BETWEEN -180 AND 180),
 zona_horaria text NOT NULL DEFAULT 'America/Mexico_City', horario text, instrucciones text,
 requiere_cita boolean NOT NULL DEFAULT false, contacto_id uuid,
-activo boolean NOT NULL DEFAULT true, UNIQUE(id, cliente_id),
+activo boolean NOT NULL DEFAULT true, principal boolean NOT NULL DEFAULT false, UNIQUE(id, cliente_id),
 FOREIGN KEY(contacto_id, cliente_id) REFERENCES tms.cliente_contactos(id, cliente_id),
 CHECK ((latitud IS NULL) = (longitud IS NULL)),
 created_at timestamptz NOT NULL DEFAULT now(),
@@ -506,7 +506,9 @@ WHERE (operador_id IS NOT NULL AND reserva_desde IS NOT NULL AND recursos_libera
 AND estado_operativo NOT IN ('BORRADOR','CANCELADO'));
 
 CREATE UNIQUE INDEX usuarios_email_ci ON tms.usuarios(lower(email));
+CREATE UNIQUE INDEX clientes_rfc_ci ON tms.clientes(upper(btrim(rfc))) WHERE rfc IS NOT NULL AND btrim(rfc) <> '';
 CREATE UNIQUE INDEX cliente_contacto_principal ON tms.cliente_contactos(cliente_id) WHERE principal AND activo;
+CREATE UNIQUE INDEX cliente_direccion_principal ON tms.cliente_direcciones(cliente_id) WHERE principal AND activo;
 CREATE UNIQUE INDEX proveedor_contacto_principal ON tms.proveedor_contactos(proveedor_id) WHERE principal AND activo;
 CREATE UNIQUE INDEX viaje_alerta_abierta ON tms.viaje_alertas(viaje_id, tipo) WHERE resuelta_at IS NULL;
 CREATE INDEX viajes_cliente_fecha ON tms.viajes(cliente_id, cita_carga_at DESC);

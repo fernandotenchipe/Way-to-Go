@@ -15,15 +15,15 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO tms.cliente_direcciones
-  (cliente_id, nombre, calle, ciudad, estado, pais, codigo_postal, zona_horaria, horario, requiere_cita)
+  (cliente_id, nombre, calle, ciudad, estado, pais, codigo_postal, zona_horaria, horario, requiere_cita, principal)
 SELECT c.id, demo.nombre, demo.calle, demo.ciudad, demo.estado, 'MX', demo.codigo_postal,
-  demo.zona_horaria, demo.horario, demo.requiere_cita
+  demo.zona_horaria, demo.horario, demo.requiere_cita, demo.principal
 FROM (VALUES
-  ('DEMO · Comercializadora Norte, S.A. de C.V.', 'CEDIS Apodaca', 'Av. de Prueba 1200', 'Apodaca', 'Nuevo León', '66600', 'America/Monterrey', 'Lun–Vie 08:00–17:00', true),
-  ('DEMO · Comercializadora Norte, S.A. de C.V.', 'Planta Monterrey', 'Calle Muestra 45', 'Monterrey', 'Nuevo León', '64000', 'America/Monterrey', 'Lun–Vie 07:00–16:00', false),
-  ('DEMO · Alimentos de Prueba, S. de R.L.', 'CEDIS Puebla', 'Blvd. Ejemplo 800', 'Puebla', 'Puebla', '72000', 'America/Mexico_City', 'Lun–Sáb 06:00–18:00', true),
-  ('DEMO · Empaques Modelo del Bajío, S.A.', 'Planta León', 'Carretera Ficticia km 4', 'León', 'Guanajuato', '37000', 'America/Mexico_City', 'Lun–Vie 08:00–17:00', false)
-) AS demo(razon_social, nombre, calle, ciudad, estado, codigo_postal, zona_horaria, horario, requiere_cita)
+  ('DEMO · Comercializadora Norte, S.A. de C.V.', 'CEDIS Apodaca', 'Av. de Prueba 1200', 'Apodaca', 'Nuevo León', '66600', 'America/Monterrey', 'Lun–Vie 08:00–17:00', true, true),
+  ('DEMO · Comercializadora Norte, S.A. de C.V.', 'Planta Monterrey', 'Calle Muestra 45', 'Monterrey', 'Nuevo León', '64000', 'America/Monterrey', 'Lun–Vie 07:00–16:00', false, false),
+  ('DEMO · Alimentos de Prueba, S. de R.L.', 'CEDIS Puebla', 'Blvd. Ejemplo 800', 'Puebla', 'Puebla', '72000', 'America/Mexico_City', 'Lun–Sáb 06:00–18:00', true, true),
+  ('DEMO · Empaques Modelo del Bajío, S.A.', 'Planta León', 'Carretera Ficticia km 4', 'León', 'Guanajuato', '37000', 'America/Mexico_City', 'Lun–Vie 08:00–17:00', false, true)
+) AS demo(razon_social, nombre, calle, ciudad, estado, codigo_postal, zona_horaria, horario, requiere_cita, principal)
 JOIN tms.clientes c ON c.razon_social = demo.razon_social
 WHERE NOT EXISTS (
   SELECT 1 FROM tms.cliente_direcciones d WHERE d.cliente_id=c.id AND d.nombre=demo.nombre

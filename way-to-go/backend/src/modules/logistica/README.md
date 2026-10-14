@@ -8,6 +8,8 @@ El contrato de datos es el esquema PostgreSQL `tms` del diseño compartido en el
 
 El esquema usa UUID, folio de viaje generado por secuencia, estados operativos separados de facturación, y vistas para evidencias y preparación de facturación. RLS está habilitado sin políticas y el esquema revoca acceso a `PUBLIC`; la API requiere usuario, rol y permiso definidos en `tms.usuarios`, `usuario_roles` y `rol_permisos`. Las asignaciones rol-permiso siguen pendientes en el diseño, así que las operaciones protegidas responderán sin permiso hasta que exista una matriz aprobada.
 
+Para un esquema ya instalado, aplica manualmente y una sola vez `database/migrations/20261013_clientes_direccion_principal_rfc_unico.sql`. La migración agrega la dirección principal y unicidad de RFC sin distinguir mayúsculas; si detecta RFC duplicados, se detiene y muestra una consulta de diagnóstico. No vuelvas a ejecutar `schema.sql` como actualización.
+
 ## Endpoints básicos
 
 | Método | Ruta | Uso |
@@ -28,6 +30,8 @@ El esquema usa UUID, folio de viaje generado por secuencia, estados operativos s
 | POST | `/api/logistica/customers/:id/addresses` | Agregar dirección |
 | PATCH | `/api/logistica/addresses/:id` | Editar dirección |
 | PATCH | `/api/logistica/addresses/:id/active` | Desactivar o reactivar dirección |
+
+El RFC se valida con formato mexicano y no se puede repetir. El correo de contacto se valida y normaliza a minúsculas. Cada cliente puede tener una dirección principal activa; al desactivar la principal se promueve otra dirección activa cuando exista.
 
 Para crear un viaje deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
 

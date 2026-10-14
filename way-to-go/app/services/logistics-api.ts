@@ -58,6 +58,7 @@ export interface LogisticsAddress {
   instrucciones: string | null;
   requiere_cita: boolean;
   activo: boolean;
+  principal?: boolean;
 }
 
 export interface LogisticsCustomerDetail extends LogisticsCustomer {

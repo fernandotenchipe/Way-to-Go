@@ -13,7 +13,15 @@ export function getDemoLogisticsCustomers(): DemoLogisticsCustomer[] {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const customers: unknown = stored ? JSON.parse(stored) : [];
-    return Array.isArray(customers) ? customers as DemoLogisticsCustomer[] : [];
+    if (!Array.isArray(customers)) return [];
+    return (customers as DemoLogisticsCustomer[]).map((customer) => {
+      const addresses = customer.demo_addresses ?? [];
+      if (addresses.some((address) => address.principal && address.activo)) return customer;
+      const firstActiveAddress = addresses.find((address) => address.activo);
+      return firstActiveAddress
+        ? { ...customer, demo_addresses: addresses.map((address) => ({ ...address, principal: address.id === firstActiveAddress.id })) }
+        : customer;
+    });
   } catch {
     return [];
   }

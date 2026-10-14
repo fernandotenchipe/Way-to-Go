@@ -45,7 +45,7 @@ export default function ClientRecordDialog({
             <LogisticsFormSection title="Datos de la empresa" description="La razón social es necesaria para identificar al cliente.">
               <LogisticsFormField label="Razón social *"><input name="razon_social" required maxLength={180} defaultValue={customer.razon_social} className={logisticsFieldClassName} /></LogisticsFormField>
               <LogisticsFormField label="Nombre comercial"><input name="nombre_comercial" maxLength={180} defaultValue={customer.nombre_comercial ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
-              <LogisticsFormField label="RFC"><input name="rfc" maxLength={13} defaultValue={customer.rfc ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
+              <LogisticsFormField label="RFC"><input name="rfc" maxLength={13} autoCapitalize="characters" defaultValue={customer.rfc ?? ''} className={logisticsFieldClassName} /><span className="mt-1 block text-xs text-slate-400">Formato mexicano y RFC no repetido.</span></LogisticsFormField>
             </LogisticsFormSection>
             <LogisticsFormSection title="Contacto principal" description="Si capturas cualquier dato, incluye también el nombre.">
               <LogisticsFormField label="Nombre"><input name="contacto_nombre" maxLength={160} defaultValue={contact?.nombre ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
@@ -70,6 +70,7 @@ export default function ClientRecordDialog({
             <LogisticsFormField label="Zona horaria"><select name="zona_horaria" defaultValue={address?.zona_horaria ?? 'America/Mexico_City'} className={logisticsFieldClassName}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></LogisticsFormField>
             <LogisticsFormField label="Instrucciones"><input name="instrucciones" maxLength={500} defaultValue={address?.instrucciones ?? ''} className={logisticsFieldClassName} placeholder="Acceso, andén o indicaciones especiales"/></LogisticsFormField>
             <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-600"><input name="requiere_cita" type="checkbox" defaultChecked={address?.requiere_cita ?? false} className="accent-[#0b1f3b]"/>Requiere cita</label>
+            <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium text-slate-700"><input name="principal" type="checkbox" defaultChecked={address?.principal ?? !customer.direcciones.some((item) => item.activo && item.principal)} className="accent-[#0b1f3b]"/>Usar como dirección principal</label>
           </LogisticsFormSection>}
 
           {demo && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Modo demo: los cambios se guardan solo en este navegador, no en la base de datos.</p>}

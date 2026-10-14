@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { logisticsApi, type LogisticsAddress, type LogisticsCustomerCreateInput } from '../services/logistics-api';
-import { saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
+import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsCustomerCreateInput } from '../services/logistics-api';
+import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
+import { hasDuplicateCustomerRfc, isValidContactEmail, isValidMexicanRfc, normalizeCustomerRfc } from '../services/customer-validation';
 import { CatalogPageHeader, LogisticsFormField, LogisticsFormSection, logisticsFieldClassName } from './LogisticsCatalogComponents';
 
 type ConnectionMode = 'checking' | 'live' | 'demo';
@@ -20,11 +21,13 @@ export default function ClientCreateScreen() {
   const [connectionMessage, setConnectionMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [existingCustomers, setExistingCustomers] = useState<LogisticsCustomer[]>([]);
 
   useEffect(() => {
     logisticsApi.getCustomers()
-      .then(() => setMode('live'))
+      .then((response) => { setExistingCustomers(response.data); setMode('live'); })
       .catch((error: unknown) => {
+        setExistingCustomers(getDemoLogisticsCustomers());
         setMode('demo');
         setConnectionMessage(error instanceof Error ? error.message : 'No fue posible consultar la base de datos.');
       });
@@ -55,12 +58,29 @@ export default function ClientCreateScreen() {
       horario: value('direccion_horario'),
       instrucciones: value('direccion_instrucciones'),
       requiere_cita: form.get('direccion_cita') === 'on',
+      principal: true,
     };
     const hasContact = [contact.nombre, contact.puesto, contact.email, contact.telefono].some(Boolean);
     const hasAddress = [address.nombre, address.calle, address.ciudad, address.estado, address.codigo_postal, address.horario, address.instrucciones].some(Boolean);
 
     if (hasContact && !contact.nombre) {
       setFormError('Escribe el nombre del contacto o deja vacía toda esa sección.');
+      setSaving(false);
+      return;
+    }
+    const rfc = normalizeCustomerRfc(value('rfc'));
+    if (!isValidMexicanRfc(rfc)) {
+      setFormError('Revisa el RFC: debe tener formato de persona moral (12 caracteres) o física (13 caracteres).');
+      setSaving(false);
+      return;
+    }
+    if (hasDuplicateCustomerRfc(existingCustomers, rfc)) {
+      setFormError('Ya existe un cliente registrado con ese RFC.');
+      setSaving(false);
+      return;
+    }
+    if (!isValidContactEmail(contact.email)) {
+      setFormError('Escribe un correo válido para el contacto.');
       setSaving(false);
       return;
     }
@@ -73,7 +93,7 @@ export default function ClientCreateScreen() {
     const input: LogisticsCustomerCreateInput = {
       razon_social: value('razon_social'),
       nombre_comercial: value('nombre_comercial'),
-      rfc: value('rfc'),
+      rfc,
       uso_cfdi: value('uso_cfdi'),
       forma_pago: value('forma_pago'),
       metodo_pago: value('metodo_pago'),
@@ -103,6 +123,7 @@ export default function ClientCreateScreen() {
           instrucciones: address.instrucciones || null,
           requiere_cita: address.requiere_cita,
           activo: true,
+          principal: true,
         } : undefined;
         const created: DemoLogisticsCustomer = {
           id: customerId,
@@ -123,7 +144,7 @@ export default function ClientCreateScreen() {
             id: `demo-contact-${crypto.randomUUID()}`,
             nombre: contact.nombre,
             puesto: contact.puesto || null,
-            email: contact.email || null,
+            email: contact.email.toLowerCase() || null,
             telefono: contact.telefono || null,
             tipo_contacto: contact.tipo_contacto,
             principal: true,
@@ -155,7 +176,7 @@ export default function ClientCreateScreen() {
         <LogisticsFormSection title="Datos de la empresa" description="La razón social es el único dato obligatorio para crear el registro.">
           <LogisticsFormField label="Razón social *"><input name="razon_social" required maxLength={180} className={field} placeholder="Empresa, S.A. de C.V."/></LogisticsFormField>
           <LogisticsFormField label="Nombre comercial"><input name="nombre_comercial" maxLength={180} className={field} placeholder="Nombre con el que la identifican"/></LogisticsFormField>
-          <LogisticsFormField label="RFC"><input name="rfc" maxLength={13} className={field} placeholder="RFC de la empresa"/></LogisticsFormField>
+          <LogisticsFormField label="RFC"><input name="rfc" maxLength={13} autoCapitalize="characters" className={field} placeholder="RFC de la empresa"/><span className="mt-1 block text-xs text-slate-400">Se valida formato y que no esté registrado.</span></LogisticsFormField>
         </LogisticsFormSection>
 
         <LogisticsFormSection title="Contacto principal" description="Opcional. Si agregas algún dato, necesitamos al menos el nombre.">
@@ -166,7 +187,7 @@ export default function ClientCreateScreen() {
           <LogisticsFormField label="Correo"><input name="contacto_email" type="email" maxLength={180} className={field} placeholder="nombre@empresa.com"/></LogisticsFormField>
         </LogisticsFormSection>
 
-        <LogisticsFormSection title="Primera ubicación" description="Opcional. Si agregas una ubicación, completa nombre, calle, ciudad y estado.">
+        <LogisticsFormSection title="Primera ubicación" description="Opcional. Si la capturas, quedará como dirección principal; podrás cambiarla después.">
           <LogisticsFormField label="Nombre de la ubicación"><input name="direccion_nombre" maxLength={120} className={field} placeholder="Planta Apodaca"/></LogisticsFormField>
           <LogisticsFormField label="Calle y número"><input name="direccion_calle" maxLength={200} className={field} placeholder="Av. Industrial 100"/></LogisticsFormField>
           <LogisticsFormField label="Ciudad"><input name="direccion_ciudad" maxLength={100} className={field} placeholder="Monterrey"/></LogisticsFormField>
