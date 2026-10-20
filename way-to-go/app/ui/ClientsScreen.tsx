@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, PencilSquareIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { logisticsApi, type LogisticsAddress, type LogisticsCustomerDetail } from '../services/logistics-api';
+import { BuildingOffice2Icon, CheckCircleIcon, ChevronRightIcon, MapPinIcon, PencilSquareIcon, PlusIcon, XMarkIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { logisticsApi, type LogisticsAddress, type LogisticsCustomerAgreement, type LogisticsCustomerContact, type LogisticsCustomerDetail, type LogisticsServiceType } from '../services/logistics-api';
 import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
 import { hasDuplicateCustomerRfc, isValidContactEmail, isValidMexicanRfc, normalizeCustomerRfc } from '../services/customer-validation';
 import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
@@ -41,6 +41,8 @@ export default function ClientsScreen() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
+  const [detailTab, setDetailTab] = useState<'resumen' | 'contactos' | 'ubicaciones' | 'comercial' | 'facturacion'>('resumen');
+  const [services, setServices] = useState<LogisticsServiceType[]>([]);
 
   const loadClients = useCallback(async (query = '') => {
     setMode((current) => current === 'live' ? 'live' : 'loading');
@@ -63,6 +65,8 @@ export default function ClientsScreen() {
 
   useEffect(() => { void loadClients(); }, [loadClients]);
 
+  useEffect(() => { logisticsApi.getCatalogs().then(({ data }) => setServices(data.servicios)).catch(() => setServices([])); }, []);
+
   useEffect(() => {
     if (mode === 'loading' || typeof window === 'undefined') return;
     const createdId = new URLSearchParams(window.location.search).get('created');
@@ -74,9 +78,10 @@ export default function ClientsScreen() {
 
   useEffect(() => {
     if (!selectedId) { setDetail(null); return; }
+    setDetailTab('resumen');
     const client = clients.find((item) => item.id === selectedId);
     if (mode === 'demo') {
-      if (client) setDetail({ ...client, direcciones: client.demo_addresses ?? [], contactos: client.demo_contacts ?? [] });
+      if (client) setDetail({ ...client, direcciones: client.demo_addresses ?? [], contactos: client.demo_contacts ?? [], convenios: client.demo_agreements ?? [] });
       return;
     }
     logisticsApi.getCustomer(selectedId).then((response) => setDetail(response.data)).catch(() => setDetail(null));
@@ -107,19 +112,6 @@ export default function ClientsScreen() {
     setFormError('');
     const form = new FormData(event.currentTarget);
     const value = (key: string) => String(form.get(key) ?? '').trim();
-    const contact = {
-      nombre: value('contacto_nombre'),
-      puesto: value('contacto_puesto'),
-      tipo_contacto: value('contacto_tipo') || 'OPERACIONES',
-      email: value('contacto_email'),
-      telefono: value('contacto_telefono'),
-    };
-    const hasContactData = [contact.nombre, contact.puesto, contact.email, contact.telefono].some(Boolean);
-    if (hasContactData && !contact.nombre) {
-      setFormError('Escribe el nombre del contacto o deja vacía toda esa sección.');
-      setSaving(false);
-      return;
-    }
     const customerInput = {
       razon_social: value('razon_social'),
       nombre_comercial: value('nombre_comercial'),
@@ -128,7 +120,15 @@ export default function ClientsScreen() {
       forma_pago: value('forma_pago'),
       metodo_pago: value('metodo_pago'),
       condiciones_pago: value('condiciones_pago'),
-      contacto: contact,
+      domicilio_legal_calle: value('domicilio_legal_calle'),
+      domicilio_legal_ciudad: value('domicilio_legal_ciudad'),
+      domicilio_legal_estado: value('domicilio_legal_estado'),
+      domicilio_legal_pais: value('domicilio_legal_pais'),
+      domicilio_legal_codigo_postal: value('domicilio_legal_codigo_postal'),
+      canal_registro: value('canal_registro'),
+      motivo_registro: value('motivo_registro'),
+      servicios_acordados: form.getAll('servicios_acordados').map(String),
+      regimen_fiscal: value('regimen_fiscal'),
     };
     const normalizedRfc = normalizeCustomerRfc(customerInput.rfc);
     if (!isValidMexicanRfc(normalizedRfc)) {
@@ -141,28 +141,13 @@ export default function ClientsScreen() {
       setSaving(false);
       return;
     }
-    if (!isValidContactEmail(contact.email)) {
-      setFormError('Escribe un correo válido para el contacto.');
-      setSaving(false);
-      return;
-    }
     customerInput.rfc = normalizedRfc;
-    customerInput.contacto.email = contact.email.toLowerCase();
     try {
       if (mode === 'live') {
         await logisticsApi.updateCustomer(detail.id, customerInput);
         const [customerResponse] = await Promise.all([logisticsApi.getCustomer(detail.id), loadClients(search)]);
         setDetail(customerResponse.data);
       } else {
-        const oldContact = detail.contactos[0];
-        const contacts = hasContactData ? [{
-          id: oldContact?.id ?? `demo-contact-${crypto.randomUUID()}`,
-          ...contact,
-          puesto: contact.puesto || null,
-          email: contact.email || null,
-          telefono: contact.telefono || null,
-          principal: true,
-        }] : [];
         const updated: ClientRow = {
           ...(clients.find((client) => client.id === detail.id) ?? detail),
           razon_social: customerInput.razon_social,
@@ -170,9 +155,18 @@ export default function ClientsScreen() {
           forma_pago: customerInput.forma_pago || null,
           metodo_pago: customerInput.metodo_pago || null,
           condiciones_pago: customerInput.condiciones_pago || null,
+          domicilio_legal_calle: customerInput.domicilio_legal_calle || null,
+          domicilio_legal_ciudad: customerInput.domicilio_legal_ciudad || null,
+          domicilio_legal_estado: customerInput.domicilio_legal_estado || null,
+          domicilio_legal_pais: customerInput.domicilio_legal_pais || null,
+          domicilio_legal_codigo_postal: customerInput.domicilio_legal_codigo_postal || null,
+          canal_registro: customerInput.canal_registro || null,
+          motivo_registro: customerInput.motivo_registro || null,
+          servicios_acordados: customerInput.servicios_acordados,
+          regimen_fiscal: customerInput.regimen_fiscal || null,
           nombre_comercial: customerInput.nombre_comercial || null,
           rfc: customerInput.rfc || null,
-          demo_contacts: contacts,
+          demo_contacts: detail.contactos,
           demo_addresses: detail.direcciones,
         };
         persistDemoCustomer(updated);
@@ -182,6 +176,134 @@ export default function ClientsScreen() {
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'No se pudo actualizar el cliente.');
     } finally { setSaving(false); }
+  }
+
+  async function submitContact(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!detail || modal?.kind !== 'contact') return;
+    setSaving(true);
+    setFormError('');
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get('email') ?? '').trim();
+    if (!isValidContactEmail(email)) { setFormError('Escribe un correo válido para el contacto.'); setSaving(false); return; }
+    const input = {
+      nombre: String(form.get('nombre') ?? '').trim(),
+      puesto: String(form.get('puesto') ?? '').trim() || null,
+      email: email.toLowerCase() || null,
+      telefono: String(form.get('telefono') ?? '').trim() || null,
+      tipo_contacto: String(form.get('tipo_contacto') ?? 'OPERACIONES'),
+      principal: form.get('principal') === 'on',
+      para_facturacion: form.get('para_facturacion') === 'on',
+    };
+    try {
+      if (mode === 'live') {
+        if (modal.contact) await logisticsApi.updateCustomerContact(modal.contact.id, input);
+        else await logisticsApi.addCustomerContact(detail.id, input);
+        setDetail((await logisticsApi.getCustomer(detail.id)).data);
+      } else {
+        let contacts = detail.contactos.map((item) => ({ ...item }));
+        const id = modal.contact?.id ?? `demo-contact-${crypto.randomUUID()}`;
+        contacts = contacts.map((item) => ({ ...item, principal: input.principal ? item.id === id : item.principal }));
+        const contact: LogisticsCustomerContact = { id, cliente_id: detail.id, ...input, activo: true };
+        const index = contacts.findIndex((item) => item.id === id);
+        if (index >= 0) contacts[index] = contact; else contacts.push(contact);
+        const customer = clients.find((item) => item.id === detail.id) ?? detail;
+        const updated: ClientRow = { ...customer, contacto_facturacion_id: input.para_facturacion ? id : customer.contacto_facturacion_id === id ? null : customer.contacto_facturacion_id, demo_contacts: contacts, demo_addresses: detail.direcciones };
+        persistDemoCustomer(updated);
+      }
+      setNotice(mode === 'live' ? 'Contacto guardado. El historial se conserva.' : 'Contacto guardado en los datos de demostración.');
+      setModal(null);
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo guardar el contacto.'); }
+    finally { setSaving(false); }
+  }
+
+  async function toggleContactActive(contact: LogisticsCustomerContact) {
+    if (!detail) return;
+    const nextActive = !contact.activo;
+    if (!window.confirm(`¿Quieres ${nextActive ? 'reactivar' : 'desactivar'} a ${contact.nombre}?`)) return;
+    setSaving(true);
+    try {
+      if (mode === 'live') {
+        await logisticsApi.setCustomerContactActive(contact.id, nextActive);
+        setDetail((await logisticsApi.getCustomer(detail.id)).data);
+      } else {
+        let contacts = detail.contactos.map((item) => item.id === contact.id ? { ...item, activo: nextActive, principal: nextActive ? item.principal : false } : item);
+        if (nextActive && !contacts.some((item) => item.activo && item.principal)) contacts = contacts.map((item) => ({ ...item, principal: item.id === contact.id }));
+        const customer = clients.find((item) => item.id === detail.id) ?? detail;
+        persistDemoCustomer({ ...customer, contacto_facturacion_id: !nextActive && customer.contacto_facturacion_id === contact.id ? null : customer.contacto_facturacion_id, demo_contacts: contacts, demo_addresses: detail.direcciones });
+      }
+      setNotice(nextActive ? 'Contacto reactivado.' : 'Contacto desactivado; se conserva su historial.');
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo cambiar el estado del contacto.'); }
+    finally { setSaving(false); }
+  }
+
+  async function submitAgreement(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!detail || modal?.kind !== 'agreement') return;
+    setSaving(true);
+    setFormError('');
+    const form = new FormData(event.currentTarget);
+    const value = (key: string) => String(form.get(key) ?? '').trim();
+    const numberOrNull = (key: string) => value(key) ? Number(value(key)) : null;
+    const input = {
+      nombre: value('nombre'), origen_id: value('origen_id') || null, destino_id: value('destino_id') || null,
+      tipo_servicio_id: value('tipo_servicio_id') || null, tipo_unidad: value('tipo_unidad') || null, tipo_carga: value('tipo_carga') || null,
+      tarifa_base: Number(value('tarifa_base')), moneda: value('moneda') || 'MXN',
+      horas_libres_carga: numberOrNull('horas_libres_carga'), horas_libres_descarga: numberOrNull('horas_libres_descarga'),
+      tarifa_estadia_hora: numberOrNull('tarifa_estadia_hora'), vigente_desde: value('vigente_desde'), vigente_hasta: value('vigente_hasta') || null,
+      condiciones: value('condiciones') || null,
+    };
+    try {
+      if (mode === 'live') {
+        if (modal.agreement) await logisticsApi.updateCustomerAgreement(modal.agreement.id, input);
+        else await logisticsApi.addCustomerAgreement(detail.id, input);
+        setDetail((await logisticsApi.getCustomer(detail.id)).data);
+      } else {
+        const agreement: LogisticsCustomerAgreement = { id: modal.agreement?.id ?? `demo-agreement-${crypto.randomUUID()}`, cliente_id: detail.id, ...input, tipo_servicio: services.find((item) => item.id === input.tipo_servicio_id)?.nombre ?? null, activo: true };
+        const agreements = [...detail.convenios.filter((item) => item.id !== agreement.id), agreement];
+        const customer = clients.find((item) => item.id === detail.id) ?? detail;
+        persistDemoCustomer({ ...customer, demo_agreements: agreements, demo_contacts: detail.contactos, demo_addresses: detail.direcciones });
+        setDetail((current) => current ? { ...current, convenios: agreements } : current);
+      }
+      setNotice(mode === 'live' ? 'Convenio guardado.' : 'Convenio guardado en datos de demostración.');
+      setModal(null);
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo guardar el convenio.'); }
+    finally { setSaving(false); }
+  }
+
+  async function toggleAgreementActive(agreement: LogisticsCustomerAgreement) {
+    if (!detail) return;
+    const nextActive = !agreement.activo;
+    setSaving(true);
+    try {
+      if (mode === 'live') {
+        await logisticsApi.setCustomerAgreementActive(agreement.id, nextActive);
+        setDetail((await logisticsApi.getCustomer(detail.id)).data);
+      } else {
+        const agreements = detail.convenios.map((item) => item.id === agreement.id ? { ...item, activo: nextActive } : item);
+        const customer = clients.find((item) => item.id === detail.id) ?? detail;
+        persistDemoCustomer({ ...customer, demo_agreements: agreements, demo_contacts: detail.contactos, demo_addresses: detail.direcciones });
+        setDetail((current) => current ? { ...current, convenios: agreements } : current);
+      }
+      setNotice(nextActive ? 'Convenio reactivado.' : 'Convenio desactivado; se conserva el historial.');
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo cambiar el estado del convenio.'); }
+    finally { setSaving(false); }
+  }
+
+  async function selectBillingContact(contactId: string) {
+    if (!detail) return;
+    setSaving(true);
+    try {
+      if (mode === 'live') {
+        await logisticsApi.updateCustomer(detail.id, { contacto_facturacion_id: contactId || null });
+        setDetail((await logisticsApi.getCustomer(detail.id)).data);
+      } else {
+        const customer = clients.find((item) => item.id === detail.id) ?? detail;
+        persistDemoCustomer({ ...customer, contacto_facturacion_id: contactId || null, demo_contacts: detail.contactos, demo_addresses: detail.direcciones });
+      }
+      setNotice('Contacto de facturación actualizado.');
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'No se pudo actualizar el contacto de facturación.'); }
+    finally { setSaving(false); }
   }
 
   async function submitAddress(event: React.FormEvent<HTMLFormElement>) {
@@ -198,6 +320,8 @@ export default function ClientsScreen() {
       pais: 'MX',
       codigo_postal: String(form.get('codigo_postal') ?? '').trim() || null,
       zona_horaria: String(form.get('zona_horaria') || 'America/Mexico_City'),
+      tipo_ubicacion: String(form.get('tipo_ubicacion') ?? '').trim() || null,
+      tipo_zona: String(form.get('tipo_zona') ?? '').trim() || null,
       horario: String(form.get('horario') ?? '').trim() || null,
       instrucciones: String(form.get('instrucciones') ?? '').trim() || null,
       requiere_cita: form.get('requiere_cita') === 'on',
@@ -356,14 +480,18 @@ export default function ClientsScreen() {
         <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">{filtered.length} {filtered.length === 1 ? 'cliente' : 'clientes'}</div>
       </section>
 
-      <section className={`${card} overflow-hidden`}>
+      <section className={`${card} max-h-[calc(100vh-2rem)] overflow-y-auto`}>
         {detail ? <>
           <div className="border-b border-slate-100 p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[#0b1f3b]"><BuildingOffice2Icon className="h-5 w-5"/></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ficha del cliente</p><h2 className="mt-0.5 truncate font-bold text-[#0b1f3b]">{detail.nombre_comercial || detail.razon_social}</h2></div></div><button onClick={() => setSelectedId(null)} aria-label="Cerrar detalle" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-4 w-4"/></button></div><p className="mt-3 text-xs text-slate-500">{detail.razon_social}</p><p className="mt-1 text-xs text-slate-400">RFC · {detail.rfc || 'Sin capturar'}</p><div className="mt-3 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${detail.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{detail.activo ? 'Activo' : 'Inactivo'}</span><button onClick={() => { setFormError(''); setModal({ kind: 'client' }); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar cliente</button><button disabled={saving} onClick={() => void toggleCustomerActive()} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{detail.activo ? 'Desactivar' : 'Reactivar'}</button></div></div>
-          <div className="border-b border-slate-100 p-5"><h3 className="text-sm font-bold text-[#0b1f3b]">Contacto principal</h3>{detail.contactos.length ? detail.contactos.map((contact) => <div key={contact.id} className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-700">{contact.nombre}{contact.puesto ? ` · ${contact.puesto}` : ''}</p><p className="mt-1 text-xs text-slate-500">{contact.email || 'Sin correo'}{contact.telefono ? ` · ${contact.telefono}` : ''}</p><p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{contact.tipo_contacto || 'Contacto'}</p></div>) : <p className="mt-2 text-xs text-slate-500">Aún no hay contactos registrados.</p>}</div>
-          <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Direcciones</h3><p className="mt-0.5 text-xs text-slate-500">Puntos de operación del cliente</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'address' }); }} aria-label="Agregar dirección" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>
-            <div className="space-y-3">{detail.direcciones.length ? detail.direcciones.map((address) => <article key={address.id} className={`rounded-lg border p-3 ${address.activo ? 'border-slate-100 bg-slate-50/70' : 'border-slate-200 bg-slate-100/70 opacity-75'}`}><div className="flex items-start gap-2.5"><MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b28b00]"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-800">{address.nombre}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${address.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{address.activo ? 'Activa' : 'Inactiva'}</span>{address.principal && address.activo && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Principal</span>}</div><p className="mt-1 text-xs leading-5 text-slate-500">{address.calle}<br/>{address.ciudad}, {address.estado}{address.codigo_postal ? ` · C.P. ${address.codigo_postal}` : ''}</p><p className="mt-2 text-[11px] text-slate-400">{address.requiere_cita ? 'Requiere cita' : 'Sin cita requerida'}{address.horario ? ` · ${address.horario}` : ''}</p><div className="mt-3 flex flex-wrap gap-2"><button onClick={() => { setFormError(''); setModal({ kind: 'address', address }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar</button>{address.activo && !address.principal && <button disabled={saving} onClick={() => void markAddressPrimary(address)} className="rounded-md border border-amber-200 bg-white px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Hacer principal</button>}<button disabled={saving} onClick={() => void toggleAddressActive(address)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{address.activo ? 'Desactivar' : 'Reactivar'}</button></div></div></div></article>) : <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center"><MapPinIcon className="mx-auto h-6 w-6 text-slate-300"/><p className="mt-2 text-sm font-medium text-slate-600">Aún no hay direcciones</p><p className="mt-1 text-xs text-slate-400">Agrega un punto de carga o entrega.</p></div>}</div>
+          <nav className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-slate-100 bg-white p-2" aria-label="Secciones de la ficha">{(['resumen', 'contactos', 'ubicaciones', 'comercial', 'facturacion'] as const).map((tab) => <button key={tab} onClick={() => setDetailTab(tab)} className={`whitespace-nowrap rounded-md px-2.5 py-2 text-xs font-semibold capitalize ${detailTab === tab ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-slate-50'}`}>{tab === 'ubicaciones' ? 'Ubicaciones' : tab === 'facturacion' ? 'Facturación' : tab === 'comercial' ? 'Comercial' : tab === 'contactos' ? 'Contactos' : 'Resumen'}</button>)}</nav>
+          {detailTab === 'contactos' && <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Contactos</h3><p className="mt-0.5 text-xs text-slate-500">Principal, operaciones, facturación y alta del cliente</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'contact' }); }} aria-label="Agregar contacto" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>{detail.contactos.length ? detail.contactos.map((contact) => <article key={contact.id} className={`mt-3 rounded-lg border p-3 ${contact.activo ? 'border-slate-100 bg-slate-50' : 'border-slate-200 bg-slate-100 opacity-70'}`}><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-700">{contact.nombre}{contact.puesto ? ` · ${contact.puesto}` : ''}</p><p className="mt-1 text-xs text-slate-500">{contact.email || 'Sin correo'}{contact.telefono ? ` · ${contact.telefono}` : ''}</p><p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{contact.tipo_contacto || 'Contacto'}{contact.principal ? ' · Principal' : ''}{detail.contacto_facturacion_id === contact.id ? ' · Facturación' : ''}</p></div><span className="text-[10px] text-slate-500">{contact.activo ? 'Activo' : 'Inactivo'}</span></div><div className="mt-3 flex gap-2"><button onClick={() => { setFormError(''); setModal({ kind: 'contact', contact }); }} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold">Editar</button><button disabled={saving} onClick={() => void toggleContactActive(contact)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold disabled:opacity-50">{contact.activo ? 'Desactivar' : 'Reactivar'}</button></div></article>) : <p className="py-6 text-center text-sm text-slate-500">Aún no hay contactos.</p>}</div>}
+          {detailTab === 'ubicaciones' && <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Ubicaciones operativas</h3><p className="mt-0.5 text-xs text-slate-500">Cada ubicación puede seleccionarse según el servicio.</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'address' }); }} aria-label="Agregar ubicación" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>
+            <div className="space-y-3">{detail.direcciones.length ? detail.direcciones.map((address) => <article key={address.id} className={`rounded-lg border p-3 ${address.activo ? 'border-slate-100 bg-slate-50/70' : 'border-slate-200 bg-slate-100/70 opacity-75'}`}><div className="flex items-start gap-2.5"><MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b28b00]"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-slate-800">{address.nombre}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${address.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{address.activo ? 'Activa' : 'Inactiva'}</span>{address.principal && address.activo && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Principal</span>}</div>{(address.tipo_ubicacion || address.tipo_zona) && <p className="mt-1 text-[11px] font-medium text-slate-500">{address.tipo_ubicacion || 'Ubicación'}{address.tipo_zona ? ` · Zona ${address.tipo_zona}` : ''}</p>}<p className="mt-1 text-xs leading-5 text-slate-500">{address.calle}<br/>{address.ciudad}, {address.estado}{address.codigo_postal ? ` · C.P. ${address.codigo_postal}` : ''}</p><p className="mt-2 text-[11px] text-slate-400">{address.requiere_cita ? 'Requiere cita' : 'Sin cita requerida'}{address.horario ? ` · ${address.horario}` : ''}</p><div className="mt-3 flex flex-wrap gap-2"><button onClick={() => { setFormError(''); setModal({ kind: 'address', address }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar</button>{address.activo && !address.principal && <button disabled={saving} onClick={() => void markAddressPrimary(address)} className="rounded-md border border-amber-200 bg-white px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Hacer principal</button>}<button disabled={saving} onClick={() => void toggleAddressActive(address)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{address.activo ? 'Desactivar' : 'Reactivar'}</button></div></div></div></article>) : <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center"><MapPinIcon className="mx-auto h-6 w-6 text-slate-300"/><p className="mt-2 text-sm font-medium text-slate-600">Aún no hay direcciones</p><p className="mt-1 text-xs text-slate-400">Agrega un punto de carga o entrega.</p></div>}</div>
             {detail.activo ? <button onClick={() => { setFormError(''); setModal({ kind: 'address' }); }} className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><PlusIcon className="mr-1.5 inline h-4 w-4"/>Agregar dirección</button> : <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">Reactiva al cliente para agregar direcciones nuevas.</p>}
-          </div>
+          </div>}
+          {detailTab === 'resumen' && <div className="space-y-3 p-5"><article className="rounded-lg bg-slate-50 p-3"><h3 className="text-sm font-bold text-[#0b1f3b]">Domicilio legal o matriz</h3><p className="mt-2 text-xs leading-5 text-slate-600">{detail.domicilio_legal_calle ? `${detail.domicilio_legal_calle}, ${detail.domicilio_legal_ciudad ?? ''}, ${detail.domicilio_legal_estado ?? ''} ${detail.domicilio_legal_codigo_postal ?? ''}` : 'Sin domicilio legal capturado'}</p></article><p className="text-xs text-slate-500">{detail.contactos.filter((item) => item.activo).length} contactos activos · {detail.direcciones.filter((item) => item.activo).length} ubicaciones activas · {detail.convenios.filter((item) => item.activo).length} convenios vigentes</p><button onClick={() => { setDetailTab('ubicaciones'); }} className="text-xs font-semibold text-blue-800">Ver ubicaciones →</button></div>}
+          {detailTab === 'comercial' && <div className="p-5"><div className="flex items-start justify-between gap-2"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Convenios y rutas frecuentes</h3><p className="mt-1 text-xs text-slate-500">Las ubicaciones no tienen un rol fijo; cada convenio guarda su par habitual.</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'agreement' }); }} aria-label="Agregar convenio" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>{detail.convenios.length ? detail.convenios.map((agreement) => <article key={agreement.id} className="mt-3 rounded-lg border border-slate-200 p-3"><div className="flex justify-between gap-2"><div><h4 className="text-sm font-semibold text-slate-800">{agreement.nombre}</h4><p className="mt-1 text-xs text-slate-500">{detail.direcciones.find((item) => item.id === agreement.origen_id)?.nombre ?? 'Origen abierto'} → {detail.direcciones.find((item) => item.id === agreement.destino_id)?.nombre ?? 'Destino abierto'}</p><p className="mt-1 text-xs text-slate-500">{agreement.tipo_servicio ?? 'Servicio por definir'} · {agreement.moneda} {Number(agreement.tarifa_base).toLocaleString('es-MX')}</p><p className="mt-1 text-[11px] text-slate-400">Vigente desde {agreement.vigente_desde?.slice(0, 10)}{agreement.vigente_hasta ? ` hasta ${agreement.vigente_hasta.slice(0, 10)}` : ''} · {agreement.activo ? 'Activo' : 'Inactivo'}</p></div><button onClick={() => { setFormError(''); setModal({ kind: 'agreement', agreement }); }} className="h-fit rounded border border-slate-200 px-2 py-1 text-xs">Editar</button></div><button disabled={saving} onClick={() => void toggleAgreementActive(agreement)} className="mt-2 text-xs font-semibold text-slate-600">{agreement.activo ? 'Desactivar convenio' : 'Reactivar convenio'}</button></article>) : <p className="mt-6 text-center text-sm text-slate-500">Aún no hay convenios registrados.</p>}</div>}
+          {detailTab === 'facturacion' && <div className="space-y-3 p-5"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Datos fiscales y de pago</h3><p className="mt-1 text-xs text-slate-500">Régimen fiscal: {detail.regimen_fiscal || 'Pendiente'} · Uso CFDI: {detail.uso_cfdi || 'Pendiente'}</p><p className="mt-1 text-xs text-slate-500">Forma: {detail.forma_pago || 'Pendiente'} · Método: {detail.metodo_pago || 'Pendiente'}</p><p className="mt-1 text-xs text-slate-500">Condiciones: {detail.condiciones_pago || 'Pendiente'}</p><label className="mt-3 block text-xs font-semibold text-slate-600">Contacto para comunicaciones de facturación<select disabled={saving || !detail.activo} value={detail.contacto_facturacion_id ?? ''} onChange={(event) => void selectBillingContact(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal"><option value="">Sin seleccionar</option>{detail.contactos.filter((item) => item.activo).map((contact) => <option key={contact.id} value={contact.id}>{contact.nombre}{contact.email ? ` · ${contact.email}` : ''}</option>)}</select></label></div><div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><div className="flex items-center gap-2 text-sm font-semibold text-amber-900"><DocumentTextIcon className="h-4 w-4"/>Datos por cotejar con documento real</div><p className="mt-1 text-xs leading-5 text-amber-900/80">Para el CFDI 4.0 del cliente se deben cotejar RFC, razón social, régimen fiscal, código postal del domicilio fiscal y uso CFDI con su constancia. Falta revisar una Carta Porte real aplicable a la operación para definir qué más debe capturarse. En esta etapa no se cargan ni envían documentos.</p></div></div>}
         </> : <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400"><MapPinIcon className="h-6 w-6"/></div><h2 className="mt-4 font-bold text-[#0b1f3b]">Detalle del cliente</h2><p className="mt-1 max-w-xs text-sm text-slate-500">Selecciona un registro para ver sus direcciones y horarios de atención.</p></div>}
       </section>
     </div>
@@ -371,11 +499,12 @@ export default function ClientsScreen() {
     {modal && detail && <ClientRecordDialog
       modal={modal}
       customer={detail}
+      services={services}
       demo={mode === 'demo'}
       saving={saving}
       error={formError}
       onClose={() => setModal(null)}
-      onSubmit={modal.kind === 'client' ? submitClientEdit : submitAddress}
+      onSubmit={modal.kind === 'client' ? submitClientEdit : modal.kind === 'address' ? submitAddress : modal.kind === 'contact' ? submitContact : submitAgreement}
     />}
   </div>;
 }

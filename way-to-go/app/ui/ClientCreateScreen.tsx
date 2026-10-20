@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsCustomerCreateInput } from '../services/logistics-api';
 import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
 import { hasDuplicateCustomerRfc, isValidContactEmail, isValidMexicanRfc, normalizeCustomerRfc } from '../services/customer-validation';
@@ -22,6 +23,7 @@ export default function ClientCreateScreen() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [existingCustomers, setExistingCustomers] = useState<LogisticsCustomer[]>([]);
+  const [contactRows, setContactRows] = useState([0]);
 
   useEffect(() => {
     logisticsApi.getCustomers()
@@ -40,13 +42,15 @@ export default function ClientCreateScreen() {
 
     const form = new FormData(event.currentTarget);
     const value = (key: string) => String(form.get(key) ?? '').trim();
-    const contact = {
-      nombre: value('contacto_nombre'),
-      puesto: value('contacto_puesto'),
-      tipo_contacto: value('contacto_tipo') || 'OPERACIONES',
-      email: value('contacto_email'),
-      telefono: value('contacto_telefono'),
-    };
+    const contacts = contactRows.map((row) => ({
+      nombre: value(`contacto_${row}_nombre`),
+      puesto: value(`contacto_${row}_puesto`),
+      tipo_contacto: value(`contacto_${row}_tipo`) || 'OPERACIONES',
+      email: value(`contacto_${row}_email`),
+      telefono: value(`contacto_${row}_telefono`),
+      principal: form.get(`contacto_${row}_principal`) === 'on',
+      para_facturacion: form.get(`contacto_${row}_facturacion`) === 'on',
+    })).filter((contact) => [contact.nombre, contact.puesto, contact.email, contact.telefono].some(Boolean));
     const address = {
       nombre: value('direccion_nombre'),
       calle: value('direccion_calle'),
@@ -54,17 +58,23 @@ export default function ClientCreateScreen() {
       estado: value('direccion_estado'),
       pais: 'MX',
       codigo_postal: value('direccion_cp'),
+      tipo_ubicacion: value('direccion_tipo_ubicacion'),
+      tipo_zona: value('direccion_tipo_zona'),
       zona_horaria: value('direccion_zona') || 'America/Mexico_City',
       horario: value('direccion_horario'),
       instrucciones: value('direccion_instrucciones'),
       requiere_cita: form.get('direccion_cita') === 'on',
       principal: true,
     };
-    const hasContact = [contact.nombre, contact.puesto, contact.email, contact.telefono].some(Boolean);
-    const hasAddress = [address.nombre, address.calle, address.ciudad, address.estado, address.codigo_postal, address.horario, address.instrucciones].some(Boolean);
+    const hasAddress = [address.nombre, address.calle, address.ciudad, address.estado, address.codigo_postal, address.tipo_ubicacion, address.tipo_zona, address.horario, address.instrucciones].some(Boolean);
 
-    if (hasContact && !contact.nombre) {
-      setFormError('Escribe el nombre del contacto o deja vacía toda esa sección.');
+    if (contacts.some((contact) => !contact.nombre)) {
+      setFormError('Escribe el nombre de cada contacto que empezaste a capturar.');
+      setSaving(false);
+      return;
+    }
+    if (contacts.filter((contact) => contact.principal).length > 1 || contacts.filter((contact) => contact.para_facturacion).length > 1) {
+      setFormError('Selecciona un solo contacto principal y un solo contacto para facturación.');
       setSaving(false);
       return;
     }
@@ -79,8 +89,8 @@ export default function ClientCreateScreen() {
       setSaving(false);
       return;
     }
-    if (!isValidContactEmail(contact.email)) {
-      setFormError('Escribe un correo válido para el contacto.');
+    if (contacts.some((contact) => !isValidContactEmail(contact.email))) {
+      setFormError('Revisa los correos: cada uno debe tener un formato válido.');
       setSaving(false);
       return;
     }
@@ -98,7 +108,16 @@ export default function ClientCreateScreen() {
       forma_pago: value('forma_pago'),
       metodo_pago: value('metodo_pago'),
       condiciones_pago: value('condiciones_pago'),
-      contacto: hasContact ? contact : undefined,
+      domicilio_legal_calle: value('domicilio_legal_calle'),
+      domicilio_legal_ciudad: value('domicilio_legal_ciudad'),
+      domicilio_legal_estado: value('domicilio_legal_estado'),
+      domicilio_legal_pais: value('domicilio_legal_pais') || 'MX',
+      domicilio_legal_codigo_postal: value('domicilio_legal_codigo_postal'),
+      canal_registro: value('canal_registro'),
+      motivo_registro: value('motivo_registro'),
+      servicios_acordados: form.getAll('servicios_acordados').map(String),
+      regimen_fiscal: value('regimen_fiscal'),
+      contactos: contacts,
       direccion: hasAddress ? address as Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'> : undefined,
     };
 
@@ -118,6 +137,8 @@ export default function ClientCreateScreen() {
           estado: address.estado,
           pais: address.pais,
           codigo_postal: address.codigo_postal || null,
+          tipo_ubicacion: address.tipo_ubicacion || null,
+          tipo_zona: address.tipo_zona || null,
           zona_horaria: address.zona_horaria,
           horario: address.horario || null,
           instrucciones: address.instrucciones || null,
@@ -125,6 +146,17 @@ export default function ClientCreateScreen() {
           activo: true,
           principal: true,
         } : undefined;
+        const demoContacts = contacts.map((contact) => ({
+          id: `demo-contact-${crypto.randomUUID()}`,
+          cliente_id: customerId,
+          nombre: contact.nombre,
+          puesto: contact.puesto || null,
+          email: contact.email.toLowerCase() || null,
+          telefono: contact.telefono || null,
+          tipo_contacto: contact.tipo_contacto,
+          principal: contact.principal,
+          activo: true,
+        }));
         const created: DemoLogisticsCustomer = {
           id: customerId,
           razon_social: input.razon_social,
@@ -134,21 +166,23 @@ export default function ClientCreateScreen() {
           forma_pago: input.forma_pago || null,
           metodo_pago: input.metodo_pago || null,
           condiciones_pago: input.condiciones_pago || null,
+          domicilio_legal_calle: input.domicilio_legal_calle || null,
+          domicilio_legal_ciudad: input.domicilio_legal_ciudad || null,
+          domicilio_legal_estado: input.domicilio_legal_estado || null,
+          domicilio_legal_pais: input.domicilio_legal_pais || null,
+          domicilio_legal_codigo_postal: input.domicilio_legal_codigo_postal || null,
+          canal_registro: input.canal_registro || null,
+          motivo_registro: input.motivo_registro || null,
+          servicios_acordados: input.servicios_acordados,
+          regimen_fiscal: input.regimen_fiscal || null,
+          contacto_facturacion_id: demoContacts.find((_, index) => contacts[index]?.para_facturacion)?.id ?? null,
           activo: true,
           direcciones_activas: demoAddress ? 1 : 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           address_preview: demoAddress ? `${demoAddress.ciudad}, ${demoAddress.estado}` : null,
           demo_addresses: demoAddress ? [demoAddress] : [],
-          demo_contacts: hasContact ? [{
-            id: `demo-contact-${crypto.randomUUID()}`,
-            nombre: contact.nombre,
-            puesto: contact.puesto || null,
-            email: contact.email.toLowerCase() || null,
-            telefono: contact.telefono || null,
-            tipo_contacto: contact.tipo_contacto,
-            principal: true,
-          }] : [],
+          demo_contacts: demoContacts,
         };
         saveDemoLogisticsCustomer(created);
       }
@@ -179,12 +213,24 @@ export default function ClientCreateScreen() {
           <LogisticsFormField label="RFC"><input name="rfc" maxLength={13} autoCapitalize="characters" className={field} placeholder="RFC de la empresa"/><span className="mt-1 block text-xs text-slate-400">Se valida formato y que no esté registrado.</span></LogisticsFormField>
         </LogisticsFormSection>
 
-        <LogisticsFormSection title="Contacto principal" description="Opcional. Si agregas algún dato, necesitamos al menos el nombre.">
-          <LogisticsFormField label="Nombre"><input name="contacto_nombre" maxLength={160} className={field} placeholder="Persona responsable"/></LogisticsFormField>
-          <LogisticsFormField label="Área"><select name="contacto_tipo" className={field}><option value="OPERACIONES">Operaciones</option><option value="FACTURACION">Facturación</option><option value="COMPRAS">Compras</option><option value="OTRO">Otro</option></select></LogisticsFormField>
-          <LogisticsFormField label="Puesto"><input name="contacto_puesto" maxLength={100} className={field} placeholder="Coordinación logística"/></LogisticsFormField>
-          <LogisticsFormField label="Teléfono"><input name="contacto_telefono" type="tel" maxLength={30} className={field} placeholder="Teléfono directo"/></LogisticsFormField>
-          <LogisticsFormField label="Correo"><input name="contacto_email" type="email" maxLength={180} className={field} placeholder="nombre@empresa.com"/></LogisticsFormField>
+        <LogisticsFormSection title="Contactos" description="Puedes registrar a la persona principal, operaciones, facturación o quien dio de alta al cliente.">
+          {contactRows.map((row, index) => <div key={row} className="col-span-full grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-3">
+            <LogisticsFormField label={`Contacto ${index + 1} · nombre`}><input name={`contacto_${row}_nombre`} maxLength={160} className={field} placeholder="Nombre completo"/></LogisticsFormField>
+            <LogisticsFormField label="Función"><select name={`contacto_${row}_tipo`} className={field}><option value="OPERACIONES">Operaciones</option><option value="FACTURACION_CXP">Facturación / cuentas por pagar</option><option value="ALTA_CLIENTE">Persona que dio de alta</option><option value="OTRO">Otro</option></select></LogisticsFormField>
+            <LogisticsFormField label="Puesto"><input name={`contacto_${row}_puesto`} maxLength={100} className={field} placeholder="Coordinación logística"/></LogisticsFormField>
+            <LogisticsFormField label="Teléfono"><input name={`contacto_${row}_telefono`} type="tel" maxLength={30} className={field} placeholder="Teléfono directo"/></LogisticsFormField>
+            <LogisticsFormField label="Correo"><input name={`contacto_${row}_email`} type="email" maxLength={180} className={field} placeholder="nombre@empresa.com"/></LogisticsFormField>
+            <div className="flex flex-wrap items-end gap-4 pb-2 text-sm text-slate-600"><label className="flex items-center gap-2"><input name={`contacto_${row}_principal`} type="checkbox" defaultChecked={index === 0} className="accent-[#0b1f3b]"/>Principal</label><label className="flex items-center gap-2"><input name={`contacto_${row}_facturacion`} type="checkbox" className="accent-[#0b1f3b]"/>Facturación</label>{contactRows.length > 1 && <button type="button" aria-label="Quitar contacto" onClick={() => setContactRows((rows) => rows.filter((item) => item !== row))} className="text-rose-700"><TrashIcon className="h-4 w-4"/></button>}</div>
+          </div>)}
+          <button type="button" onClick={() => setContactRows((rows) => [...rows, Math.max(...rows) + 1])} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b1f3b]"><PlusIcon className="h-4 w-4"/>Agregar contacto</button>
+        </LogisticsFormSection>
+
+        <LogisticsFormSection title="Domicilio legal o matriz" description="Se guarda por separado de las ubicaciones operativas.">
+          <LogisticsFormField label="Calle y número"><input name="domicilio_legal_calle" maxLength={200} className={field}/></LogisticsFormField>
+          <LogisticsFormField label="Ciudad"><input name="domicilio_legal_ciudad" maxLength={100} className={field}/></LogisticsFormField>
+          <LogisticsFormField label="Estado"><input name="domicilio_legal_estado" maxLength={100} className={field}/></LogisticsFormField>
+          <LogisticsFormField label="País"><input name="domicilio_legal_pais" maxLength={2} defaultValue="MX" className={field}/></LogisticsFormField>
+          <LogisticsFormField label="Código postal"><input name="domicilio_legal_codigo_postal" maxLength={12} className={field}/></LogisticsFormField>
         </LogisticsFormSection>
 
         <LogisticsFormSection title="Primera ubicación" description="Opcional. Si la capturas, quedará como dirección principal; podrás cambiarla después.">
@@ -193,13 +239,22 @@ export default function ClientCreateScreen() {
           <LogisticsFormField label="Ciudad"><input name="direccion_ciudad" maxLength={100} className={field} placeholder="Monterrey"/></LogisticsFormField>
           <LogisticsFormField label="Estado"><input name="direccion_estado" maxLength={100} className={field} placeholder="Nuevo León"/></LogisticsFormField>
           <LogisticsFormField label="Código postal"><input name="direccion_cp" maxLength={12} className={field} placeholder="64000"/></LogisticsFormField>
+          <LogisticsFormField label="Tipo de ubicación"><input name="direccion_tipo_ubicacion" maxLength={80} className={field} placeholder="Sucursal, planta, almacén…"/></LogisticsFormField>
+          <LogisticsFormField label="Tipo de zona"><input name="direccion_tipo_zona" maxLength={80} className={field} placeholder="Industrial, urbana…"/></LogisticsFormField>
           <LogisticsFormField label="Horario de atención"><input name="direccion_horario" maxLength={120} className={field} placeholder="Lun–Vie 08:00–17:00"/></LogisticsFormField>
           <LogisticsFormField label="Zona horaria"><select name="direccion_zona" className={field}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></LogisticsFormField>
           <LogisticsFormField label="Instrucciones de acceso"><input name="direccion_instrucciones" maxLength={500} className={field} placeholder="Andén, acceso o indicaciones"/></LogisticsFormField>
           <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-600"><input name="direccion_cita" type="checkbox" className="accent-[#0b1f3b]"/>Requiere cita</label>
         </LogisticsFormSection>
 
+        <LogisticsFormSection title="Perfil comercial" description="Información de adquisición y servicios acordados.">
+          <LogisticsFormField label="Canal de registro"><input name="canal_registro" maxLength={100} className={field} placeholder="Recomendación, prospección…"/></LogisticsFormField>
+          <LogisticsFormField label="Motivo de registro"><input name="motivo_registro" maxLength={300} className={field} placeholder="Necesidad o referencia de alta"/></LogisticsFormField>
+          <div className="flex flex-wrap items-center gap-4 pb-2 text-sm text-slate-700"><span className="font-medium">Servicios acordados</span><label className="flex items-center gap-2"><input type="checkbox" name="servicios_acordados" value="IMPORTACION" className="accent-[#0b1f3b]"/>Importación</label><label className="flex items-center gap-2"><input type="checkbox" name="servicios_acordados" value="EXPORTACION" className="accent-[#0b1f3b]"/>Exportación</label></div>
+        </LogisticsFormSection>
+
         <LogisticsFormSection title="Datos de facturación y pago" description="Opcionales; puedes agregarlos cuando el cliente confirme sus condiciones.">
+          <LogisticsFormField label="Régimen fiscal receptor"><input name="regimen_fiscal" maxLength={80} className={field} placeholder="Según constancia de situación fiscal"/></LogisticsFormField>
           <LogisticsFormField label="Uso CFDI"><input name="uso_cfdi" maxLength={40} className={field} placeholder="Clave o descripción"/></LogisticsFormField>
           <LogisticsFormField label="Forma de pago"><input name="forma_pago" maxLength={60} className={field} placeholder="Forma acordada"/></LogisticsFormField>
           <LogisticsFormField label="Método de pago"><input name="metodo_pago" maxLength={60} className={field} placeholder="Método acordado"/></LogisticsFormField>

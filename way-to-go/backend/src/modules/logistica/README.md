@@ -10,6 +10,8 @@ El esquema usa UUID, folio de viaje generado por secuencia, estados operativos s
 
 Para un esquema ya instalado, aplica manualmente y una sola vez `database/migrations/20261013_clientes_direccion_principal_rfc_unico.sql`. La migración agrega la dirección principal y unicidad de RFC sin distinguir mayúsculas; si detecta RFC duplicados, se detiene y muestra una consulta de diagnóstico. No vuelvas a ejecutar `schema.sql` como actualización.
 
+Las mejoras del perfil de Clientes requieren aplicar manualmente y una sola vez `database/migrations/20261018_clientes_perfil_contactos_ubicaciones.sql`. Añade domicilio legal, perfil comercial, régimen fiscal receptor, contacto de facturación y clasificación de ubicaciones. No se ejecutó en Supabase durante este trabajo.
+
 ## Endpoints básicos
 
 | Método | Ruta | Uso |
@@ -24,14 +26,20 @@ Para un esquema ya instalado, aplica manualmente y una sola vez `database/migrat
 | GET, POST | `/api/logistica/trips/:folio/evidence` | Consultar checklist y subir entregas |
 | GET | `/api/logistica/customers`, `/units`, `/operators`, `/providers`, `/catalogs` | Consultar catálogos |
 | POST | `/api/logistica/customers` | Crear cliente |
-| PATCH | `/api/logistica/customers/:id` | Editar datos y contacto principal |
+| PATCH | `/api/logistica/customers/:id` | Editar perfil comercial y datos fiscales del cliente |
 | PATCH | `/api/logistica/customers/:id/active` | Desactivar o reactivar cliente |
-| GET | `/api/logistica/customers/:id` | Consultar ficha, direcciones y contactos |
+| GET | `/api/logistica/customers/:id` | Consultar ficha, direcciones, contactos activos e inactivos y convenios |
+| POST | `/api/logistica/customers/:id/contacts` | Agregar contacto |
+| PATCH | `/api/logistica/contacts/:id` | Editar contacto sin reemplazar a otras personas |
+| PATCH | `/api/logistica/contacts/:id/active` | Desactivar o reactivar contacto conservando su historial |
+| POST | `/api/logistica/customers/:id/agreements` | Agregar convenio con ruta, tarifa y vigencia |
+| PATCH | `/api/logistica/agreements/:id` | Editar convenio |
+| PATCH | `/api/logistica/agreements/:id/active` | Desactivar o reactivar convenio |
 | POST | `/api/logistica/customers/:id/addresses` | Agregar dirección |
 | PATCH | `/api/logistica/addresses/:id` | Editar dirección |
 | PATCH | `/api/logistica/addresses/:id/active` | Desactivar o reactivar dirección |
 
-El RFC se valida con formato mexicano y no se puede repetir. El correo de contacto se valida y normaliza a minúsculas. Cada cliente puede tener una dirección principal activa; al desactivar la principal se promueve otra dirección activa cuando exista.
+El RFC se valida con formato mexicano y no se puede repetir. Los correos de cada contacto se validan y normalizan a minúsculas. Los contactos y direcciones se desactivan sin borrar su historial. Cada cliente puede tener una dirección principal activa y un contacto principal activo. Los convenios reutilizan `tms.cliente_convenios` para representar rutas frecuentes y tarifas; las ubicaciones no tienen un rol permanente de origen o destino.
 
 Para crear un viaje deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
 

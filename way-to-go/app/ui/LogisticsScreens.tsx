@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ArrowDownTrayIcon, ArrowLeftIcon, ArrowUpTrayIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, DocumentTextIcon, MagnifyingGlassIcon, PlusIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
+import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsServiceType } from '../services/logistics-api';
 
 type Trip = { folio: string; client: string; route: string; unit: string; driver: string; status: string; update: string; eta: string; evidence: string; amount: string };
 const trips: Trip[] = [
@@ -35,8 +37,88 @@ export function TripsScreen() {
 }
 
 export function TripForm() {
-  const [saved,setSaved]=useState(false);
-  return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Operación · TMS" title="Preparar viaje" description="Captura la información mínima y asigna los recursos del servicio." action={<Link href="/logistica/viajes" className={subtle}><ArrowLeftIcon className="h-4 w-4"/>Volver a viajes</Link>}/>{saved&&<div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">Viaje guardado en esta demo. La conexión al backend aún no está habilitada.</div>}<form onSubmit={e=>{e.preventDefault();setSaved(true)}} className="space-y-5"><FormSection title="Servicio y cliente" description="Datos comerciales y tipo de carga"><Field label="Cliente"><select required className="field"><option value="">Seleccionar cliente</option><option>Automotriz del Norte</option><option>Alimentos Sierra</option><option>Empaques del Bajío</option></select></Field><Field label="Tipo de servicio"><select className="field"><option>Flete dedicado</option><option>Consolidado</option><option>Local</option></select></Field><Field label="Tipo de carga"><input className="field" placeholder="Ej. autopartes"/></Field><Field label="Ingreso estimado"><input className="field" placeholder="$ MXN"/></Field></FormSection><FormSection title="Ruta y programación" description="Direcciones y citas del servicio"><Field label="Origen"><input required className="field" placeholder="Planta, ciudad o dirección"/></Field><Field label="Destino"><input required className="field" placeholder="CEDIS, ciudad o dirección"/></Field><Field label="Cita de carga"><input required type="datetime-local" className="field"/></Field><Field label="Entrega estimada"><input type="datetime-local" className="field"/></Field></FormSection><FormSection title="Asignación" description="Valida disponibilidad antes de programar"><Field label="Unidad"><select className="field"><option>Seleccionar unidad</option><option>WTG-12 · 3.5 HAZMAT</option><option>WTG-07 · Rabón</option></select></Field><Field label="Caja"><select className="field"><option>Seleccionar caja</option><option>CX-04 · Seca 53'</option><option>RB-02 · Rabón</option></select></Field><Field label="Operador / proveedor"><select className="field"><option>Seleccionar operador</option><option>A. Ramírez</option><option>Transportes del Norte</option></select></Field><Field label="Evidencia requerida"><select className="field"><option>POD firmado + fotos de carga</option><option>POD firmado</option></select></Field><label className="col-span-full text-sm text-slate-600"><input type="checkbox" className="mr-2 accent-[#0b1f3b]"/>Confirmo disponibilidad de unidad, operador y documentos.</label></FormSection><div className="flex justify-end gap-3"><Link className={subtle} href="/logistica/viajes">Cancelar</Link><button className={button} type="submit">Guardar borrador</button></div></form><style jsx>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#334155;background:white;outline:none}.field:focus{border-color:#c79d00}`}</style></div>;
+  const router = useRouter();
+  const [customers, setCustomers] = useState<LogisticsCustomer[]>([]);
+  const [services, setServices] = useState<LogisticsServiceType[]>([]);
+  const [addresses, setAddresses] = useState<LogisticsAddress[]>([]);
+  const [customerId, setCustomerId] = useState('');
+  const [originId, setOriginId] = useState('');
+  const [destinationId, setDestinationId] = useState('');
+  const [serviceId, setServiceId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([logisticsApi.getCustomers(), logisticsApi.getCatalogs()])
+      .then(([customerResult, catalogResult]) => {
+        if (!active) return;
+        setCustomers(customerResult.data.filter(customer => customer.activo));
+        setServices(catalogResult.data.servicios.filter(service => service.activo));
+      })
+      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'No se pudieron cargar clientes y servicios.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const chooseCustomer = async (id: string) => {
+    setCustomerId(id); setAddresses([]); setOriginId(''); setDestinationId(''); setError('');
+    if (!id) return;
+    try {
+      const result = await logisticsApi.getCustomer(id);
+      const activeAddresses = result.data.direcciones.filter(address => address.activo)
+        .sort((a, b) => Number(Boolean(b.principal)) - Number(Boolean(a.principal)) || a.nombre.localeCompare(b.nombre));
+      setAddresses(activeAddresses);
+      const primary = activeAddresses.find(address => address.principal) ?? activeAddresses[0];
+      setOriginId(primary?.id ?? '');
+      setDestinationId(activeAddresses.find(address => address.id !== primary?.id)?.id ?? '');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudieron cargar las direcciones del cliente.'); }
+  };
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setSaving(true); setError('');
+    const form = new FormData(event.currentTarget);
+    const loadingAt = String(form.get('cita_carga_at'));
+    const deliveryAt = String(form.get('entrega_estimada_at'));
+    try {
+      const result = await logisticsApi.createTrip({
+        cliente_id: customerId, origen_id: originId, destino_id: destinationId, tipo_servicio_id: serviceId,
+        tipo_carga: form.get('tipo_carga'), descripcion_carga: form.get('descripcion_carga'),
+        flete_base: Number(form.get('flete_base')), moneda: form.get('moneda'),
+        cita_carga_at: new Date(loadingAt).toISOString(), entrega_estimada_at: new Date(deliveryAt).toISOString(),
+        reserva_desde: new Date(loadingAt).toISOString(), reserva_hasta: new Date(deliveryAt).toISOString(),
+        instrucciones: form.get('instrucciones'),
+      });
+      router.push(`/logistica/viajes/${result.data.folio}`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el viaje.'); }
+    finally { setSaving(false); }
+  };
+
+  const addressLabel = (address: LogisticsAddress) => `${address.nombre} · ${[address.ciudad, address.estado].filter(Boolean).join(', ')}${address.principal ? ' · Principal' : ''}`;
+  return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Operación · TMS" title="Preparar viaje" description="Elige el cliente y usa sus direcciones registradas para definir origen y destino." action={<Link href="/logistica/viajes" className={subtle}><ArrowLeftIcon className="h-4 w-4"/>Volver a viajes</Link>}/>
+    {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
+    {loading ? <div className={`${cls} p-6 text-sm text-slate-500`}>Cargando clientes y tipos de servicio…</div> : <form onSubmit={submit} className="space-y-5">
+      <FormSection title="Servicio y cliente" description="Selecciona el cliente; sus ubicaciones activas aparecerán en la ruta.">
+        <Field label="Cliente"><select required value={customerId} onChange={event => void chooseCustomer(event.target.value)} className="field"><option value="">Seleccionar cliente</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.nombre_comercial || customer.razon_social}</option>)}</select></Field>
+        <Field label="Tipo de servicio"><select required value={serviceId} onChange={event => setServiceId(event.target.value)} className="field"><option value="">Seleccionar servicio</option>{services.map(service => <option key={service.id} value={service.id}>{service.nombre}</option>)}</select></Field>
+        <Field label="Tipo de carga"><input name="tipo_carga" required className="field" placeholder="Ej. autopartes"/></Field>
+        <Field label="Flete base"><div className="flex gap-2"><input name="flete_base" required type="number" min="0" step="0.01" className="field" placeholder="0.00"/><select name="moneda" className="field max-w-28"><option>MXN</option><option>USD</option></select></div></Field>
+        <Field label="Descripción de la carga"><input name="descripcion_carga" className="field" placeholder="Descripción breve (opcional)"/></Field>
+      </FormSection>
+      <FormSection title="Ruta y programación" description="Origen y destino se guardarán con las direcciones elegidas para este viaje.">
+        <Field label="Origen"><select required value={originId} onChange={event => setOriginId(event.target.value)} disabled={!addresses.length} className="field"><option value="">{customerId ? 'Seleccionar dirección de origen' : 'Primero selecciona un cliente'}</option>{addresses.map(address => <option key={address.id} value={address.id}>{addressLabel(address)}</option>)}</select></Field>
+        <Field label="Destino"><select required value={destinationId} onChange={event => setDestinationId(event.target.value)} disabled={!addresses.length} className="field"><option value="">{customerId ? 'Seleccionar dirección de destino' : 'Primero selecciona un cliente'}</option>{addresses.map(address => <option key={address.id} value={address.id}>{addressLabel(address)}</option>)}</select></Field>
+        {customerId && addresses.length === 0 && <div className="col-span-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Este cliente no tiene direcciones activas. <Link className="font-semibold underline" href="/logistica/clientes">Agrega una dirección en Clientes</Link> y vuelve a preparar el viaje.</div>}
+        {addresses.length === 1 && <p className="col-span-full text-xs text-amber-700">Solo hay una dirección activa. El origen y el destino no pueden ser el mismo; agrega otra ubicación del cliente.</p>}
+        <Field label="Cita de carga"><input name="cita_carga_at" required type="datetime-local" className="field"/></Field>
+        <Field label="Entrega estimada"><input name="entrega_estimada_at" required type="datetime-local" className="field"/></Field>
+        <div className="col-span-full"><Field label="Instrucciones"><textarea name="instrucciones" className="field min-h-20" placeholder="Indicaciones para este servicio (opcional)"/></Field></div>
+      </FormSection>
+      {services.length === 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No hay tipos de servicio activos configurados.</p>}
+      <div className="flex justify-end gap-3"><Link className={subtle} href="/logistica/viajes">Cancelar</Link><button className={button} type="submit" disabled={saving || !addresses.length || services.length === 0}>{saving ? 'Guardando…' : 'Crear viaje'}</button></div>
+    </form>}
+    <style jsx>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#334155;background:white;outline:none}.field:focus{border-color:#c79d00}.field:disabled{background:#f8fafc;color:#94a3b8}`}</style></div>;
 }
 function Field({label,children}:{label:string;children:ReactNode}) {return <label className="block text-xs font-semibold text-slate-600">{label}<div className="mt-1.5">{children}</div></label>}
 function FormSection({title,description,children}:{title:string;description:string;children:ReactNode}) {return <section className={`${cls} p-5 sm:p-6`}><div className="mb-5 border-b border-slate-100 pb-4"><h2 className="font-bold text-[#0b1f3b]">{title}</h2><p className="mt-1 text-xs text-slate-500">{description}</p></div><div className="grid gap-4 sm:grid-cols-2">{children}</div></section>}

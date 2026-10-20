@@ -38,6 +38,16 @@ export interface LogisticsCustomer {
   forma_pago?: string | null;
   metodo_pago?: string | null;
   condiciones_pago?: string | null;
+  domicilio_legal_calle?: string | null;
+  domicilio_legal_ciudad?: string | null;
+  domicilio_legal_estado?: string | null;
+  domicilio_legal_pais?: string | null;
+  domicilio_legal_codigo_postal?: string | null;
+  canal_registro?: string | null;
+  motivo_registro?: string | null;
+  servicios_acordados?: string[];
+  regimen_fiscal?: string | null;
+  contacto_facturacion_id?: string | null;
   activo: boolean;
   direcciones_activas?: number;
   created_at: string;
@@ -59,11 +69,54 @@ export interface LogisticsAddress {
   requiere_cita: boolean;
   activo: boolean;
   principal?: boolean;
+  tipo_ubicacion?: string | null;
+  tipo_zona?: string | null;
+}
+
+export interface LogisticsCustomerContact {
+  id: string;
+  cliente_id?: string;
+  nombre: string;
+  email: string | null;
+  telefono: string | null;
+  puesto: string | null;
+  tipo_contacto: string | null;
+  principal: boolean;
+  activo: boolean;
+}
+
+export interface LogisticsCustomerAgreement {
+  id: string;
+  cliente_id: string;
+  nombre: string;
+  origen_id: string | null;
+  destino_id: string | null;
+  tipo_servicio_id: string | null;
+  tipo_servicio?: string | null;
+  tipo_unidad: string | null;
+  tipo_carga: string | null;
+  tarifa_base: number;
+  moneda: string;
+  horas_libres_carga: number | null;
+  horas_libres_descarga: number | null;
+  tarifa_estadia_hora: number | null;
+  vigente_desde: string;
+  vigente_hasta: string | null;
+  condiciones: string | null;
+  activo: boolean;
 }
 
 export interface LogisticsCustomerDetail extends LogisticsCustomer {
   direcciones: LogisticsAddress[];
-  contactos: Array<{ id: string; nombre: string; email: string | null; telefono: string | null; puesto: string | null; tipo_contacto: string | null; principal: boolean }>;
+  contactos: LogisticsCustomerContact[];
+  convenios: LogisticsCustomerAgreement[];
+}
+
+export interface LogisticsServiceType {
+  id: string;
+  nombre: string;
+  codigo?: string;
+  activo: boolean;
 }
 
 export interface LogisticsCustomerCreateInput {
@@ -74,7 +127,17 @@ export interface LogisticsCustomerCreateInput {
   forma_pago?: string;
   metodo_pago?: string;
   condiciones_pago?: string;
-  contacto?: { nombre?: string; puesto?: string; email?: string; telefono?: string; tipo_contacto?: string };
+  domicilio_legal_calle?: string;
+  domicilio_legal_ciudad?: string;
+  domicilio_legal_estado?: string;
+  domicilio_legal_pais?: string;
+  domicilio_legal_codigo_postal?: string;
+  canal_registro?: string;
+  motivo_registro?: string;
+  servicios_acordados?: string[];
+  regimen_fiscal?: string;
+  contacto_facturacion_id?: string | null;
+  contactos?: Array<{ nombre: string; puesto?: string; email?: string; telefono?: string; tipo_contacto?: string; principal?: boolean; para_facturacion?: boolean }>;
   direccion?: Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>;
 }
 
@@ -107,8 +170,36 @@ class LogisticsApi {
     return this.request<LogisticsCustomerDetail>(`customers/${encodeURIComponent(id)}`);
   }
 
+  getCatalogs() {
+    return this.request<{ servicios: LogisticsServiceType[]; evidencias: Array<{ id: string; nombre: string; codigo?: string }>; costos: unknown[]; extras: unknown[] }>('catalogs');
+  }
+
   createCustomer(input: LogisticsCustomerCreateInput) {
     return this.request<LogisticsCustomer>('customers', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  addCustomerContact(id: string, input: Omit<LogisticsCustomerContact, 'id' | 'cliente_id' | 'activo'> & { email?: string | null }) {
+    return this.request<LogisticsCustomerContact>(`customers/${encodeURIComponent(id)}/contacts`, { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  updateCustomerContact(id: string, input: Partial<LogisticsCustomerContact>) {
+    return this.request<LogisticsCustomerContact>(`contacts/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
+  }
+
+  setCustomerContactActive(id: string, activo: boolean) {
+    return this.request<LogisticsCustomerContact>(`contacts/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ activo }) });
+  }
+
+  addCustomerAgreement(id: string, input: Omit<LogisticsCustomerAgreement, 'id' | 'cliente_id' | 'activo' | 'tipo_servicio'>) {
+    return this.request<LogisticsCustomerAgreement>(`customers/${encodeURIComponent(id)}/agreements`, { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  updateCustomerAgreement(id: string, input: Partial<LogisticsCustomerAgreement>) {
+    return this.request<LogisticsCustomerAgreement>(`agreements/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
+  }
+
+  setCustomerAgreementActive(id: string, activo: boolean) {
+    return this.request<LogisticsCustomerAgreement>(`agreements/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ activo }) });
   }
 
   updateCustomer(id: string, input: LogisticsCustomerUpdateInput) {

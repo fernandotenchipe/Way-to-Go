@@ -257,16 +257,29 @@ router.get('/customers', requireTripRead, wrap(async (req, res) => {
 router.post('/customers', requireTripEdit, wrap(async (req, res) => {
   const { razon_social: legalName, nombre_comercial: tradeName, rfc, uso_cfdi: cfdiUse,
     forma_pago: paymentForm, metodo_pago: paymentMethod, condiciones_pago: paymentTerms,
-    contacto, direccion } = req.body || {};
+    domicilio_legal_calle: legalStreet, domicilio_legal_ciudad: legalCity, domicilio_legal_estado: legalState,
+    domicilio_legal_pais: legalCountry, domicilio_legal_codigo_postal: legalPostalCode,
+    canal_registro: registrationChannel, motivo_registro: registrationReason,
+    servicios_acordados: agreedServices = [], regimen_fiscal: taxRegime, contactos = [], contacto, direccion } = req.body || {};
   if (typeof legalName !== 'string' || !legalName.trim()) return fail(res, 400, 'La razón social es obligatoria');
+  const optionalTextFields = [tradeName, cfdiUse, paymentForm, paymentMethod, paymentTerms, legalStreet, legalCity, legalState, legalPostalCode, registrationChannel, registrationReason, taxRegime];
+  if (optionalTextFields.some((value) => value != null && typeof value !== 'string')) return fail(res, 400, 'Los datos del cliente deben ser texto');
   if (rfc != null && (typeof rfc !== 'string' || !isValidRfc(rfc))) return fail(res, 400, 'El RFC debe tener formato válido de persona moral (12 caracteres) o física (13 caracteres)');
+  if (legalCountry != null && (typeof legalCountry !== 'string' || legalCountry.trim().length !== 2)) return fail(res, 400, 'El país del domicilio legal debe usar un código de dos letras');
   const normalizedRfc = normalizeRfc(rfc);
   if (normalizedRfc) {
     const { rows: [duplicate] } = await query(`SELECT id FROM tms.clientes WHERE upper(btrim(rfc))=$1 LIMIT 1`, [normalizedRfc]);
     if (duplicate) return fail(res, 409, 'Ya existe un cliente registrado con ese RFC');
   }
-  if (contacto?.email != null && (typeof contacto.email !== 'string' || !isValidEmail(contacto.email))) return fail(res, 400, 'El correo del contacto no tiene un formato válido');
-  if (contacto && typeof contacto.nombre === 'string' && !contacto.nombre.trim() && (contacto.email || contacto.telefono || contacto.puesto)) return fail(res, 400, 'El nombre del contacto es obligatorio cuando agregas sus datos');
+  if (contactos != null && !Array.isArray(contactos)) return fail(res, 400, 'Los contactos deben enviarse como una lista');
+  if (!Array.isArray(agreedServices) || agreedServices.some((service) => typeof service !== 'string')) return fail(res, 400, 'Los servicios acordados deben ser una lista de texto');
+  const contactsToSave = contactos.length ? contactos : (contacto?.nombre ? [{ ...contacto, principal: true }] : []);
+  for (const item of contactsToSave) {
+    if (!item || typeof item.nombre !== 'string' || !item.nombre.trim()) return fail(res, 400, 'Cada contacto requiere nombre');
+    if (item.email != null && (typeof item.email !== 'string' || !isValidEmail(item.email))) return fail(res, 400, 'El correo de un contacto no tiene un formato válido');
+    if (item.principal != null && typeof item.principal !== 'boolean') return fail(res, 400, 'principal debe ser verdadero o falso');
+  }
+  if (contactsToSave.filter((item) => item.principal).length > 1 || contactsToSave.filter((item) => item.para_facturacion).length > 1) return fail(res, 400, 'Solo puede elegirse un contacto principal y uno de facturación');
   if (direccion && [direccion.nombre, direccion.calle, direccion.ciudad, direccion.estado].some((value) => typeof value === 'string' && value.trim())
     && ![direccion.nombre, direccion.calle, direccion.ciudad, direccion.estado].every((value) => typeof value === 'string' && value.trim())) {
     return fail(res, 400, 'Completa nombre, calle, ciudad y estado para guardar la dirección');
@@ -276,35 +289,45 @@ router.post('/customers', requireTripEdit, wrap(async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows: [customer] } = await client.query(`INSERT INTO tms.clientes
-      (razon_social,nombre_comercial,rfc,uso_cfdi,forma_pago,metodo_pago,condiciones_pago)
-      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [legalName.trim(), typeof tradeName === 'string' && tradeName.trim() ? tradeName.trim() : null,
-      normalizedRfc || null, cfdiUse?.trim() || null, paymentForm?.trim() || null, paymentMethod?.trim() || null, paymentTerms?.trim() || null]);
+      (razon_social,nombre_comercial,rfc,uso_cfdi,forma_pago,metodo_pago,condiciones_pago,domicilio_legal_calle,
+       domicilio_legal_ciudad,domicilio_legal_estado,domicilio_legal_pais,domicilio_legal_codigo_postal,canal_registro,motivo_registro,servicios_acordados,regimen_fiscal)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`, [legalName.trim(), typeof tradeName === 'string' && tradeName.trim() ? tradeName.trim() : null,
+      normalizedRfc || null, cfdiUse?.trim() || null, paymentForm?.trim() || null, paymentMethod?.trim() || null, paymentTerms?.trim() || null,
+      legalStreet?.trim() || null, legalCity?.trim() || null, legalState?.trim() || null, legalCountry ? String(legalCountry).slice(0, 2).toUpperCase() : null,
+      legalPostalCode?.trim() || null, registrationChannel?.trim() || null, registrationReason?.trim() || null,
+      [...new Set(agreedServices.map((service) => service.trim()).filter(Boolean))], taxRegime?.trim() || null]);
 
-    let contact = null;
-    if (typeof contacto?.nombre === 'string' && contacto.nombre.trim()) {
+    const savedContacts = [];
+    let billingContactId = null;
+    for (const item of contactsToSave) {
       const { rows: [savedContact] } = await client.query(`INSERT INTO tms.cliente_contactos
         (cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal)
-        VALUES ($1,$2,$3,$4,$5,$6,true) RETURNING id,nombre,puesto,email,telefono,tipo_contacto,principal`,
-      [customer.id, contacto.nombre.trim(), contacto.puesto?.trim() || null, contacto.email?.trim().toLowerCase() || null,
-        contacto.telefono?.trim() || null, contacto.tipo_contacto?.trim() || 'OPERACIONES']);
-      contact = savedContact;
+        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal,activo`,
+      [customer.id, item.nombre.trim(), item.puesto?.trim() || null, item.email?.trim().toLowerCase() || null,
+        item.telefono?.trim() || null, item.tipo_contacto?.trim() || 'OPERACIONES', Boolean(item.principal)]);
+      savedContacts.push(savedContact);
+      if (item.para_facturacion) billingContactId = savedContact.id;
     }
 
     let address = null;
     if (typeof direccion?.nombre === 'string' && direccion.nombre.trim()) {
       const { rows: [savedAddress] } = await client.query(`INSERT INTO tms.cliente_direcciones
-        (cliente_id,nombre,calle,ciudad,estado,pais,codigo_postal,zona_horaria,horario,instrucciones,requiere_cita,contacto_id,principal)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        (cliente_id,nombre,calle,ciudad,estado,pais,codigo_postal,zona_horaria,horario,instrucciones,requiere_cita,contacto_id,principal,tipo_ubicacion,tipo_zona)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [customer.id, direccion.nombre.trim(), direccion.calle.trim(), direccion.ciudad.trim(), direccion.estado.trim(),
         String(direccion.pais || 'MX').slice(0, 2).toUpperCase(), direccion.codigo_postal?.trim() || null,
         direccion.zona_horaria || 'America/Mexico_City', direccion.horario?.trim() || null,
-        direccion.instrucciones?.trim() || null, Boolean(direccion.requiere_cita), contact?.id || null, true]);
+        direccion.instrucciones?.trim() || null, Boolean(direccion.requiere_cita), savedContacts.find((item) => item.principal)?.id || null, true,
+        direccion.tipo_ubicacion?.trim() || null, direccion.tipo_zona?.trim() || null]);
       address = savedAddress;
     }
 
+    if (billingContactId) await client.query('UPDATE tms.clientes SET contacto_facturacion_id=$2 WHERE id=$1', [customer.id, billingContactId]);
+
     await client.query('COMMIT');
     res.status(201).json({ success: true, data: { ...customer, direcciones_activas: address ? 1 : 0,
-      address_preview: address ? `${address.ciudad}, ${address.estado}` : null, contactos: contact ? [contact] : [], direcciones: address ? [address] : [] } });
+      contacto_facturacion_id: billingContactId, address_preview: address ? `${address.ciudad}, ${address.estado}` : null,
+      contactos: savedContacts, direcciones: address ? [address] : [], convenios: [] } });
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -316,6 +339,10 @@ router.patch('/customers/:id', requireTripEdit, wrap(async (req, res) => {
   const fields = [
     ['razon_social', 'razon_social'], ['nombre_comercial', 'nombre_comercial'], ['rfc', 'rfc'],
     ['uso_cfdi', 'uso_cfdi'], ['forma_pago', 'forma_pago'], ['metodo_pago', 'metodo_pago'], ['condiciones_pago', 'condiciones_pago'],
+    ['domicilio_legal_calle', 'domicilio_legal_calle'], ['domicilio_legal_ciudad', 'domicilio_legal_ciudad'],
+    ['domicilio_legal_estado', 'domicilio_legal_estado'], ['domicilio_legal_pais', 'domicilio_legal_pais'],
+    ['domicilio_legal_codigo_postal', 'domicilio_legal_codigo_postal'], ['canal_registro', 'canal_registro'],
+    ['motivo_registro', 'motivo_registro'], ['regimen_fiscal', 'regimen_fiscal'], ['contacto_facturacion_id', 'contacto_facturacion_id'],
   ];
   const updates = [];
   const values = [];
@@ -325,17 +352,17 @@ router.patch('/customers/:id', requireTripEdit, wrap(async (req, res) => {
     if (key === 'razon_social' && (typeof value !== 'string' || !value.trim())) return fail(res, 400, 'La razón social es obligatoria');
     if (value != null && typeof value !== 'string') return fail(res, 400, `El campo ${key} debe ser texto`);
     if (key === 'rfc' && value != null && !isValidRfc(value)) return fail(res, 400, 'El RFC debe tener formato válido de persona moral (12 caracteres) o física (13 caracteres)');
-    values.push(key === 'razon_social' ? value.trim() : key === 'rfc' ? normalizeRfc(value) || null : value?.trim() || null);
+    if (key === 'contacto_facturacion_id' && value != null && !isUuid(value)) return fail(res, 400, 'El contacto de facturación seleccionado no es válido');
+    values.push(key === 'razon_social' ? value.trim() : key === 'rfc' ? normalizeRfc(value) || null : key === 'domicilio_legal_pais' ? value?.trim().toUpperCase() || null : value?.trim() || null);
     updates.push(`${column}=$${values.length}`);
   }
-  const hasContactUpdate = Object.prototype.hasOwnProperty.call(body, 'contacto');
-  const contact = body.contacto || {};
-  if (hasContactUpdate && (typeof contact !== 'object' || Array.isArray(contact))) return fail(res, 400, 'Los datos del contacto no son válidos');
-  if (hasContactUpdate && ['nombre', 'puesto', 'email', 'telefono', 'tipo_contacto'].some((key) => contact[key] != null && typeof contact[key] !== 'string')) return fail(res, 400, 'Los campos del contacto deben ser texto');
-  if (hasContactUpdate && contact.email != null && !isValidEmail(contact.email)) return fail(res, 400, 'El correo del contacto no tiene un formato válido');
-  const hasContactData = [contact.nombre, contact.puesto, contact.email, contact.telefono].some((value) => typeof value === 'string' && value.trim());
-  if (hasContactUpdate && hasContactData && (typeof contact.nombre !== 'string' || !contact.nombre.trim())) return fail(res, 400, 'El nombre del contacto es obligatorio cuando agregas sus datos');
-  if (!updates.length && !hasContactUpdate) return fail(res, 400, 'No se recibieron campos para actualizar');
+  if (Object.prototype.hasOwnProperty.call(body, 'servicios_acordados')) {
+    if (!Array.isArray(body.servicios_acordados) || body.servicios_acordados.some((item) => typeof item !== 'string')) return fail(res, 400, 'Los servicios acordados deben ser una lista de texto');
+    values.push([...new Set(body.servicios_acordados.map((item) => item.trim()).filter(Boolean))]);
+    updates.push(`servicios_acordados=$${values.length}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'contacto')) return fail(res, 400, 'Administra los contactos desde la sección de contactos para conservar el historial');
+  if (!updates.length) return fail(res, 400, 'No se recibieron campos para actualizar');
 
   const rfcPosition = fields.findIndex(([, key]) => key === 'rfc');
   if (rfcPosition >= 0 && Object.prototype.hasOwnProperty.call(body, 'rfc') && normalizeRfc(body.rfc)) {
@@ -356,20 +383,9 @@ router.patch('/customers/:id', requireTripEdit, wrap(async (req, res) => {
       [customer] = result.rows;
     }
     if (!customer) { await client.query('ROLLBACK'); return fail(res, 404, 'Cliente no encontrado'); }
-
-    if (hasContactUpdate && hasContactData) {
-      const { rows: [existingContact] } = await client.query('SELECT id FROM tms.cliente_contactos WHERE cliente_id=$1 AND principal AND activo FOR UPDATE', [req.params.id]);
-      const contactValues = [contact.nombre.trim(), contact.puesto?.trim() || null, contact.email?.trim().toLowerCase() || null,
-        contact.telefono?.trim() || null, contact.tipo_contacto?.trim() || 'OPERACIONES'];
-      if (existingContact) {
-        await client.query(`UPDATE tms.cliente_contactos SET nombre=$2,puesto=$3,email=$4,telefono=$5,tipo_contacto=$6,updated_at=now() WHERE id=$1`, [existingContact.id, ...contactValues]);
-      } else {
-        await client.query(`INSERT INTO tms.cliente_contactos (cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal)
-          VALUES ($1,$2,$3,$4,$5,$6,true)`, [req.params.id, ...contactValues]);
-      }
-    } else if (hasContactUpdate) {
-      await client.query(`UPDATE tms.cliente_contactos SET activo=false,principal=false,updated_at=now()
-        WHERE cliente_id=$1 AND principal AND activo`, [req.params.id]);
+    if (Object.prototype.hasOwnProperty.call(body, 'contacto_facturacion_id') && body.contacto_facturacion_id) {
+      const { rows: [billingContact] } = await client.query('SELECT id FROM tms.cliente_contactos WHERE id=$1 AND cliente_id=$2 AND activo', [body.contacto_facturacion_id, req.params.id]);
+      if (!billingContact) { await client.query('ROLLBACK'); return fail(res, 400, 'El contacto de facturación debe pertenecer al cliente y estar activo'); }
     }
     await client.query('COMMIT');
     res.json({ success: true, data: customer });
@@ -385,19 +401,169 @@ router.patch('/customers/:id/active', requireTripEdit, wrap(async (req, res) => 
   if (!customer) return fail(res, 404, 'Cliente no encontrado');
   res.json({ success: true, data: customer });
 }));
+router.post('/customers/:id/contacts', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
+  const { nombre, puesto, email, telefono, tipo_contacto: contactType = 'OPERACIONES', principal = false, para_facturacion: billing = false } = req.body || {};
+  if (typeof nombre !== 'string' || !nombre.trim()) return fail(res, 400, 'El nombre del contacto es obligatorio');
+  if (email != null && (typeof email !== 'string' || !isValidEmail(email))) return fail(res, 400, 'El correo del contacto no tiene un formato válido');
+  if (typeof principal !== 'boolean' || typeof billing !== 'boolean') return fail(res, 400, 'Las selecciones del contacto deben ser verdaderas o falsas');
+  if ([puesto, telefono, contactType].some((value) => value != null && typeof value !== 'string')) return fail(res, 400, 'Los datos del contacto deben ser texto');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [customer] } = await client.query('SELECT id FROM tms.clientes WHERE id=$1 AND activo FOR UPDATE', [req.params.id]);
+    if (!customer) { await client.query('ROLLBACK'); return fail(res, 404, 'Cliente no encontrado o inactivo'); }
+    if (principal) await client.query('UPDATE tms.cliente_contactos SET principal=false WHERE cliente_id=$1 AND principal', [req.params.id]);
+    const { rows: [contact] } = await client.query(`INSERT INTO tms.cliente_contactos
+      (cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal)
+      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal,activo`,
+    [req.params.id, nombre.trim(), puesto?.trim() || null, email?.trim().toLowerCase() || null, telefono?.trim() || null, contactType.trim(), principal]);
+    if (billing) await client.query('UPDATE tms.clientes SET contacto_facturacion_id=$2 WHERE id=$1', [req.params.id, contact.id]);
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, data: contact });
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}));
+router.patch('/contacts/:id', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de contacto inválido');
+  const body = req.body || {};
+  const columns = { nombre: 'nombre', puesto: 'puesto', email: 'email', telefono: 'telefono', tipo_contacto: 'tipo_contacto' };
+  const values = [];
+  const updates = [];
+  for (const [key, column] of Object.entries(columns)) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const value = body[key];
+    if (key === 'nombre' && (typeof value !== 'string' || !value.trim())) return fail(res, 400, 'El nombre del contacto es obligatorio');
+    if (value != null && typeof value !== 'string') return fail(res, 400, `El campo ${key} debe ser texto`);
+    if (key === 'email' && value != null && !isValidEmail(value)) return fail(res, 400, 'El correo del contacto no tiene un formato válido');
+    values.push(key === 'email' ? value?.trim().toLowerCase() || null : value?.trim() || null);
+    updates.push(`${column}=$${values.length}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'principal') && typeof body.principal !== 'boolean') return fail(res, 400, 'principal debe ser verdadero o falso');
+  if (Object.prototype.hasOwnProperty.call(body, 'para_facturacion') && typeof body.para_facturacion !== 'boolean') return fail(res, 400, 'para_facturacion debe ser verdadero o falso');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [contact] } = await client.query('SELECT * FROM tms.cliente_contactos WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!contact) { await client.query('ROLLBACK'); return fail(res, 404, 'Contacto no encontrado'); }
+    await client.query('SELECT id FROM tms.clientes WHERE id=$1 FOR UPDATE', [contact.cliente_id]);
+    if (body.principal === true && !contact.activo) { await client.query('ROLLBACK'); return fail(res, 400, 'Reactiva el contacto antes de marcarlo como principal'); }
+    if (body.principal === true) await client.query('UPDATE tms.cliente_contactos SET principal=false WHERE cliente_id=$1 AND id<>$2', [contact.cliente_id, contact.id]);
+    if (body.principal != null) { values.push(body.principal); updates.push(`principal=$${values.length}`); }
+    if (updates.length) {
+      values.push(contact.id);
+      await client.query(`UPDATE tms.cliente_contactos SET ${updates.join(', ')},updated_at=now() WHERE id=$${values.length}`, values);
+    }
+    if (body.para_facturacion === true) await client.query('UPDATE tms.clientes SET contacto_facturacion_id=$2,updated_at=now() WHERE id=$1', [contact.cliente_id, contact.id]);
+    else if (body.para_facturacion === false) await client.query('UPDATE tms.clientes SET contacto_facturacion_id=NULL,updated_at=now() WHERE id=$1 AND contacto_facturacion_id=$2', [contact.cliente_id, contact.id]);
+    const { rows: [updated] } = await client.query('SELECT id,cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal,activo FROM tms.cliente_contactos WHERE id=$1', [contact.id]);
+    await client.query('COMMIT');
+    res.json({ success: true, data: updated });
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}));
+router.patch('/contacts/:id/active', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de contacto inválido');
+  if (typeof req.body?.activo !== 'boolean') return fail(res, 400, 'El estado activo debe ser verdadero o falso');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [contact] } = await client.query('SELECT * FROM tms.cliente_contactos WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!contact) { await client.query('ROLLBACK'); return fail(res, 404, 'Contacto no encontrado'); }
+    await client.query('SELECT id FROM tms.clientes WHERE id=$1 FOR UPDATE', [contact.cliente_id]);
+    await client.query('UPDATE tms.cliente_contactos SET activo=$2,principal=CASE WHEN $2 THEN principal ELSE false END,updated_at=now() WHERE id=$1', [contact.id, req.body.activo]);
+    if (contact.principal && !req.body.activo) {
+      const { rows: [replacement] } = await client.query('SELECT id FROM tms.cliente_contactos WHERE cliente_id=$1 AND activo ORDER BY nombre LIMIT 1', [contact.cliente_id]);
+      if (replacement) await client.query('UPDATE tms.cliente_contactos SET principal=true WHERE id=$1', [replacement.id]);
+    } else if (req.body.activo) {
+      const { rows: [currentPrimary] } = await client.query('SELECT id FROM tms.cliente_contactos WHERE cliente_id=$1 AND activo AND principal LIMIT 1', [contact.cliente_id]);
+      if (!currentPrimary) await client.query('UPDATE tms.cliente_contactos SET principal=true WHERE id=$1', [contact.id]);
+    }
+    if (!req.body.activo) await client.query('UPDATE tms.clientes SET contacto_facturacion_id=NULL WHERE id=$1 AND contacto_facturacion_id=$2', [contact.cliente_id, contact.id]);
+    const { rows: [updated] } = await client.query('SELECT id,cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal,activo FROM tms.cliente_contactos WHERE id=$1', [contact.id]);
+    await client.query('COMMIT');
+    res.json({ success: true, data: updated });
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}));
 router.get('/customers/:id', requireTripRead, wrap(async (req, res) => {
   if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
   const { rows: [customer] } = await query(`SELECT * FROM tms.clientes WHERE id=$1`, [req.params.id]);
   if (!customer) return fail(res, 404, 'Cliente no encontrado');
   const [addresses, contacts] = await Promise.all([
     query(`SELECT * FROM tms.cliente_direcciones WHERE cliente_id=$1 ORDER BY principal DESC,activo DESC,nombre`, [req.params.id]),
-    query(`SELECT id,nombre,puesto,email,telefono,tipo_contacto,principal FROM tms.cliente_contactos WHERE cliente_id=$1 AND activo ORDER BY principal DESC,nombre`, [req.params.id]),
+    query(`SELECT id,cliente_id,nombre,puesto,email,telefono,tipo_contacto,principal,activo FROM tms.cliente_contactos WHERE cliente_id=$1 ORDER BY principal DESC,activo DESC,nombre`, [req.params.id]),
   ]);
-  res.json({ success: true, data: { ...customer, direcciones: addresses.rows, contactos: contacts.rows } });
+  const { rows: agreements } = await query(`SELECT a.*,s.nombre AS tipo_servicio FROM tms.cliente_convenios a
+    LEFT JOIN tms.tipos_servicio s ON s.id=a.tipo_servicio_id WHERE a.cliente_id=$1 ORDER BY a.activo DESC,a.vigente_desde DESC,a.nombre`, [req.params.id]);
+  res.json({ success: true, data: { ...customer, direcciones: addresses.rows, contactos: contacts.rows, convenios: agreements } });
+}));
+router.post('/customers/:id/agreements', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
+  const { nombre, origen_id: originId, destino_id: destinationId, tipo_servicio_id: serviceTypeId, tipo_unidad: unitType,
+    tipo_carga: cargoType, tarifa_base: baseRate, moneda = 'MXN', horas_libres_carga: loadingFreeHours,
+    horas_libres_descarga: unloadingFreeHours, tarifa_estadia_hora: waitingFee, vigente_desde: validFrom,
+    vigente_hasta: validUntil, condiciones } = req.body || {};
+  if (typeof nombre !== 'string' || !nombre.trim() || !Number.isFinite(Number(baseRate)) || Number(baseRate) < 0 || typeof validFrom !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(validFrom)) return fail(res, 400, 'Nombre, tarifa válida y fecha de inicio son obligatorios');
+  if (!['MXN', 'USD'].includes(moneda)) return fail(res, 400, 'La moneda debe ser MXN o USD');
+  const optionalAmounts = [loadingFreeHours, unloadingFreeHours, waitingFee];
+  if (optionalAmounts.some((value) => value != null && value !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0))) return fail(res, 400, 'Las horas y tarifas opcionales deben ser números iguales o mayores a cero');
+  if (validUntil && validUntil < validFrom) return fail(res, 400, 'La fecha final no puede ser anterior a la fecha inicial');
+  if ((originId && !isUuid(originId)) || (destinationId && !isUuid(destinationId)) || (serviceTypeId && !isUuid(serviceTypeId))) return fail(res, 400, 'La ubicación o tipo de servicio no es válido');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [customer] } = await client.query('SELECT id FROM tms.clientes WHERE id=$1 AND activo FOR UPDATE', [req.params.id]);
+    if (!customer) { await client.query('ROLLBACK'); return fail(res, 404, 'Cliente no encontrado o inactivo'); }
+    const addressIds = [originId, destinationId].filter(Boolean);
+    if (addressIds.length) {
+      const { rows } = await client.query('SELECT id FROM tms.cliente_direcciones WHERE id=ANY($1::uuid[]) AND cliente_id=$2 AND activo', [addressIds, req.params.id]);
+      if (rows.length !== new Set(addressIds).size) { await client.query('ROLLBACK'); return fail(res, 400, 'Las ubicaciones deben pertenecer al cliente y estar activas'); }
+    }
+    const { rows: [agreement] } = await client.query(`INSERT INTO tms.cliente_convenios
+      (cliente_id,nombre,origen_id,destino_id,tipo_servicio_id,tipo_unidad,tipo_carga,tarifa_base,moneda,horas_libres_carga,horas_libres_descarga,tarifa_estadia_hora,vigente_desde,vigente_hasta,condiciones)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+    [req.params.id, nombre.trim(), originId || null, destinationId || null, serviceTypeId || null, unitType?.trim() || null, cargoType?.trim() || null,
+      Number(baseRate), moneda, loadingFreeHours == null || loadingFreeHours === '' ? null : Number(loadingFreeHours),
+      unloadingFreeHours == null || unloadingFreeHours === '' ? null : Number(unloadingFreeHours), waitingFee == null || waitingFee === '' ? null : Number(waitingFee),
+      validFrom, validUntil || null, condiciones?.trim() || null]);
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, data: agreement });
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}));
+router.patch('/agreements/:id', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de convenio inválido');
+  const body = req.body || {};
+  const columns = { nombre: 'nombre', origen_id: 'origen_id', destino_id: 'destino_id', tipo_servicio_id: 'tipo_servicio_id', tipo_unidad: 'tipo_unidad', tipo_carga: 'tipo_carga', tarifa_base: 'tarifa_base', moneda: 'moneda', horas_libres_carga: 'horas_libres_carga', horas_libres_descarga: 'horas_libres_descarga', tarifa_estadia_hora: 'tarifa_estadia_hora', vigente_desde: 'vigente_desde', vigente_hasta: 'vigente_hasta', condiciones: 'condiciones' };
+  const values = [];
+  const updates = [];
+  for (const [key, column] of Object.entries(columns)) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const value = body[key];
+    if (['origen_id', 'destino_id', 'tipo_servicio_id'].includes(key) && value != null && !isUuid(value)) return fail(res, 400, `${key} no es válido`);
+    if (key === 'nombre' && (typeof value !== 'string' || !value.trim())) return fail(res, 400, 'El nombre del convenio es obligatorio');
+    if (key === 'tarifa_base' && (!Number.isFinite(Number(value)) || Number(value) < 0)) return fail(res, 400, 'La tarifa debe ser un número igual o mayor a cero');
+    if (['horas_libres_carga', 'horas_libres_descarga', 'tarifa_estadia_hora'].includes(key) && value != null && value !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0)) return fail(res, 400, 'Las horas y tarifas deben ser números iguales o mayores a cero');
+    if (key === 'moneda' && !['MXN', 'USD'].includes(value)) return fail(res, 400, 'La moneda debe ser MXN o USD');
+    values.push(['tarifa_base', 'horas_libres_carga', 'horas_libres_descarga', 'tarifa_estadia_hora'].includes(key) && value != null ? Number(value) : value === '' ? null : value);
+    updates.push(`${column}=$${values.length}`);
+  }
+  if (!updates.length) return fail(res, 400, 'No se recibieron campos para actualizar');
+  const { rows: [agreement] } = await query(`UPDATE tms.cliente_convenios SET ${updates.join(',')},updated_at=now() WHERE id=$${values.length + 1} RETURNING *`, [...values, req.params.id]);
+  if (!agreement) return fail(res, 404, 'Convenio no encontrado');
+  res.json({ success: true, data: agreement });
+}));
+router.patch('/agreements/:id/active', requireTripEdit, wrap(async (req, res) => {
+  if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de convenio inválido');
+  if (typeof req.body?.activo !== 'boolean') return fail(res, 400, 'El estado activo debe ser verdadero o falso');
+  const { rows: [agreement] } = await query('UPDATE tms.cliente_convenios SET activo=$2,updated_at=now() WHERE id=$1 RETURNING *', [req.params.id, req.body.activo]);
+  if (!agreement) return fail(res, 404, 'Convenio no encontrado');
+  res.json({ success: true, data: agreement });
 }));
 router.post('/customers/:id/addresses', requireTripEdit, wrap(async (req, res) => {
   if (!isUuid(req.params.id)) return fail(res, 400, 'Identificador de cliente inválido');
-  const { nombre, calle, ciudad, estado, pais = 'MX', codigo_postal: postalCode, zona_horaria: timezone = 'America/Mexico_City', horario, instrucciones, requiere_cita: appointment = false, principal: requestPrimary } = req.body || {};
+  const { nombre, calle, ciudad, estado, pais = 'MX', codigo_postal: postalCode, zona_horaria: timezone = 'America/Mexico_City', horario, instrucciones, requiere_cita: appointment = false, principal: requestPrimary, tipo_ubicacion: locationType, tipo_zona: zoneType } = req.body || {};
   if (![nombre, calle, ciudad, estado].every((value) => typeof value === 'string' && value.trim())) return fail(res, 400, 'Nombre, calle, ciudad y estado son obligatorios');
   if (requestPrimary != null && typeof requestPrimary !== 'boolean') return fail(res, 400, 'principal debe ser verdadero o falso');
   const client = await pool.connect();
@@ -409,9 +575,10 @@ router.post('/customers/:id/addresses', requireTripEdit, wrap(async (req, res) =
     const primary = requestPrimary === true || !currentPrimary;
     if (primary) await client.query('UPDATE tms.cliente_direcciones SET principal=false WHERE cliente_id=$1 AND principal', [req.params.id]);
     const { rows: [address] } = await client.query(`INSERT INTO tms.cliente_direcciones
-      (cliente_id,nombre,calle,ciudad,estado,pais,codigo_postal,zona_horaria,horario,instrucciones,requiere_cita,principal)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [req.params.id, nombre.trim(), calle.trim(), ciudad.trim(), estado.trim(), String(pais).slice(0, 2).toUpperCase(), postalCode || null, timezone, horario || null, instrucciones || null, Boolean(appointment), primary]);
+      (cliente_id,nombre,calle,ciudad,estado,pais,codigo_postal,zona_horaria,horario,instrucciones,requiere_cita,principal,tipo_ubicacion,tipo_zona)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+    [req.params.id, nombre.trim(), calle.trim(), ciudad.trim(), estado.trim(), String(pais).slice(0, 2).toUpperCase(), postalCode || null, timezone, horario || null, instrucciones || null, Boolean(appointment), primary,
+      typeof locationType === 'string' ? locationType.trim() || null : null, typeof zoneType === 'string' ? zoneType.trim() || null : null]);
     await client.query('COMMIT');
     res.status(201).json({ success: true, data: address });
   } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -423,11 +590,11 @@ router.patch('/addresses/:id', requireTripEdit, wrap(async (req, res) => {
   const textFields = [
     ['nombre', 'nombre', true], ['calle', 'calle', true], ['ciudad', 'ciudad', true], ['estado', 'estado', true],
     ['pais', 'pais', false], ['codigo_postal', 'codigo_postal', false], ['zona_horaria', 'zona_horaria', false],
-    ['horario', 'horario', false], ['instrucciones', 'instrucciones', false],
+    ['horario', 'horario', false], ['instrucciones', 'instrucciones', false], ['tipo_ubicacion', 'tipo_ubicacion', false], ['tipo_zona', 'tipo_zona', false],
   ];
   const updates = [];
   const values = [];
-  const nullableFields = new Set(['codigo_postal', 'horario', 'instrucciones']);
+  const nullableFields = new Set(['codigo_postal', 'horario', 'instrucciones', 'tipo_ubicacion', 'tipo_zona']);
   for (const [column, key, required] of textFields) {
     if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
     const value = body[key];

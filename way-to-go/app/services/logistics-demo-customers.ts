@@ -1,9 +1,10 @@
-import type { LogisticsAddress, LogisticsCustomer, LogisticsCustomerDetail } from './logistics-api';
+import type { LogisticsAddress, LogisticsCustomer, LogisticsCustomerAgreement, LogisticsCustomerDetail } from './logistics-api';
 
 export type DemoLogisticsCustomer = LogisticsCustomer & {
   address_preview?: string | null;
   demo_addresses?: LogisticsAddress[];
   demo_contacts?: LogisticsCustomerDetail['contactos'];
+  demo_agreements?: LogisticsCustomerAgreement[];
 };
 
 const STORAGE_KEY = 'wtg-logistics-demo-customers';
@@ -16,11 +17,14 @@ export function getDemoLogisticsCustomers(): DemoLogisticsCustomer[] {
     if (!Array.isArray(customers)) return [];
     return (customers as DemoLogisticsCustomer[]).map((customer) => {
       const addresses = customer.demo_addresses ?? [];
-      if (addresses.some((address) => address.principal && address.activo)) return customer;
-      const firstActiveAddress = addresses.find((address) => address.activo);
-      return firstActiveAddress
-        ? { ...customer, demo_addresses: addresses.map((address) => ({ ...address, principal: address.id === firstActiveAddress.id })) }
-        : customer;
+      const hasPrimary = addresses.some((address) => address.principal && address.activo);
+      const firstActiveAddress = hasPrimary ? undefined : addresses.find((address) => address.activo);
+      return {
+        ...customer,
+        demo_addresses: firstActiveAddress ? addresses.map((address) => ({ ...address, principal: address.id === firstActiveAddress.id })) : addresses,
+        demo_contacts: (customer.demo_contacts ?? []).map((contact) => ({ ...contact, activo: contact.activo ?? true })),
+        demo_agreements: customer.demo_agreements ?? [],
+      };
     });
   } catch {
     return [];
