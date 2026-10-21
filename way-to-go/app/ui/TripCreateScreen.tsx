@@ -97,7 +97,7 @@ export default function TripCreateScreen() {
       if (departure < loading || arrival <= departure || (unloading && unloading < arrival)) throw new Error('Revisa el orden de recolección, salida, llegada y descarga, considerando las zonas horarias.');
       const input: LogisticsTripCreateInput = {
         ...(quick ? { cliente_nuevo: { razon_social: value('nuevo_cliente'), direcciones: quickAddresses } } : { cliente_id: customer!.id, origen_id: originId, destino_id: destinationId }),
-        estado_operativo: 'BORRADOR', tipo_servicio_id: value('servicio'), tipo_carga: value('tipo_carga'), descripcion_carga: value('descripcion_carga'),
+        estado_operativo: 'CONFIRMADO', tipo_servicio_id: value('servicio'), tipo_carga: value('tipo_carga'), descripcion_carga: value('descripcion_carga'),
         cita_carga_at: loading, salida_programada_at: departure, entrega_estimada_at: arrival, descarga_programada_at: unloading,
         reserva_desde: loading, reserva_hasta: unloading || arrival, flete_base: value('flete_base') ? Number(value('flete_base')) : undefined,
         moneda: value('moneda'), instrucciones: value('instrucciones'),
@@ -113,7 +113,7 @@ export default function TripCreateScreen() {
         folio = `DEMO-${crypto.randomUUID()}`;
         const trip: LogisticsTrip = {
           id: folio, folio, cliente_id: customerId, cliente: quick ? value('nuevo_cliente') : customer!.razon_social,
-          estado_operativo: 'BORRADOR', tipo_servicio_id: input.tipo_servicio_id, tipo_servicio: services.find((row) => row.id === input.tipo_servicio_id)?.nombre || null,
+          estado_operativo: 'CONFIRMADO', tipo_servicio_id: input.tipo_servicio_id, tipo_servicio: services.find((row) => row.id === input.tipo_servicio_id)?.nombre || null,
           tipo_carga: input.tipo_carga, cita_carga_at: loading, salida_programada_at: departure, entrega_estimada_at: arrival, descarga_programada_at: unloading,
           origen_snapshot: { ...snapshots[0] }, destino_snapshot: { ...snapshots[1] }, instrucciones: input.instrucciones,
           unidad_id: null, unidad: null, operador_id: null, operador: null, created_at: now, updated_at: now,
@@ -165,11 +165,11 @@ export default function TripCreateScreen() {
             <Field label="Inicio de descarga programado (opcional)"><input name="descarga_programada_at" type="datetime-local" className={field} /></Field>
           </Section>
           <details className="mt-4 rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-semibold">Flete e instrucciones (opcionales)</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Flete base"><input name="flete_base" type="number" min="0" step="0.01" className={field} placeholder="Pendiente de cotizar" /></Field><Field label="Moneda"><select name="moneda" className={field}><option>MXN</option><option>USD</option></select></Field><Field label="Instrucciones del servicio"><textarea name="instrucciones" maxLength={2000} className={field} /></Field></div></details>
-          <p className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">Se guardará como <strong>borrador</strong>, pendiente de asignar recursos y confirmar programación. Si omites el flete, quedará pendiente de cotizar con cero provisional.</p>
+          <p className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">Se registrará como <strong>confirmado</strong>. La asignación de transporte puede completarse después en la ficha del viaje. Si omites el flete, quedará pendiente de cotizar con cero provisional hasta cotizar.</p>
         </div>
       </fieldset>
       {!services.length && <p role="alert" className="text-sm text-amber-800">No hay tipos de servicio activos configurados.</p>}
-      <div className="flex justify-between gap-3"><Link href="/logistica/viajes" className="px-3 py-2 text-sm text-slate-600">Cancelar</Link><div className="flex gap-3">{step > 0 && <button type="button" disabled={saving} onClick={() => setStep(step - 1)} className="px-3 py-2 text-sm font-semibold">Anterior</button>}<button type="submit" disabled={saving || loadingAddresses || !services.length} className={button}>{saving ? 'Guardando…' : step < 2 ? 'Continuar' : mode === 'demo' ? 'Guardar borrador en demo' : 'Guardar borrador de viaje'}</button></div></div>
+      <div className="flex justify-between gap-3"><Link href="/logistica/viajes" className="px-3 py-2 text-sm text-slate-600">Cancelar</Link><div className="flex gap-3">{step > 0 && <button type="button" disabled={saving} onClick={() => setStep(step - 1)} className="px-3 py-2 text-sm font-semibold">Anterior</button>}<button type="submit" disabled={saving || loadingAddresses || !services.length} className={button}>{saving ? 'Guardando…' : step < 2 ? 'Continuar' : mode === 'demo' ? 'Crear viaje confirmado en demo' : 'Crear viaje confirmado'}</button></div></div>
     </form>}
   </div>;
 }

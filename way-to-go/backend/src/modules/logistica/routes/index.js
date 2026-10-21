@@ -16,9 +16,9 @@ const routeDir = path.dirname(fileURLToPath(import.meta.url));
 export const LOGISTICS_UPLOAD_DIR = path.resolve(routeDir, '../../../../uploads/logistica');
 mkdirSync(LOGISTICS_UPLOAD_DIR, { recursive: true });
 
-const statuses = new Set(['BORRADOR', 'PROGRAMADO', 'EN_CAMINO_A_CARGA', 'LLEGO_A_CARGA', 'EN_CARGA', 'SALIO_CARGADO_EN_RUTA', 'LLEGO_A_DESTINO', 'EN_DESCARGA', 'ENTREGADO', 'CANCELADO']);
+const statuses = new Set(['BORRADOR', 'CONFIRMADO', 'PROGRAMADO', 'EN_CAMINO_A_CARGA', 'LLEGO_A_CARGA', 'EN_CARGA', 'SALIO_CARGADO_EN_RUTA', 'LLEGO_A_DESTINO', 'EN_DESCARGA', 'ENTREGADO', 'CANCELADO']);
 const transitions = {
-  BORRADOR: ['PROGRAMADO', 'CANCELADO'], PROGRAMADO: ['EN_CAMINO_A_CARGA', 'CANCELADO'],
+  BORRADOR: ['CONFIRMADO', 'CANCELADO'], CONFIRMADO: ['PROGRAMADO', 'CANCELADO'], PROGRAMADO: ['EN_CAMINO_A_CARGA', 'CANCELADO'],
   EN_CAMINO_A_CARGA: ['LLEGO_A_CARGA', 'CANCELADO'], LLEGO_A_CARGA: ['EN_CARGA', 'CANCELADO'],
   EN_CARGA: ['SALIO_CARGADO_EN_RUTA', 'CANCELADO'], SALIO_CARGADO_EN_RUTA: ['LLEGO_A_DESTINO', 'CANCELADO'],
   LLEGO_A_DESTINO: ['EN_DESCARGA', 'CANCELADO'], EN_DESCARGA: ['ENTREGADO', 'CANCELADO'],
@@ -101,7 +101,7 @@ router.get('/trips', requireTripRead, wrap(async (req, res) => {
   res.json({ success: true, data: rows, pagination: { limit, offset, count: rows.length } });
 }));
 
-router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
+router.post('/trips', requireCreateTrip, requireActor, wrap(async (req, res) => {
   const body = req.body || {};
   let { cliente_id: clienteId, convenio_id: convenioId, origen_id: originId, destino_id: destinationId,
     tipo_servicio_id: serviceTypeId, tipo_carga: cargoType, unidad_id: unitId, caja_id: boxId,
@@ -109,8 +109,7 @@ router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
     entrega_estimada_at: deliveryAt, reserva_desde: reserveFrom, reserva_hasta: reserveTo,
     flete_base: baseFare, moneda = 'MXN', instrucciones, restricciones_ruta: routeRestrictions } = body;
   const quick = body.cliente_nuevo;
-  const draft = body.estado_operativo === 'BORRADOR';
-  if (body.estado_operativo != null && !['BORRADOR', 'PROGRAMADO'].includes(body.estado_operativo)) return fail(res, 400, 'Estado inicial inválido');
+  if (body.estado_operativo != null && body.estado_operativo !== 'CONFIRMADO') return fail(res, 400, 'Estado inicial inválido');
   if (quick) {
     if (clienteId || originId || destinationId || convenioId) return fail(res, 400, 'Elige cliente existente o captura rápida');
     if (typeof quick.razon_social !== 'string' || !quick.razon_social.trim() || quick.razon_social.length > 180) return fail(res, 400, 'Escribe el nombre del cliente (máximo 180 caracteres)');
@@ -121,7 +120,6 @@ router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
   if (!quick && originId === destinationId) return fail(res, 400, 'Elige ubicaciones diferentes para recoger y entregar');
   if (typeof cargoType !== 'string' || !cargoType.trim()) return fail(res, 400, 'El tipo de carga es requerido');
   if (baseFare != null && (typeof baseFare !== 'number' || !Number.isFinite(baseFare) || baseFare < 0)) return fail(res, 400, 'El flete base debe ser un monto válido');
-  if (!draft && baseFare == null) return fail(res, 400, 'El flete base es requerido para programar');
   if (![loadingAt, deliveryAt, reserveFrom, reserveTo].every((value) => typeof value === 'string' && Number.isFinite(Date.parse(value)))) return fail(res, 400, 'Captura fechas y horas válidas');
   if (Date.parse(reserveFrom) < Date.parse(loadingAt) || Date.parse(deliveryAt) <= Date.parse(reserveFrom) || Date.parse(reserveTo) < Date.parse(deliveryAt)) return fail(res, 400, 'Revisa el orden: recolección, salida y llegada');
   if (!['MXN', 'USD'].includes(moneda)) return fail(res, 400, 'Moneda no admitida');
@@ -132,11 +130,13 @@ router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
   const unloadingAt = body.descarga_programada_at || null;
   if (!Number.isFinite(Date.parse(departureAt)) || Date.parse(departureAt) < Date.parse(loadingAt) || Date.parse(departureAt) >= Date.parse(deliveryAt)) return fail(res, 400, 'La salida debe estar entre la recolección y la llegada');
   if (unloadingAt && (!Number.isFinite(Date.parse(unloadingAt)) || Date.parse(unloadingAt) < Date.parse(deliveryAt) || Date.parse(unloadingAt) > Date.parse(reserveTo))) return fail(res, 400, 'La descarga debe ser posterior a la llegada y estar dentro de la reserva');
-  const initialStatus = draft ? 'BORRADOR' : 'PROGRAMADO';
+  const initialStatus = 'CONFIRMADO';
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const { rows: [schema] } = await client.query(`SELECT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='tms.viajes'::regclass AND conname='viajes_estado_operativo_confirmacion_check') AS ready`);
+    if (!schema?.ready) { await client.query('ROLLBACK'); return fail(res, 503, 'El alta confirmada requiere aplicar la migración 20261021_viajes_confirmados.sql. No se guardó el viaje.'); }
     if (quick) {
       // Serializa altas rápidas del mismo nombre; nunca combina clientes en silencio.
       const normalizedName = quick.razon_social.trim().toLowerCase();
@@ -173,16 +173,14 @@ router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
       VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11,$12,$20,$13,$14,$15,$16,$17,$18,$19,now())
       RETURNING *`, [clienteId, convenioId || null, originId, destinationId, ...snapshots, serviceTypeId, cargoType.trim(), unitId || null, boxId || null, operatorId || null, providerId || null, loadingAt, deliveryAt, reserveFrom, reserveTo, instrucciones || null, routeRestrictions || null, req.user.id, initialStatus]);
 
-    const checklist = await client.query(`INSERT INTO tms.viaje_evidencias
+    await client.query(`INSERT INTO tms.viaje_evidencias
       (viaje_id,tipo_evidencia_id,obligatoria_facturar,requiere_validacion,visible_cliente)
       SELECT $1,tipo_evidencia_id,obligatoria_facturar,requiere_validacion,visible_cliente
       FROM tms.servicio_evidencias WHERE tipo_servicio_id=$2`, [trip.id, serviceTypeId]);
-    if (!draft && checklist.rowCount === 0) { await client.query('ROLLBACK'); return fail(res, 409, 'El servicio no tiene plantilla de evidencias configurada'); }
-    await client.query(`INSERT INTO tms.viaje_comercial (viaje_id,flete_base,moneda,condiciones_snapshot) VALUES ($1,$2,$3,$4)`, [trip.id, baseFare ?? 0, moneda, baseFare == null ? 'Flete pendiente de cotizar; cero provisional en borrador.' : null]);
+    await client.query(`INSERT INTO tms.viaje_comercial (viaje_id,flete_base,moneda,condiciones_snapshot) VALUES ($1,$2,$3,$4)`, [trip.id, baseFare ?? 0, moneda, baseFare == null ? 'Flete pendiente de cotizar; cero provisional en servicio confirmado.' : null]);
     await client.query('INSERT INTO tms.viaje_tiempos(viaje_id,salida_programada_at,descarga_programada_at) VALUES ($1,$2,$3)', [trip.id, departureAt, unloadingAt]);
     await client.query('INSERT INTO tms.viaje_carga(viaje_id,descripcion) VALUES ($1,$2)', [trip.id, body.descripcion_carga || null]);
     await client.query('INSERT INTO tms.viaje_facturacion_operativa(viaje_id) VALUES ($1)', [trip.id]);
-    if (!draft) await client.query('UPDATE tms.viaje_comercial SET checklist_confirmado_por=$1, checklist_confirmado_at=now() WHERE viaje_id=$2', [req.user.id, trip.id]);
     await client.query(`INSERT INTO tms.viaje_eventos
       (viaje_id,tipo,estado_nuevo,ocurrido_at,registrado_por,origen,comentario,idempotency_key)
       VALUES ($1,'CREACION',$4,now(),$2,'INTERNO','Viaje creado desde Logística',$3)`, [trip.id, req.user.id, randomUUID(), initialStatus]);
@@ -225,6 +223,7 @@ router.patch('/trips/:folio/status', requireTrafficRole, requireActor, wrap(asyn
     const { rows: [trip] } = await client.query('SELECT * FROM tms.viajes WHERE folio::text=$1 FOR UPDATE', [req.params.folio]);
     if (!trip) { await client.query('ROLLBACK'); return fail(res, 404, 'Viaje no encontrado'); }
     if (!transitions[trip.estado_operativo]?.includes(estado)) { await client.query('ROLLBACK'); return fail(res, 409, `No se permite cambiar de ${trip.estado_operativo} a ${estado}`); }
+    if (estado === 'PROGRAMADO' && !trip.proveedor_id && !(trip.unidad_id && trip.operador_id)) { await client.query('ROLLBACK'); return fail(res, 400, 'Asigna un proveedor o una unidad y operador antes de programar'); }
     if (estado === 'CANCELADO' && (typeof cancelReason !== 'string' || !cancelReason.trim())) { await client.query('ROLLBACK'); return fail(res, 400, 'Indica el motivo de cancelación'); }
 
     const { rows: [last] } = await client.query(`SELECT max(ocurrido_at) AS fecha FROM tms.viaje_eventos WHERE viaje_id=$1 AND tipo IN ('CREACION','ESTATUS')`, [trip.id]);

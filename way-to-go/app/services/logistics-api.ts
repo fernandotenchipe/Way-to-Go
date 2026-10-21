@@ -1,5 +1,5 @@
 export type LogisticsTripStatus =
-  | 'BORRADOR' | 'PROGRAMADO' | 'EN_CAMINO_A_CARGA' | 'LLEGO_A_CARGA' | 'EN_CARGA'
+  | 'BORRADOR' | 'CONFIRMADO' | 'PROGRAMADO' | 'EN_CAMINO_A_CARGA' | 'LLEGO_A_CARGA' | 'EN_CARGA'
   | 'SALIO_CARGADO_EN_RUTA' | 'LLEGO_A_DESTINO' | 'EN_DESCARGA' | 'ENTREGADO' | 'CANCELADO';
 
 export interface LogisticsTrip {
@@ -34,7 +34,7 @@ export interface LogisticsTrip {
 }
 
 export interface LogisticsResource { id: string; nombre: string; proveedor_id?: string | null }
-export interface LogisticsTripEvent { id: string; tipo: string; comentario: string | null; ocurrido_at: string; created_at?: string; registrado_por_nombre?: string; estado_nuevo?: string | null; datos?: { antes?: Record<string, unknown>; despues?: Record<string, unknown> } }
+export interface LogisticsTripEvent { id: string; tipo: string; comentario: string | null; ocurrido_at: string; created_at?: string; registrado_por_nombre?: string; estado_nuevo?: string | null; datos?: { categoria?: string; antes?: Record<string, unknown>; despues?: Record<string, unknown> } }
 export interface LogisticsTripRecord { tiempos: Record<string, string | null>; eventos: LogisticsTripEvent[]; unidades: LogisticsResource[]; operadores: LogisticsResource[]; cajas: LogisticsResource[]; proveedores: LogisticsResource[] }
 export interface LogisticsEvidence { id: string; tipo_evidencia_id: string; nombre: string; estado: string; obligatoria_facturar?: boolean; entregas: Array<{ archivo_id: string; nombre: string; estado: string; created_at: string; subida_por_nombre?: string; mime_type: string }> | null }
 export interface LogisticsTripSession { nombre: string; canEdit: boolean; canAdvance: boolean; validActor: boolean }
@@ -165,7 +165,7 @@ export interface LogisticsTripCreateInput {
   origen_id?: string;
   destino_id?: string;
   cliente_nuevo?: { razon_social: string; direcciones: LogisticsAddressInput[] };
-  estado_operativo: 'BORRADOR';
+  estado_operativo: 'CONFIRMADO';
   salida_programada_at: string;
   descarga_programada_at?: string;
   tipo_servicio_id: string;
@@ -274,7 +274,8 @@ class LogisticsApi {
   getTripSession() { return this.request<LogisticsTripSession>('session'); }
   getTripRecord(folio: string) { return this.request<LogisticsTripRecord>(`trips/${encodeURIComponent(folio)}/record`); }
   getTripEvidence(folio: string) { return this.request<LogisticsEvidence[]>(`trips/${encodeURIComponent(folio)}/evidence`); }
-  editTripRecord(folio: string, input: { tipo_carga: string; instrucciones: string; motivo: string; updated_at: string }) { return this.request(`trips/${encodeURIComponent(folio)}/record`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  editTripRecord(folio: string, input: { tipo_carga: string; instrucciones: string; motivo: string; updated_at: string; cita_carga_at?: string; salida_programada_at?: string; entrega_estimada_at?: string; descarga_programada_at?: string | null }) { return this.request(`trips/${encodeURIComponent(folio)}/record`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  addTripNote(folio: string, texto: string) { return this.request(`trips/${encodeURIComponent(folio)}/notes`, { method: 'POST', body: JSON.stringify({ texto }) }); }
   assignTrip(folio: string, input: { modalidad: string; unidad_id: string | null; operador_id: string | null; caja_id: string | null; proveedor_id: string | null; motivo: string; updated_at: string }) { return this.request(`trips/${encodeURIComponent(folio)}/assignment`, { method: 'PATCH', body: JSON.stringify(input) }); }
   async getEvidenceFile(id: string) {
     const headers = new Headers();
