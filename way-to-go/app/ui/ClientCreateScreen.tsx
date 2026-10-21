@@ -10,6 +10,8 @@ import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogistic
 import { hasDuplicateCustomerRfc, isValidContactEmail, isValidMexicanRfc, normalizeCustomerRfc } from '../services/customer-validation';
 import { CatalogPageHeader, LogisticsFormField, LogisticsFormSection, logisticsFieldClassName } from './LogisticsCatalogComponents';
 
+import LogisticsAddressFields, { readAddress, isAddressStarted, isAddressComplete } from './LogisticsAddressFields';
+
 type ConnectionMode = 'checking' | 'live' | 'demo';
 
 const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-lg bg-[#0b1f3b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#183a64] disabled:cursor-wait disabled:opacity-60';
@@ -24,6 +26,8 @@ export default function ClientCreateScreen() {
   const [formError, setFormError] = useState('');
   const [existingCustomers, setExistingCustomers] = useState<LogisticsCustomer[]>([]);
   const [contactRows, setContactRows] = useState([0]);
+  const [addressRows, setAddressRows] = useState([0]);
+  const [primaryRow, setPrimaryRow] = useState(0);
 
   useEffect(() => {
     logisticsApi.getCustomers()
@@ -51,22 +55,8 @@ export default function ClientCreateScreen() {
       principal: form.get(`contacto_${row}_principal`) === 'on',
       para_facturacion: form.get(`contacto_${row}_facturacion`) === 'on',
     })).filter((contact) => [contact.nombre, contact.puesto, contact.email, contact.telefono].some(Boolean));
-    const address = {
-      nombre: value('direccion_nombre'),
-      calle: value('direccion_calle'),
-      ciudad: value('direccion_ciudad'),
-      estado: value('direccion_estado'),
-      pais: 'MX',
-      codigo_postal: value('direccion_cp'),
-      tipo_ubicacion: value('direccion_tipo_ubicacion'),
-      tipo_zona: value('direccion_tipo_zona'),
-      zona_horaria: value('direccion_zona') || 'America/Mexico_City',
-      horario: value('direccion_horario'),
-      instrucciones: value('direccion_instrucciones'),
-      requiere_cita: form.get('direccion_cita') === 'on',
-      principal: true,
-    };
-    const hasAddress = [address.nombre, address.calle, address.ciudad, address.estado, address.codigo_postal, address.tipo_ubicacion, address.tipo_zona, address.horario, address.instrucciones].some(Boolean);
+    const addresses = addressRows.map((row) => ({ ...readAddress(form, `direccion_${row}`), principal: row === primaryRow })).filter(isAddressStarted);
+    if (addresses.length && !addresses.some((address) => address.principal)) addresses[0].principal = true;
 
     if (contacts.some((contact) => !contact.nombre)) {
       setFormError('Escribe el nombre de cada contacto que empezaste a capturar.');
@@ -94,7 +84,7 @@ export default function ClientCreateScreen() {
       setSaving(false);
       return;
     }
-    if (hasAddress && ![address.nombre, address.calle, address.ciudad, address.estado].every(Boolean)) {
+    if (addresses.some((address) => !isAddressComplete(address))) {
       setFormError('Para guardar la ubicación necesitamos nombre, calle, ciudad y estado.');
       setSaving(false);
       return;
@@ -118,7 +108,7 @@ export default function ClientCreateScreen() {
       servicios_acordados: form.getAll('servicios_acordados').map(String),
       regimen_fiscal: value('regimen_fiscal'),
       contactos: contacts,
-      direccion: hasAddress ? address as Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'> : undefined,
+      direcciones: addresses,
     };
 
     try {
@@ -128,24 +118,8 @@ export default function ClientCreateScreen() {
         customerId = response.data.id;
       } else {
         customerId = `demo-${crypto.randomUUID()}`;
-        const demoAddress: LogisticsAddress | undefined = hasAddress ? {
-          id: `demo-address-${crypto.randomUUID()}`,
-          cliente_id: customerId,
-          nombre: address.nombre,
-          calle: address.calle,
-          ciudad: address.ciudad,
-          estado: address.estado,
-          pais: address.pais,
-          codigo_postal: address.codigo_postal || null,
-          tipo_ubicacion: address.tipo_ubicacion || null,
-          tipo_zona: address.tipo_zona || null,
-          zona_horaria: address.zona_horaria,
-          horario: address.horario || null,
-          instrucciones: address.instrucciones || null,
-          requiere_cita: address.requiere_cita,
-          activo: true,
-          principal: true,
-        } : undefined;
+        const demoAddresses: LogisticsAddress[] = addresses.map((address) => ({ ...address, id: `demo-address-${crypto.randomUUID()}`, cliente_id: customerId, activo: true }));
+        const demoAddress = demoAddresses.find((address) => address.principal);
         const demoContacts = contacts.map((contact) => ({
           id: `demo-contact-${crypto.randomUUID()}`,
           cliente_id: customerId,
@@ -177,11 +151,11 @@ export default function ClientCreateScreen() {
           regimen_fiscal: input.regimen_fiscal || null,
           contacto_facturacion_id: demoContacts.find((_, index) => contacts[index]?.para_facturacion)?.id ?? null,
           activo: true,
-          direcciones_activas: demoAddress ? 1 : 0,
+          direcciones_activas: demoAddresses.length,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           address_preview: demoAddress ? `${demoAddress.ciudad}, ${demoAddress.estado}` : null,
-          demo_addresses: demoAddress ? [demoAddress] : [],
+          demo_addresses: demoAddresses,
           demo_contacts: demoContacts,
         };
         saveDemoLogisticsCustomer(created);
@@ -225,7 +199,7 @@ export default function ClientCreateScreen() {
           <button type="button" onClick={() => setContactRows((rows) => [...rows, Math.max(...rows) + 1])} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b1f3b]"><PlusIcon className="h-4 w-4"/>Agregar contacto</button>
         </LogisticsFormSection>
 
-        <LogisticsFormSection title="Domicilio legal o matriz" description="Se guarda por separado de las ubicaciones operativas.">
+        <LogisticsFormSection title="Domicilio de facturación" description="Separado de los lugares donde se recoge o entrega carga. La matriz puede tener otra dirección.">
           <LogisticsFormField label="Calle y número"><input name="domicilio_legal_calle" maxLength={200} className={field}/></LogisticsFormField>
           <LogisticsFormField label="Ciudad"><input name="domicilio_legal_ciudad" maxLength={100} className={field}/></LogisticsFormField>
           <LogisticsFormField label="Estado"><input name="domicilio_legal_estado" maxLength={100} className={field}/></LogisticsFormField>
@@ -233,18 +207,23 @@ export default function ClientCreateScreen() {
           <LogisticsFormField label="Código postal"><input name="domicilio_legal_codigo_postal" maxLength={12} className={field}/></LogisticsFormField>
         </LogisticsFormSection>
 
-        <LogisticsFormSection title="Primera ubicación" description="Opcional. Si la capturas, quedará como dirección principal; podrás cambiarla después.">
-          <LogisticsFormField label="Nombre de la ubicación"><input name="direccion_nombre" maxLength={120} className={field} placeholder="Planta Apodaca"/></LogisticsFormField>
-          <LogisticsFormField label="Calle y número"><input name="direccion_calle" maxLength={200} className={field} placeholder="Av. Industrial 100"/></LogisticsFormField>
-          <LogisticsFormField label="Ciudad"><input name="direccion_ciudad" maxLength={100} className={field} placeholder="Monterrey"/></LogisticsFormField>
-          <LogisticsFormField label="Estado"><input name="direccion_estado" maxLength={100} className={field} placeholder="Nuevo León"/></LogisticsFormField>
-          <LogisticsFormField label="Código postal"><input name="direccion_cp" maxLength={12} className={field} placeholder="64000"/></LogisticsFormField>
-          <LogisticsFormField label="Tipo de ubicación"><input name="direccion_tipo_ubicacion" maxLength={80} className={field} placeholder="Sucursal, planta, almacén…"/></LogisticsFormField>
-          <LogisticsFormField label="Tipo de zona"><input name="direccion_tipo_zona" maxLength={80} className={field} placeholder="Industrial, urbana…"/></LogisticsFormField>
-          <LogisticsFormField label="Horario de atención"><input name="direccion_horario" maxLength={120} className={field} placeholder="Lun–Vie 08:00–17:00"/></LogisticsFormField>
-          <LogisticsFormField label="Zona horaria"><select name="direccion_zona" className={field}><option value="America/Mexico_City">Centro · Ciudad de México</option><option value="America/Monterrey">Norte · Monterrey</option><option value="America/Tijuana">Pacífico · Tijuana</option></select></LogisticsFormField>
-          <LogisticsFormField label="Instrucciones de acceso"><input name="direccion_instrucciones" maxLength={500} className={field} placeholder="Andén, acceso o indicaciones"/></LogisticsFormField>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-600"><input name="direccion_cita" type="checkbox" className="accent-[#0b1f3b]"/>Requiere cita</label>
+        <LogisticsFormSection title="Ubicaciones de operación" description="Agrega plantas, sucursales o almacenes. En cada viaje elegirás dónde recoger y entregar; principal solo identifica la ubicación habitual.">
+          {addressRows.map((row, index) => <div key={row} className="col-span-full grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Ubicación {index + 1}</h3>
+              <label className="flex items-center gap-2 text-sm"><input type="radio" name="ubicacion_principal" checked={primaryRow === row} onChange={() => setPrimaryRow(row)} />Principal</label>
+              {addressRows.length > 1 && <button type="button" className="text-sm text-rose-700" onClick={() => { setAddressRows((rows) => rows.filter((item) => item !== row)); if (primaryRow === row) setPrimaryRow(addressRows.find((item) => item !== row)!); }}>Quitar ubicación</button>}
+            </div>
+            <LogisticsAddressFields prefix={`direccion_${row}`} />
+            <button type="button" className="col-span-full text-left text-sm font-semibold text-blue-800" onClick={(event) => {
+              const form = event.currentTarget.form!;
+              for (const [target, source] of [['calle', 'calle'], ['ciudad', 'ciudad'], ['estado', 'estado'], ['pais', 'pais'], ['cp', 'codigo_postal']]) {
+                const input = form.elements.namedItem(`direccion_${row}_${target}`) as HTMLInputElement;
+                input.value = (form.elements.namedItem(`domicilio_legal_${source}`) as HTMLInputElement).value;
+              }
+            }}>Copiar domicilio de facturación a esta ubicación</button>
+          </div>)}
+          <button type="button" disabled={addressRows.length >= 30} onClick={() => setAddressRows((rows) => [...rows, Math.max(...rows) + 1])} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0b1f3b]"><PlusIcon className="h-4 w-4" />Agregar ubicación</button>
         </LogisticsFormSection>
 
         <LogisticsFormSection title="Perfil comercial" description="Información de adquisición y servicios acordados.">

@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDownTrayIcon, ArrowLeftIcon, ArrowUpTrayIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, DocumentTextIcon, MagnifyingGlassIcon, PlusIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
-import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsServiceType } from '../services/logistics-api';
+import CreatedTripSummary from './CreatedTripSummary';
+import RegisteredTrips from './RegisteredTrips';
 
 type Trip = { folio: string; client: string; route: string; unit: string; driver: string; status: string; update: string; eta: string; evidence: string; amount: string };
 const trips: Trip[] = [
@@ -33,97 +33,15 @@ function Table({ rows, headings, children }: { rows?: Trip[]; headings: string[]
 export function TripsScreen() {
   const [query, setQuery] = useState(''); const [status, setStatus] = useState('Todos');
   const filtered = useMemo(() => trips.filter(t => `${t.folio} ${t.client} ${t.route} ${t.driver}`.toLowerCase().includes(query.toLowerCase()) && (status === 'Todos' || t.status === status)), [query, status]);
-  return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Operación · TMS" title="Viajes" description="Administra cada servicio desde la programación hasta el cierre." action={<Link href="/logistica/viajes/nuevo" className={button}><PlusIcon className="h-4 w-4"/>Crear viaje</Link>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Viajes activos" value="18" note="4 requieren atención"/><Kpi label="En ruta" value="8" note="Última actualización hace 18 min"/><Kpi label="POD pendiente" value="6" note="2 entregas de hoy"/><Kpi label="Por facturar" value="9" note="$184,600 MXN estimados"/></div><div className="flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar folio, cliente, ruta u operador" className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#c79d00]"/></label><select value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"><option>Todos</option>{['Programado','En ruta','En descarga','Incidencia','Listo para facturar'].map(s=><option key={s}>{s}</option>)}</select><button className={subtle}><ArrowDownTrayIcon className="h-4 w-4"/>Exportar</button></div><Table rows={filtered} headings={['Viaje / cliente','Ruta','Unidad / operador','Estatus','Actualización','ETA','']}/><p className="text-xs text-slate-400">Mostrando {filtered.length} de {trips.length} viajes de ejemplo.</p></div>;
+  return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Operación · TMS" title="Viajes" description="Administra cada servicio desde la programación hasta el cierre." action={<Link href="/logistica/viajes/nuevo" className={button}><PlusIcon className="h-4 w-4"/>Crear viaje</Link>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Viajes activos" value="18" note="4 requieren atención"/><Kpi label="En ruta" value="8" note="Última actualización hace 18 min"/><Kpi label="POD pendiente" value="6" note="2 entregas de hoy"/><Kpi label="Por facturar" value="9" note="$184,600 MXN estimados"/></div><div className="flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar folio, cliente, ruta u operador" className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#c79d00]"/></label><select value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"><option>Todos</option>{['Programado','En ruta','En descarga','Incidencia','Listo para facturar'].map(s=><option key={s}>{s}</option>)}</select><button className={subtle}><ArrowDownTrayIcon className="h-4 w-4"/>Exportar</button></div><RegisteredTrips/><Table rows={filtered} headings={['Viaje / cliente','Ruta','Unidad / operador','Estatus','Actualización','ETA','']}/><p className="text-xs text-slate-400">Mostrando {filtered.length} de {trips.length} viajes de ejemplo.</p></div>;
 }
 
-export function TripForm() {
-  const router = useRouter();
-  const [customers, setCustomers] = useState<LogisticsCustomer[]>([]);
-  const [services, setServices] = useState<LogisticsServiceType[]>([]);
-  const [addresses, setAddresses] = useState<LogisticsAddress[]>([]);
-  const [customerId, setCustomerId] = useState('');
-  const [originId, setOriginId] = useState('');
-  const [destinationId, setDestinationId] = useState('');
-  const [serviceId, setServiceId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([logisticsApi.getCustomers(), logisticsApi.getCatalogs()])
-      .then(([customerResult, catalogResult]) => {
-        if (!active) return;
-        setCustomers(customerResult.data.filter(customer => customer.activo));
-        setServices(catalogResult.data.servicios.filter(service => service.activo));
-      })
-      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'No se pudieron cargar clientes y servicios.'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, []);
-
-  const chooseCustomer = async (id: string) => {
-    setCustomerId(id); setAddresses([]); setOriginId(''); setDestinationId(''); setError('');
-    if (!id) return;
-    try {
-      const result = await logisticsApi.getCustomer(id);
-      const activeAddresses = result.data.direcciones.filter(address => address.activo)
-        .sort((a, b) => Number(Boolean(b.principal)) - Number(Boolean(a.principal)) || a.nombre.localeCompare(b.nombre));
-      setAddresses(activeAddresses);
-      const primary = activeAddresses.find(address => address.principal) ?? activeAddresses[0];
-      setOriginId(primary?.id ?? '');
-      setDestinationId(activeAddresses.find(address => address.id !== primary?.id)?.id ?? '');
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudieron cargar las direcciones del cliente.'); }
-  };
-
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setSaving(true); setError('');
-    const form = new FormData(event.currentTarget);
-    const loadingAt = String(form.get('cita_carga_at'));
-    const deliveryAt = String(form.get('entrega_estimada_at'));
-    try {
-      const result = await logisticsApi.createTrip({
-        cliente_id: customerId, origen_id: originId, destino_id: destinationId, tipo_servicio_id: serviceId,
-        tipo_carga: form.get('tipo_carga'), descripcion_carga: form.get('descripcion_carga'),
-        flete_base: Number(form.get('flete_base')), moneda: form.get('moneda'),
-        cita_carga_at: new Date(loadingAt).toISOString(), entrega_estimada_at: new Date(deliveryAt).toISOString(),
-        reserva_desde: new Date(loadingAt).toISOString(), reserva_hasta: new Date(deliveryAt).toISOString(),
-        instrucciones: form.get('instrucciones'),
-      });
-      router.push(`/logistica/viajes/${result.data.folio}`);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el viaje.'); }
-    finally { setSaving(false); }
-  };
-
-  const addressLabel = (address: LogisticsAddress) => `${address.nombre} · ${[address.ciudad, address.estado].filter(Boolean).join(', ')}${address.principal ? ' · Principal' : ''}`;
-  return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Operación · TMS" title="Preparar viaje" description="Elige el cliente y usa sus direcciones registradas para definir origen y destino." action={<Link href="/logistica/viajes" className={subtle}><ArrowLeftIcon className="h-4 w-4"/>Volver a viajes</Link>}/>
-    {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
-    {loading ? <div className={`${cls} p-6 text-sm text-slate-500`}>Cargando clientes y tipos de servicio…</div> : <form onSubmit={submit} className="space-y-5">
-      <FormSection title="Servicio y cliente" description="Selecciona el cliente; sus ubicaciones activas aparecerán en la ruta.">
-        <Field label="Cliente"><select required value={customerId} onChange={event => void chooseCustomer(event.target.value)} className="field"><option value="">Seleccionar cliente</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.nombre_comercial || customer.razon_social}</option>)}</select></Field>
-        <Field label="Tipo de servicio"><select required value={serviceId} onChange={event => setServiceId(event.target.value)} className="field"><option value="">Seleccionar servicio</option>{services.map(service => <option key={service.id} value={service.id}>{service.nombre}</option>)}</select></Field>
-        <Field label="Tipo de carga"><input name="tipo_carga" required className="field" placeholder="Ej. autopartes"/></Field>
-        <Field label="Flete base"><div className="flex gap-2"><input name="flete_base" required type="number" min="0" step="0.01" className="field" placeholder="0.00"/><select name="moneda" className="field max-w-28"><option>MXN</option><option>USD</option></select></div></Field>
-        <Field label="Descripción de la carga"><input name="descripcion_carga" className="field" placeholder="Descripción breve (opcional)"/></Field>
-      </FormSection>
-      <FormSection title="Ruta y programación" description="Origen y destino se guardarán con las direcciones elegidas para este viaje.">
-        <Field label="Origen"><select required value={originId} onChange={event => setOriginId(event.target.value)} disabled={!addresses.length} className="field"><option value="">{customerId ? 'Seleccionar dirección de origen' : 'Primero selecciona un cliente'}</option>{addresses.map(address => <option key={address.id} value={address.id}>{addressLabel(address)}</option>)}</select></Field>
-        <Field label="Destino"><select required value={destinationId} onChange={event => setDestinationId(event.target.value)} disabled={!addresses.length} className="field"><option value="">{customerId ? 'Seleccionar dirección de destino' : 'Primero selecciona un cliente'}</option>{addresses.map(address => <option key={address.id} value={address.id}>{addressLabel(address)}</option>)}</select></Field>
-        {customerId && addresses.length === 0 && <div className="col-span-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Este cliente no tiene direcciones activas. <Link className="font-semibold underline" href="/logistica/clientes">Agrega una dirección en Clientes</Link> y vuelve a preparar el viaje.</div>}
-        {addresses.length === 1 && <p className="col-span-full text-xs text-amber-700">Solo hay una dirección activa. El origen y el destino no pueden ser el mismo; agrega otra ubicación del cliente.</p>}
-        <Field label="Cita de carga"><input name="cita_carga_at" required type="datetime-local" className="field"/></Field>
-        <Field label="Entrega estimada"><input name="entrega_estimada_at" required type="datetime-local" className="field"/></Field>
-        <div className="col-span-full"><Field label="Instrucciones"><textarea name="instrucciones" className="field min-h-20" placeholder="Indicaciones para este servicio (opcional)"/></Field></div>
-      </FormSection>
-      {services.length === 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No hay tipos de servicio activos configurados.</p>}
-      <div className="flex justify-end gap-3"><Link className={subtle} href="/logistica/viajes">Cancelar</Link><button className={button} type="submit" disabled={saving || !addresses.length || services.length === 0}>{saving ? 'Guardando…' : 'Crear viaje'}</button></div>
-    </form>}
-    <style jsx>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#334155;background:white;outline:none}.field:focus{border-color:#c79d00}.field:disabled{background:#f8fafc;color:#94a3b8}`}</style></div>;
-}
-function Field({label,children}:{label:string;children:ReactNode}) {return <label className="block text-xs font-semibold text-slate-600">{label}<div className="mt-1.5">{children}</div></label>}
-function FormSection({title,description,children}:{title:string;description:string;children:ReactNode}) {return <section className={`${cls} p-5 sm:p-6`}><div className="mb-5 border-b border-slate-100 pb-4"><h2 className="font-bold text-[#0b1f3b]">{title}</h2><p className="mt-1 text-xs text-slate-500">{description}</p></div><div className="grid gap-4 sm:grid-cols-2">{children}</div></section>}
-
+export { default as TripForm } from './TripCreateScreen';
 export function TripDetail({ folio }: { folio: string }) {
+  return trips.some((trip) => trip.folio === folio) ? <LegacyTripDetail folio={folio} /> : <CreatedTripSummary folio={folio} />;
+}
+
+function LegacyTripDetail({ folio }: { folio: string }) {
   const trip=trips.find(t=>t.folio===folio) ?? trips[0]; const [tab,setTab]=useState('Resumen'); const tabs=['Resumen','Seguimiento','Evidencias','Costos y extras','Comunicación','Historial'];
   return <div className="space-y-6 p-6 lg:p-8"><Link href="/logistica/viajes" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0b1f3b]"><ArrowLeftIcon className="h-4 w-4"/>Todos los viajes</Link><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#b28b00]">Expediente de viaje</p><h1 className="mt-1 text-3xl font-bold text-[#0b1f3b]">{trip.folio}<span className="ml-3 align-middle"><Pill>{trip.status}</Pill></span></h1><p className="mt-2 text-sm text-slate-500">{trip.client} · Creado hoy por George Davidson</p></div><button className={subtle}><ArrowUpTrayIcon className="h-4 w-4"/>Subir evidencia</button></div><div className={`${cls} grid gap-5 p-5 sm:grid-cols-2 xl:grid-cols-4`}><Info label="Ruta" value={trip.route}/><Info label="Unidad / caja" value={trip.unit}/><Info label="Operador" value={trip.driver}/><Info label="ETA destino" value={`${trip.eta} · hoy`}/></div><div className="overflow-x-auto border-b border-slate-200"><div className="flex min-w-max gap-6">{tabs.map(t=><button key={t} onClick={()=>setTab(t)} className={`border-b-2 px-1 pb-3 text-sm font-semibold ${tab===t?'border-[#f4c430] text-[#0b1f3b]':'border-transparent text-slate-400 hover:text-slate-700'}`}>{t}</button>)}</div></div>{tab==='Resumen'?<div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]"><section className={`${cls} p-5`}><h2 className="font-bold text-[#0b1f3b]">Progreso del viaje</h2><div className="mt-6 space-y-0">{['Viaje programado','Llegada a carga','Carga completada','En ruta a destino','Entrega y POD'].map((s,i)=><div key={s} className="flex gap-4"><div className="flex flex-col items-center"><span className={`flex h-7 w-7 items-center justify-center rounded-full ${i<3?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-400'}`}>{i<3?<CheckCircleIcon className="h-4 w-4"/>:<span className="text-xs">{i+1}</span>}</span>{i<4&&<span className="h-9 w-px bg-slate-200"/>}</div><div className="pb-5"><p className="text-sm font-semibold text-slate-700">{s}</p><p className="mt-1 text-xs text-slate-400">{i<3?['Hoy, 07:15','Hoy, 08:12','Hoy, 10:42'][i]:'Pendiente'}</p></div></div>)}</div></section><div className="space-y-5"><section className={`${cls} p-5`}><h2 className="font-bold text-[#0b1f3b]">Expediente</h2><p className="mt-4 text-sm text-slate-600">{trip.evidence} evidencias recibidas</p><div className="mt-3 h-2 rounded-full bg-slate-100"><div className="h-full w-2/3 rounded-full bg-[#f4c430]"/></div><Link href="/logistica/evidencias" className="mt-4 inline-flex text-sm font-semibold text-[#0b1f3b]">Revisar checklist <ChevronRightIcon className="ml-1 h-4 w-4"/></Link></section><section className={`${cls} p-5`}><h2 className="font-bold text-[#0b1f3b]">Última actualización</h2><p className="mt-3 text-sm text-slate-600">Unidad cargada y en ruta. ETA aproximada: {trip.eta}.</p><p className="mt-2 text-xs text-slate-400"><ClockIcon className="mr-1 inline h-3.5 w-3.5"/>{trip.update} · A. Ramírez</p></section></div></div>:<section className={`${cls} p-6`}><h2 className="font-bold text-[#0b1f3b]">{tab}</h2><p className="mt-2 text-sm text-slate-500">La información de {tab.toLowerCase()} de {trip.folio} queda organizada en esta vista del expediente.</p>{tab==='Evidencias'&&<div className="mt-5 space-y-3">{['Fotos de carga','Sello / cincho','POD firmado'].map((e,i)=><div key={e} className="flex items-center justify-between border-b border-slate-100 py-3 text-sm"><span>{e}</span><Pill>{i<2?'Validada':'Pendiente'}</Pill></div>)}</div>}{tab==='Costos y extras'&&<div className="mt-5 grid gap-3 sm:grid-cols-3"><Info label="Ingreso base" value={trip.amount}/><Info label="Costos registrados" value="$12,450"/><Info label="Extras por validar" value="$2,500"/></div>}</section>}</div>;
 }

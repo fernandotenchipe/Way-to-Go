@@ -41,7 +41,19 @@ Las mejoras del perfil de Clientes requieren aplicar manualmente y una sola vez 
 
 El RFC se valida con formato mexicano y no se puede repetir. Los correos de cada contacto se validan y normalizan a minúsculas. Los contactos y direcciones se desactivan sin borrar su historial. Cada cliente puede tener una dirección principal activa y un contacto principal activo. Los convenios reutilizan `tms.cliente_convenios` para representar rutas frecuentes y tarifas; las ubicaciones no tienen un rol permanente de origen o destino.
 
-Para crear un viaje deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
+Para crear un viaje programado deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
+
+### Captura de clientes y viajes
+
+El alta de cliente acepta `direcciones` (hasta 30 ubicaciones) y conserva compatibilidad con `direccion`. Todas se guardan en la transacción del cliente. Una sola ubicación activa puede ser principal; esto no le asigna un rol de origen o destino. El domicilio de facturación usa los campos existentes `domicilio_legal_*` y se mantiene separado de las ubicaciones operativas.
+
+Crear viaje permite seleccionar un cliente activo y dos ubicaciones activas diferentes, o enviar `cliente_nuevo: { razon_social, direcciones: [origen, destino] }`. La captura rápida crea el cliente mínimo, las ubicaciones y el viaje en una sola transacción. Un nombre ya registrado se rechaza para que el usuario seleccione al cliente existente; no se fusionan clientes automáticamente. La facturación se completa posteriormente desde Clientes.
+
+La pantalla guarda inicialmente `estado_operativo: BORRADOR`, sin exigir recursos asignados ni confirmar el checklist. Se exige servicio y tipo de carga, recolección, salida prevista y llegada estimada; la descarga programada es opcional. La salida y descarga previstas se guardan en `viaje_tiempos.salida_programada_at` y `descarga_programada_at`; los tiempos reales permanecen separados. Las horas capturadas se interpretan en la zona de cada ubicación. El rango de reserva abarca desde la recolección hasta la descarga prevista, o llegada cuando no hay descarga capturada. El flete omitido se conserva como cero provisional con una nota explícita en `condiciones_snapshot` y debe cotizarse antes de confirmar la operación. La asignación de recursos y confirmación posterior no forman parte de esta pantalla.
+
+Si falla la consulta inicial del servicio, la pantalla identifica el modo demo y usa almacenamiento local separado. Un error durante el guardado conectado no cambia a modo demo ni presenta el viaje como guardado. Los folios `DEMO-*` solo se consultan en el navegador, nunca en la API. Los viajes registrados y las demostraciones se muestran por separado en el listado.
+
+Estos cambios reutilizan el esquema existente y las dos migraciones previas de Clientes; no requieren una migración adicional ni ejecutan SQL en Supabase. Las pruebas `node --test src/modules/logistica/services/creation.test.js` usan dobles en memoria sin conexión PostgreSQL. Desde la raíz de la app, `node --test app/services/trip-dates.test.ts` verifica zonas horarias y cambios de horario con Node 24.
 
 Los archivos de evidencia se guardan localmente en `backend/uploads/logistica`. La tabla `tms.archivos` registra su metadato. Para producción se debe definir almacenamiento privado y políticas de acceso a archivos.
 

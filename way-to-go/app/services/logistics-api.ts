@@ -13,6 +13,10 @@ export interface LogisticsTrip {
   tipo_carga: string | null;
   cita_carga_at: string | null;
   entrega_estimada_at: string | null;
+  reserva_desde?: string | null;
+  salida_programada_at?: string | null;
+  descarga_programada_at?: string | null;
+  instrucciones?: string | null;
   origen_snapshot: Record<string, unknown> | null;
   destino_snapshot: Record<string, unknown> | null;
   unidad_id: string | null;
@@ -139,6 +143,29 @@ export interface LogisticsCustomerCreateInput {
   contacto_facturacion_id?: string | null;
   contactos?: Array<{ nombre: string; puesto?: string; email?: string; telefono?: string; tipo_contacto?: string; principal?: boolean; para_facturacion?: boolean }>;
   direccion?: Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>;
+  direcciones?: LogisticsAddressInput[];
+}
+
+export type LogisticsAddressInput = Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>;
+
+export interface LogisticsTripCreateInput {
+  cliente_id?: string;
+  origen_id?: string;
+  destino_id?: string;
+  cliente_nuevo?: { razon_social: string; direcciones: LogisticsAddressInput[] };
+  estado_operativo: 'BORRADOR';
+  salida_programada_at: string;
+  descarga_programada_at?: string;
+  tipo_servicio_id: string;
+  tipo_carga: string;
+  descripcion_carga: string;
+  cita_carga_at: string;
+  entrega_estimada_at: string;
+  reserva_desde: string;
+  reserva_hasta: string;
+  flete_base?: number;
+  moneda: string;
+  instrucciones: string;
 }
 
 export type LogisticsCustomerUpdateInput = Partial<Omit<LogisticsCustomerCreateInput, 'direccion'>>;
@@ -228,7 +255,11 @@ class LogisticsApi {
     return this.request<LogisticsTrip[]>(`trips${search.size ? `?${search}` : ''}`);
   }
 
-  createTrip(input: Record<string, unknown>) {
+  getTrip(folio: string) {
+    return this.request<LogisticsTrip>(`trips/${encodeURIComponent(folio)}`);
+  }
+
+  createTrip(input: LogisticsTripCreateInput) {
     return this.request<LogisticsTrip>('trips', { method: 'POST', body: JSON.stringify(input) });
   }
 

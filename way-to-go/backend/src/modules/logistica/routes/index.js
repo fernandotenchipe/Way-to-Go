@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import pool, { query } from '../../../shared/database/db.js';
 import { requireCostRead, requireCreateTrip, requireExtraApproval, requireFinanceRole, requireLogisticsUser, requireTrafficRole, requireTripEdit, requireTripRead } from '../middleware/auth.js';
 
+import { validateAddresses, insertCustomerAddresses } from '../services/customer-addresses.js';
+
 const router = express.Router();
 const routeDir = path.dirname(fileURLToPath(import.meta.url));
 export const LOGISTICS_UPLOAD_DIR = path.resolve(routeDir, '../../../../uploads/logistica');
@@ -98,20 +100,56 @@ router.get('/trips', requireTripRead, wrap(async (req, res) => {
 
 router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
   const body = req.body || {};
-  const { cliente_id: clienteId, convenio_id: convenioId, origen_id: originId, destino_id: destinationId,
+  let { cliente_id: clienteId, convenio_id: convenioId, origen_id: originId, destino_id: destinationId,
     tipo_servicio_id: serviceTypeId, tipo_carga: cargoType, unidad_id: unitId, caja_id: boxId,
     operador_id: operatorId, proveedor_id: providerId, cita_carga_at: loadingAt,
     entrega_estimada_at: deliveryAt, reserva_desde: reserveFrom, reserva_hasta: reserveTo,
     flete_base: baseFare, moneda = 'MXN', instrucciones, restricciones_ruta: routeRestrictions } = body;
-  if (![clienteId, originId, destinationId, serviceTypeId].every((value) => typeof value === 'string')) return fail(res, 400, 'Cliente, origen, destino y tipo de servicio son requeridos');
+  const quick = body.cliente_nuevo;
+  const draft = body.estado_operativo === 'BORRADOR';
+  if (body.estado_operativo != null && !['BORRADOR', 'PROGRAMADO'].includes(body.estado_operativo)) return fail(res, 400, 'Estado inicial inválido');
+  if (quick) {
+    if (clienteId || originId || destinationId || convenioId) return fail(res, 400, 'Elige cliente existente o captura rápida');
+    if (typeof quick.razon_social !== 'string' || !quick.razon_social.trim() || quick.razon_social.length > 180) return fail(res, 400, 'Escribe el nombre del cliente (máximo 180 caracteres)');
+    const addressError = validateAddresses(quick.direcciones);
+    if (addressError || quick.direcciones.length !== 2) return fail(res, 400, addressError || 'Captura origen y destino');
+  } else if (![clienteId, originId, destinationId].every(isUuid)) return fail(res, 400, 'Cliente, origen y destino no son válidos');
+  if (!isUuid(serviceTypeId)) return fail(res, 400, 'Selecciona un tipo de servicio');
+  if (!quick && originId === destinationId) return fail(res, 400, 'Elige ubicaciones diferentes para recoger y entregar');
   if (typeof cargoType !== 'string' || !cargoType.trim()) return fail(res, 400, 'El tipo de carga es requerido');
-  if (!Number.isFinite(Number(baseFare)) || Number(baseFare) < 0) return fail(res, 400, 'El flete base debe ser un monto válido');
-  if (!loadingAt || !deliveryAt || !reserveFrom || !reserveTo) return fail(res, 400, 'Citas y rango de reserva son requeridos');
+  if (baseFare != null && (typeof baseFare !== 'number' || !Number.isFinite(baseFare) || baseFare < 0)) return fail(res, 400, 'El flete base debe ser un monto válido');
+  if (!draft && baseFare == null) return fail(res, 400, 'El flete base es requerido para programar');
+  if (![loadingAt, deliveryAt, reserveFrom, reserveTo].every((value) => typeof value === 'string' && Number.isFinite(Date.parse(value)))) return fail(res, 400, 'Captura fechas y horas válidas');
+  if (Date.parse(reserveFrom) < Date.parse(loadingAt) || Date.parse(deliveryAt) <= Date.parse(reserveFrom) || Date.parse(reserveTo) < Date.parse(deliveryAt)) return fail(res, 400, 'Revisa el orden: recolección, salida y llegada');
   if (!['MXN', 'USD'].includes(moneda)) return fail(res, 400, 'Moneda no admitida');
+  for (const value of [convenioId, unitId, boxId, operatorId, providerId]) {
+    if (value != null && !isUuid(value)) return fail(res, 400, 'Referencia de recurso no válida');
+  }
+  const departureAt = body.salida_programada_at || reserveFrom;
+  const unloadingAt = body.descarga_programada_at || null;
+  if (!Number.isFinite(Date.parse(departureAt)) || Date.parse(departureAt) < Date.parse(loadingAt) || Date.parse(departureAt) >= Date.parse(deliveryAt)) return fail(res, 400, 'La salida debe estar entre la recolección y la llegada');
+  if (unloadingAt && (!Number.isFinite(Date.parse(unloadingAt)) || Date.parse(unloadingAt) < Date.parse(deliveryAt) || Date.parse(unloadingAt) > Date.parse(reserveTo))) return fail(res, 400, 'La descarga debe ser posterior a la llegada y estar dentro de la reserva');
+  const initialStatus = draft ? 'BORRADOR' : 'PROGRAMADO';
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    if (quick) {
+      // Serializa altas rápidas del mismo nombre; nunca combina clientes en silencio.
+      const normalizedName = quick.razon_social.trim().toLowerCase();
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [normalizedName]);
+      const { rows: [duplicate] } = await client.query('SELECT id FROM tms.clientes WHERE lower(btrim(razon_social))=$1 LIMIT 1', [normalizedName]);
+      if (duplicate) { await client.query('ROLLBACK'); return fail(res, 409, 'Ya existe un cliente con ese nombre. Selecciónalo en Cliente registrado o revisa su ficha.'); }
+      const { rows: [customer] } = await client.query('INSERT INTO tms.clientes(razon_social) VALUES ($1) RETURNING id', [quick.razon_social.trim()]);
+      clienteId = customer.id;
+      const savedAddresses = await insertCustomerAddresses(client, clienteId, quick.direcciones);
+      originId = savedAddresses[0].id;
+      destinationId = savedAddresses[1].id;
+    } else {
+      const { rows: [customer] } = await client.query('SELECT id FROM tms.clientes WHERE id=$1 AND activo FOR SHARE', [clienteId]);
+      if (!customer) { await client.query('ROLLBACK'); return fail(res, 400, 'El cliente no existe o está inactivo'); }
+    }
+
     const { rows: addresses } = await client.query(`
       SELECT id, cliente_id, nombre, calle, ciudad, estado, pais, codigo_postal, zona_horaria,
         horario, instrucciones, requiere_cita
@@ -129,22 +167,22 @@ router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
         tipo_servicio_id, tipo_carga, unidad_id, caja_id, operador_id, proveedor_id, estado_operativo,
         cita_carga_at, entrega_estimada_at, reserva_desde, reserva_hasta, instrucciones, restricciones_ruta,
         creado_por, ultima_actualizacion_operativa_at)
-      VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11,$12,'PROGRAMADO',$13,$14,$15,$16,$17,$18,$19,now())
-      RETURNING *`, [clienteId, convenioId || null, originId, destinationId, ...snapshots, serviceTypeId, cargoType.trim(), unitId || null, boxId || null, operatorId || null, providerId || null, loadingAt, deliveryAt, reserveFrom, reserveTo, instrucciones || null, routeRestrictions || null, req.user.id]);
+      VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11,$12,$20,$13,$14,$15,$16,$17,$18,$19,now())
+      RETURNING *`, [clienteId, convenioId || null, originId, destinationId, ...snapshots, serviceTypeId, cargoType.trim(), unitId || null, boxId || null, operatorId || null, providerId || null, loadingAt, deliveryAt, reserveFrom, reserveTo, instrucciones || null, routeRestrictions || null, req.user.id, initialStatus]);
 
     const checklist = await client.query(`INSERT INTO tms.viaje_evidencias
       (viaje_id,tipo_evidencia_id,obligatoria_facturar,requiere_validacion,visible_cliente)
       SELECT $1,tipo_evidencia_id,obligatoria_facturar,requiere_validacion,visible_cliente
       FROM tms.servicio_evidencias WHERE tipo_servicio_id=$2`, [trip.id, serviceTypeId]);
-    if (checklist.rowCount === 0) { await client.query('ROLLBACK'); return fail(res, 409, 'El servicio no tiene plantilla de evidencias configurada'); }
-    await client.query(`INSERT INTO tms.viaje_comercial (viaje_id,flete_base,moneda) VALUES ($1,$2,$3)`, [trip.id, baseFare, moneda]);
-    await client.query('INSERT INTO tms.viaje_tiempos(viaje_id) VALUES ($1)', [trip.id]);
+    if (!draft && checklist.rowCount === 0) { await client.query('ROLLBACK'); return fail(res, 409, 'El servicio no tiene plantilla de evidencias configurada'); }
+    await client.query(`INSERT INTO tms.viaje_comercial (viaje_id,flete_base,moneda,condiciones_snapshot) VALUES ($1,$2,$3,$4)`, [trip.id, baseFare ?? 0, moneda, baseFare == null ? 'Flete pendiente de cotizar; cero provisional en borrador.' : null]);
+    await client.query('INSERT INTO tms.viaje_tiempos(viaje_id,salida_programada_at,descarga_programada_at) VALUES ($1,$2,$3)', [trip.id, departureAt, unloadingAt]);
     await client.query('INSERT INTO tms.viaje_carga(viaje_id,descripcion) VALUES ($1,$2)', [trip.id, body.descripcion_carga || null]);
     await client.query('INSERT INTO tms.viaje_facturacion_operativa(viaje_id) VALUES ($1)', [trip.id]);
-    await client.query('UPDATE tms.viaje_comercial SET checklist_confirmado_por=$1, checklist_confirmado_at=now() WHERE viaje_id=$2', [req.user.id, trip.id]);
+    if (!draft) await client.query('UPDATE tms.viaje_comercial SET checklist_confirmado_por=$1, checklist_confirmado_at=now() WHERE viaje_id=$2', [req.user.id, trip.id]);
     await client.query(`INSERT INTO tms.viaje_eventos
       (viaje_id,tipo,estado_nuevo,ocurrido_at,registrado_por,origen,comentario,idempotency_key)
-      VALUES ($1,'CREACION','PROGRAMADO',now(),$2,'INTERNO','Viaje creado desde Logística',$3)`, [trip.id, req.user.id, randomUUID()]);
+      VALUES ($1,'CREACION',$4,now(),$2,'INTERNO','Viaje creado desde Logística',$3)`, [trip.id, req.user.id, randomUUID(), initialStatus]);
     await client.query('COMMIT');
     res.status(201).json({ success: true, data: trip });
   } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -154,13 +192,14 @@ router.post('/trips', requireCreateTrip, wrap(async (req, res) => {
 router.get('/trips/:folio', requireTripRead, wrap(async (req, res) => {
   const { rows: [trip] } = await query(`
     SELECT v.*, v.folio::text AS folio, c.razon_social AS cliente, ts.nombre AS tipo_servicio,
-      u.numero_economico AS unidad, b.numero_caja AS caja, o.nombre AS operador,
+      vt.salida_programada_at, vt.descarga_programada_at, u.numero_economico AS unidad, b.numero_caja AS caja, o.nombre AS operador,
       p.razon_social AS proveedor, vc.flete_base, vc.moneda,
       vf.estado AS estado_facturacion, prep.listo AS listo_para_facturar, prep.subtotal_sin_impuestos
     FROM tms.viajes v JOIN tms.clientes c ON c.id=v.cliente_id
     LEFT JOIN tms.tipos_servicio ts ON ts.id=v.tipo_servicio_id
     LEFT JOIN tms.unidades u ON u.id=v.unidad_id LEFT JOIN tms.cajas b ON b.id=v.caja_id
     LEFT JOIN tms.operadores o ON o.id=v.operador_id LEFT JOIN tms.proveedores p ON p.id=v.proveedor_id
+    LEFT JOIN tms.viaje_tiempos vt ON vt.viaje_id=v.id
     LEFT JOIN tms.viaje_comercial vc ON vc.viaje_id=v.id
     LEFT JOIN tms.viaje_facturacion_operativa vf ON vf.viaje_id=v.id
     LEFT JOIN tms.v_listo_facturar prep ON prep.viaje_id=v.id WHERE v.folio::text=$1`, [req.params.folio]);
@@ -280,10 +319,9 @@ router.post('/customers', requireTripEdit, wrap(async (req, res) => {
     if (item.principal != null && typeof item.principal !== 'boolean') return fail(res, 400, 'principal debe ser verdadero o falso');
   }
   if (contactsToSave.filter((item) => item.principal).length > 1 || contactsToSave.filter((item) => item.para_facturacion).length > 1) return fail(res, 400, 'Solo puede elegirse un contacto principal y uno de facturación');
-  if (direccion && [direccion.nombre, direccion.calle, direccion.ciudad, direccion.estado].some((value) => typeof value === 'string' && value.trim())
-    && ![direccion.nombre, direccion.calle, direccion.ciudad, direccion.estado].every((value) => typeof value === 'string' && value.trim())) {
-    return fail(res, 400, 'Completa nombre, calle, ciudad y estado para guardar la dirección');
-  }
+  const addressesToSave = req.body.direcciones ?? (direccion ? [direccion] : []);
+  const addressError = validateAddresses(addressesToSave);
+  if (addressError) return fail(res, 400, addressError);
 
   const client = await pool.connect();
   try {
@@ -309,25 +347,15 @@ router.post('/customers', requireTripEdit, wrap(async (req, res) => {
       if (item.para_facturacion) billingContactId = savedContact.id;
     }
 
-    let address = null;
-    if (typeof direccion?.nombre === 'string' && direccion.nombre.trim()) {
-      const { rows: [savedAddress] } = await client.query(`INSERT INTO tms.cliente_direcciones
-        (cliente_id,nombre,calle,ciudad,estado,pais,codigo_postal,zona_horaria,horario,instrucciones,requiere_cita,contacto_id,principal,tipo_ubicacion,tipo_zona)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-      [customer.id, direccion.nombre.trim(), direccion.calle.trim(), direccion.ciudad.trim(), direccion.estado.trim(),
-        String(direccion.pais || 'MX').slice(0, 2).toUpperCase(), direccion.codigo_postal?.trim() || null,
-        direccion.zona_horaria || 'America/Mexico_City', direccion.horario?.trim() || null,
-        direccion.instrucciones?.trim() || null, Boolean(direccion.requiere_cita), savedContacts.find((item) => item.principal)?.id || null, true,
-        direccion.tipo_ubicacion?.trim() || null, direccion.tipo_zona?.trim() || null]);
-      address = savedAddress;
-    }
+    const savedAddresses = await insertCustomerAddresses(client, customer.id, addressesToSave, savedContacts.find((item) => item.principal)?.id || null);
+    const address = savedAddresses.find((item) => item.principal) || null;
 
     if (billingContactId) await client.query('UPDATE tms.clientes SET contacto_facturacion_id=$2 WHERE id=$1', [customer.id, billingContactId]);
 
     await client.query('COMMIT');
-    res.status(201).json({ success: true, data: { ...customer, direcciones_activas: address ? 1 : 0,
+    res.status(201).json({ success: true, data: { ...customer, direcciones_activas: savedAddresses.length,
       contacto_facturacion_id: billingContactId, address_preview: address ? `${address.ciudad}, ${address.estado}` : null,
-      contactos: savedContacts, direcciones: address ? [address] : [], convenios: [] } });
+      contactos: savedContacts, direcciones: savedAddresses, convenios: [] } });
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

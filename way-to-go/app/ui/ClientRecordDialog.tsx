@@ -54,7 +54,7 @@ export default function ClientRecordDialog({
               <LogisticsFormField label="Nombre comercial"><input name="nombre_comercial" maxLength={180} defaultValue={customer.nombre_comercial ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
               <LogisticsFormField label="RFC"><input name="rfc" maxLength={13} autoCapitalize="characters" defaultValue={customer.rfc ?? ''} className={logisticsFieldClassName} /><span className="mt-1 block text-xs text-slate-400">Formato mexicano y RFC no repetido.</span></LogisticsFormField>
             </LogisticsFormSection>
-            <LogisticsFormSection title="Domicilio legal o matriz" description="Se conserva aparte de las ubicaciones operativas.">
+            <LogisticsFormSection title="Domicilio de facturación" description="Se conserva aparte de las ubicaciones operativas.">
               <LogisticsFormField label="Calle y número"><input name="domicilio_legal_calle" maxLength={200} defaultValue={customer.domicilio_legal_calle ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
               <LogisticsFormField label="Ciudad"><input name="domicilio_legal_ciudad" maxLength={100} defaultValue={customer.domicilio_legal_ciudad ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
               <LogisticsFormField label="Estado"><input name="domicilio_legal_estado" maxLength={100} defaultValue={customer.domicilio_legal_estado ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
