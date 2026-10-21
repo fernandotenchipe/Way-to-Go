@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, ChevronRightIcon, DocumentTextIcon, MagnifyingGlassIcon, PlusIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
 import CreatedTripSummary from './CreatedTripSummary';
 import RegisteredTrips from './RegisteredTrips';
+import { logisticsApi, type LogisticsDashboardData, type LogisticsDashboardTrip, type LogisticsTrip } from '../services/logistics-api';
+import { tripStatusLabels } from '../services/trip-record';
 
 type Trip = { folio: string; client: string; route: string; unit: string; driver: string; status: string; update: string; eta: string; evidence: string; amount: string };
 const trips: Trip[] = [
@@ -41,7 +43,55 @@ export function TripDetail({ folio }: { folio: string }) { return <CreatedTripSu
 function Info({label,value}:{label:string;value:string}) {return <div><p className="text-xs text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800">{value}</p></div>}
 
 export function LogisticsDashboard() {
- return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Centro de control TMS" title="Operación logística" description="Sigue los servicios desde su programación hasta el expediente listo para facturar." action={<Link href="/logistica/viajes/nuevo" className={button}><PlusIcon className="h-4 w-4"/>Crear viaje</Link>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Viajes activos" value="18" note="8 en ruta · 4 en carga o descarga"/><Kpi label="Sin actualización" value="2" note="Requieren seguimiento"/><Kpi label="POD pendiente" value="6" note="2 entregas de hoy"/><Kpi label="Listos para facturar" value="9" note="$184,600 MXN estimados"/></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><QuickCard href="/logistica/viajes" title="Viajes" detail="Programación, asignaciones y estatus"/><QuickCard href="/logistica/evidencias" title="Expedientes" detail="POD y documentos requeridos"/><QuickCard href="/logistica/clientes" title="Clientes y tarifas" detail="Direcciones y convenios vigentes"/><QuickCard href="/logistica/costos" title="Costos y extras" detail="Validación de costos por viaje"/></div><div className="flex items-end justify-between"><div><h2 className="text-lg font-bold text-[#0b1f3b]">Viajes que requieren atención</h2><p className="mt-1 text-sm text-slate-500">Actualizaciones recientes y pendientes operativos.</p></div><Link href="/logistica/viajes" className="text-sm font-semibold text-[#0b1f3b]">Ver todos →</Link></div><Table rows={trips.slice(0,4)} headings={['Viaje / cliente','Ruta','Unidad / operador','Estatus','Actualización','ETA','']}/><p className="text-xs text-slate-400">Vista de demostración con datos de ejemplo.</p></div>;
+ const [dashboard, setDashboard] = useState<LogisticsDashboardData | null>(null);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState('');
+ const loadDashboard = useCallback(async () => {
+  setLoading(true); setError('');
+  try {
+   const [dashboardResponse, tripsResponse] = await Promise.all([logisticsApi.getDashboard(), logisticsApi.getTrips({ limit: 8 })]);
+   const recentTrips = tripsResponse.data.filter(trip => !['ENTREGADO', 'CANCELADO'].includes(trip.estado_operativo));
+   setDashboard({ summary: dashboardResponse.data.summary, recent_trips: recentTrips });
+  }
+  catch (reason) { setDashboard(null); setError(reason instanceof Error ? reason.message : 'No se pudo consultar el dashboard.'); }
+  finally { setLoading(false); }
+ }, []);
+ useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+ const rows = (dashboard?.recent_trips || []).map(toDashboardTrip);
+ const summary = dashboard?.summary;
+ return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Centro de control TMS" title="Operación logística" description="Sigue los servicios desde su programación hasta el expediente listo para facturar." action={<Link href="/logistica/viajes/nuevo" className={button}><PlusIcon className="h-4 w-4"/>Crear viaje</Link>}/>
+  {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>No se pudieron cargar los datos reales: {error}</span><button type="button" className={subtle} onClick={() => void loadDashboard()}>Reintentar</button></div>}
+  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+   <Kpi label="Viajes activos" value={summary ? String(summary.viajes_activos) : loading ? '…' : '—'} note="Confirmados, programados y en curso"/>
+   <Kpi label="En operación" value={summary ? String(summary.en_operacion) : loading ? '…' : '—'} note="Programados o con avance iniciado"/>
+   <Kpi label="Sin actualización" value={summary ? String(summary.sin_actualizacion) : loading ? '…' : '—'} note="Requieren seguimiento"/>
+   <Kpi label="Listos para facturar" value={summary ? String(summary.listos_para_facturar) : loading ? '…' : '—'} note="Según el expediente operativo"/>
+  </div>
+  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><QuickCard href="/logistica/viajes" title="Viajes" detail="Programación, asignaciones y estatus"/><QuickCard href="/logistica/evidencias" title="Expedientes" detail="POD y documentos requeridos"/><QuickCard href="/logistica/clientes" title="Clientes y tarifas" detail="Direcciones y convenios vigentes"/><QuickCard href="/logistica/costos" title="Costos y extras" detail="Validación de costos por viaje"/></div>
+  <div className="flex items-end justify-between"><div><h2 className="text-lg font-bold text-[#0b1f3b]">Viajes recientes</h2><p className="mt-1 text-sm text-slate-500">Los viajes creados y actualizados aparecen aquí desde el backend.</p></div><Link href="/logistica/viajes" className="text-sm font-semibold text-[#0b1f3b]">Ver todos →</Link></div>
+  {loading && !dashboard ? <p role="status" className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">Cargando indicadores y viajes…</p> : dashboard && rows.length ? <Table rows={rows} headings={['Viaje / cliente','Ruta','Unidad / operador','Estatus','Actualización','ETA','']}/> : !error && <p className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay viajes activos para mostrar.</p>}
+ </div>;
+}
+
+function toDashboardTrip(trip: LogisticsDashboardTrip | LogisticsTrip): Trip {
+ const locationName = (value: Record<string, unknown> | null) => value ? String(value.nombre || value.ciudad || '') : '';
+ const route = [locationName(trip.origen_snapshot), locationName(trip.destino_snapshot)].filter(Boolean).join(' → ') || 'Ruta pendiente';
+ return {
+  folio: trip.folio, client: trip.cliente, route, unit: trip.unidad || 'Sin asignar', driver: trip.operador || 'Sin asignar',
+  status: tripStatusLabels[trip.estado_operativo] || trip.estado_operativo, update: formatDashboardUpdate(trip.updated_at),
+  eta: trip.entrega_estimada_at ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(trip.entrega_estimada_at)) : 'Pendiente',
+  evidence: '', amount: '',
+ };
+}
+
+function formatDashboardUpdate(value: string) {
+ const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000));
+ if (!Number.isFinite(minutes)) return 'Sin fecha';
+ if (minutes < 1) return 'Ahora';
+ if (minutes < 60) return `Hace ${minutes} min`;
+ if (minutes < 1440) return `Hace ${Math.floor(minutes / 60)} h`;
+ return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 function QuickCard({href,title,detail}:{href:string;title:string;detail:string}) {return <Link href={href} className={`${cls} p-4 transition hover:border-[#d5b23f] hover:shadow-md`}><h3 className="text-sm font-bold text-[#0b1f3b]">{title}</h3><p className="mt-1 text-xs text-slate-500">{detail}</p></Link>}
 

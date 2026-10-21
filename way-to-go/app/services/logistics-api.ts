@@ -45,6 +45,30 @@ export interface LogisticsResponse<T> {
   error?: string;
 }
 
+export interface LogisticsDashboardTrip {
+  folio: string;
+  estado_operativo: LogisticsTripStatus;
+  cliente: string;
+  unidad: string | null;
+  operador: string | null;
+  cita_carga_at: string | null;
+  entrega_estimada_at: string | null;
+  origen_snapshot: Record<string, unknown> | null;
+  destino_snapshot: Record<string, unknown> | null;
+  updated_at: string;
+}
+
+export interface LogisticsDashboardData {
+  summary: {
+    viajes_activos: number;
+    en_operacion: number;
+    entregados: number;
+    sin_actualizacion: number;
+    listos_para_facturar: number;
+  };
+  recent_trips: Array<LogisticsDashboardTrip | LogisticsTrip>;
+}
+
 export interface LogisticsCustomer {
   id: string;
   razon_social: string;
@@ -196,7 +220,7 @@ class LogisticsApi {
   }
 
   getDashboard() {
-    return this.request<{ summary: Record<string, number>; recent_trips: LogisticsTrip[] }>('dashboard');
+    return this.request<LogisticsDashboardData>('dashboard');
   }
 
   getCustomers(q = '') {
