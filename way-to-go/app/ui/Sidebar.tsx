@@ -18,6 +18,7 @@ const menus: Record<PortalModule, NavItem[]> = {
     { name: 'Viajes', href: '/logistica/viajes', icon: MapIcon },
     { name: 'Evidencias y POD', href: '/logistica/evidencias', icon: DocumentTextIcon },
     { name: 'Facturación operativa', href: '/logistica/facturacion', icon: BanknotesIcon },
+    { name: 'Catálogo de Carta Porte', href: '/logistica/catalogo-carta-porte', icon: ClipboardDocumentCheckIcon },
     { name: 'Costos y extras', href: '/logistica/costos', icon: CurrencyDollarIcon },
     { name: 'Clientes y direcciones', href: '/logistica/clientes', icon: BuildingOffice2Icon },
     { name: 'Flota', href: '/logistica/flota', icon: TruckIcon },
