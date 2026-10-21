@@ -1,4 +1,5 @@
 import express from 'express';
+import tripRecordRouter from './trip-record.js';
 import multer from 'multer';
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
@@ -59,6 +60,8 @@ const upload = multer({
 
 router.get('/health', (_req, res) => res.json({ success: true, module: 'logistica', database_schema: 'tms', status: 'ready' }));
 router.use(requireLogisticsUser);
+const requireActor = (req, res, next) => isUuid(req.user.id) ? next() : fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');
+router.use(tripRecordRouter({ pool, wrap, fail, isUuid }));
 
 router.get('/dashboard', requireTripRead, wrap(async (_req, res) => {
   const { rows: [summary] } = await query(`
@@ -210,9 +213,12 @@ router.get('/trips/:folio', requireTripRead, wrap(async (req, res) => {
   res.json({ success: true, data: trip });
 }));
 
-router.patch('/trips/:folio/status', requireTrafficRole, wrap(async (req, res) => {
+router.patch('/trips/:folio/status', requireTrafficRole, requireActor, wrap(async (req, res) => {
   const { estado, comentario, motivo_cancelacion: cancelReason } = req.body || {};
   if (!statuses.has(estado)) return fail(res, 400, 'Estado operativo inválido');
+  const occurredAt = req.body.ocurrido_at || new Date().toISOString();
+  if (typeof occurredAt !== 'string' || !Number.isFinite(Date.parse(occurredAt)) || Date.parse(occurredAt) > Date.now() + 60000) return fail(res, 400, 'La fecha del avance debe ser válida y no estar en el futuro');
+  if (comentario != null && (typeof comentario !== 'string' || comentario.length > 2000)) return fail(res, 400, 'Observación no válida');
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -221,15 +227,18 @@ router.patch('/trips/:folio/status', requireTrafficRole, wrap(async (req, res) =
     if (!transitions[trip.estado_operativo]?.includes(estado)) { await client.query('ROLLBACK'); return fail(res, 409, `No se permite cambiar de ${trip.estado_operativo} a ${estado}`); }
     if (estado === 'CANCELADO' && (typeof cancelReason !== 'string' || !cancelReason.trim())) { await client.query('ROLLBACK'); return fail(res, 400, 'Indica el motivo de cancelación'); }
 
+    const { rows: [last] } = await client.query(`SELECT max(ocurrido_at) AS fecha FROM tms.viaje_eventos WHERE viaje_id=$1 AND tipo IN ('CREACION','ESTATUS')`, [trip.id]);
+    if (last?.fecha && Date.parse(occurredAt) < new Date(last.fecha).getTime()) { await client.query('ROLLBACK'); return fail(res, 400, 'El avance no puede ser anterior al último evento operativo'); }
     const { rows: [updated] } = await client.query(`UPDATE tms.viajes SET estado_operativo=$1,
       cancelado_at=CASE WHEN $1='CANCELADO' THEN now() ELSE cancelado_at END,
       motivo_cancelacion=CASE WHEN $1='CANCELADO' THEN $2 ELSE motivo_cancelacion END,
       ultima_actualizacion_operativa_at=now() WHERE id=$3 RETURNING *`, [estado, cancelReason || null, trip.id]);
-    const timeColumn = { LLEGO_A_CARGA: 'llegada_carga_at', EN_CARGA: 'inicio_carga_at', SALIO_CARGADO_EN_RUTA: 'salida_cargado_at', LLEGO_A_DESTINO: 'llegada_destino_at', EN_DESCARGA: 'inicio_descarga_at', ENTREGADO: 'entregado_at' }[estado];
-    if (timeColumn) await client.query(`UPDATE tms.viaje_tiempos SET ${timeColumn}=now() WHERE viaje_id=$1`, [trip.id]);
+    const timeColumn = { LLEGO_A_CARGA: 'llegada_carga_at', EN_CARGA: 'inicio_carga_at', SALIO_CARGADO_EN_RUTA: 'salida_cargado_at', LLEGO_A_DESTINO: 'llegada_destino_at', EN_DESCARGA: 'inicio_descarga_at', ENTREGADO: 'fin_descarga_at' }[estado];
+    if (timeColumn) await client.query(`UPDATE tms.viaje_tiempos SET ${timeColumn}=$2 WHERE viaje_id=$1`, [trip.id, occurredAt]);
+    if (estado === 'ENTREGADO') await client.query('UPDATE tms.viaje_tiempos SET entregado_at=$2 WHERE viaje_id=$1', [trip.id, occurredAt]);
     await client.query(`INSERT INTO tms.viaje_eventos
       (viaje_id,tipo,estado_anterior,estado_nuevo,ocurrido_at,registrado_por,origen,comentario,idempotency_key)
-      VALUES ($1,$2,$3,$4,now(),$5,'INTERNO',$6,$7)`, [trip.id, estado === 'CANCELADO' ? 'CANCELACION' : 'ESTATUS', trip.estado_operativo, estado, req.user.id, comentario || cancelReason || null, randomUUID()]);
+      VALUES ($1,$2,$3,$4,$8,$5,'INTERNO',$6,$7)`, [trip.id, estado === 'CANCELADO' ? 'CANCELACION' : 'ESTATUS', trip.estado_operativo, estado, req.user.id, comentario || cancelReason || null, randomUUID(), occurredAt]);
     await client.query('COMMIT');
     res.json({ success: true, data: updated });
   } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -245,7 +254,7 @@ router.get('/trips/:folio/events', requireTripRead, wrap(async (req, res) => {
 router.get('/trips/:folio/evidence', requireTripRead, wrap(async (req, res) => {
   const { rows } = await query(`SELECT e.id,e.tipo_evidencia_id,t.codigo,t.nombre,e.obligatoria_facturar,
     e.visible_cliente,e.no_aplica,estado.estado AS estado,
-    jsonb_agg(jsonb_build_object('entrega_id',d.id,'archivo_id',a.id,'nombre',a.nombre_original,'mime_type',a.mime_type,'estado',d.estado,'created_at',d.created_at)) FILTER (WHERE d.id IS NOT NULL) AS entregas
+    jsonb_agg(jsonb_build_object('entrega_id',d.id,'archivo_id',a.id,'nombre',a.nombre_original,'mime_type',a.mime_type,'estado',d.estado,'created_at',d.created_at,'subida_por_nombre',(SELECT nombre FROM tms.usuarios WHERE id=d.subida_por))) FILTER (WHERE d.id IS NOT NULL) AS entregas
     FROM tms.viaje_evidencias e JOIN tms.viajes v ON v.id=e.viaje_id
     JOIN tms.tipos_evidencia t ON t.id=e.tipo_evidencia_id JOIN tms.v_evidencias_estado estado ON estado.id=e.id
     LEFT JOIN tms.evidencia_entregas d ON d.evidencia_id=e.id LEFT JOIN tms.archivos a ON a.id=d.archivo_id
@@ -253,12 +262,18 @@ router.get('/trips/:folio/evidence', requireTripRead, wrap(async (req, res) => {
   res.json({ success: true, data: rows });
 }));
 
-router.post('/trips/:folio/evidence', requireTripEdit, (req, res, next) => upload.single('file')(req, res, (error) => error ? fail(res, error.code === 'LIMIT_FILE_SIZE' ? 413 : 400, error.message) : next()), wrap(async (req, res) => {
+router.post('/trips/:folio/evidence', requireTripEdit, requireActor, (req, res, next) => upload.single('file')(req, res, (error) => error ? fail(res, error.code === 'LIMIT_FILE_SIZE' ? 413 : 400, error.message) : next()), wrap(async (req, res) => {
   if (!req.file) return fail(res, 400, 'Selecciona un archivo');
-  const { tipo_evidencia_id: evidenceTypeId } = req.body || {};
-  const client = await pool.connect();
+  const { tipo_evidencia_id: evidenceTypeId, observacion = '' } = req.body || {};
+  if (!isUuid(evidenceTypeId) || typeof observacion !== 'string' || observacion.length > 2000) { await unlink(req.file.path).catch(() => {}); return fail(res, 400, 'Revisa el tipo de evidencia y la observación'); }
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
+    const { rows: [trip] } = await client.query('SELECT id FROM tms.viajes WHERE folio::text=$1 FOR UPDATE', [req.params.folio]);
+    const { rows: [type] } = await client.query('SELECT id FROM tms.tipos_evidencia WHERE id=$1 AND activo', [evidenceTypeId]);
+    if (!trip || !type) { await client.query('ROLLBACK'); await unlink(req.file.path); return fail(res, 404, 'Viaje o tipo de evidencia no disponible'); }
+    await client.query('INSERT INTO tms.viaje_evidencias(viaje_id,tipo_evidencia_id) VALUES ($1,$2) ON CONFLICT(viaje_id,tipo_evidencia_id) DO NOTHING', [trip.id, evidenceTypeId]);
     const { rows: [evidence] } = await client.query(`SELECT e.id FROM tms.viaje_evidencias e
       JOIN tms.viajes v ON v.id=e.viaje_id WHERE v.folio::text=$1 AND e.tipo_evidencia_id=$2 FOR UPDATE`, [req.params.folio, evidenceTypeId]);
     if (!evidence) { await client.query('ROLLBACK'); await unlink(req.file.path); return fail(res, 404, 'No existe ese requisito de evidencia para el viaje'); }
@@ -268,10 +283,11 @@ router.post('/trips/:folio/evidence', requireTripEdit, (req, res, next) => uploa
       VALUES ('logistica',$1,$2,$3,$4,'DISPONIBLE',$5) RETURNING id`, [storagePath, path.basename(req.file.originalname), req.file.mimetype, req.file.size, req.user.id]);
     const { rows: [delivery] } = await client.query(`INSERT INTO tms.evidencia_entregas
       (evidencia_id,archivo_id,subida_por) VALUES ($1,$2,$3) RETURNING *`, [evidence.id, file.id, req.user.id]);
+    await client.query(`INSERT INTO tms.viaje_eventos(viaje_id,tipo,ocurrido_at,registrado_por,origen,comentario,archivo_id,idempotency_key) VALUES ($1,'COMENTARIO',now(),$2,'INTERNO',$3,$4,$5)`, [trip.id, req.user.id, 'Evidencia adjunta: ' + req.file.originalname + (observacion ? '. ' + observacion : ''), file.id, randomUUID()]);
     await client.query('COMMIT');
     res.status(201).json({ success: true, data: { ...delivery, archivo_id: file.id } });
-  } catch (error) { await client.query('ROLLBACK'); if (req.file) await unlink(req.file.path).catch(() => {}); throw error; }
-  finally { client.release(); }
+  } catch (error) { if (client) await client.query('ROLLBACK'); if (req.file) await unlink(req.file.path).catch(() => {}); throw error; }
+  finally { client?.release(); }
 }));
 
 router.get('/evidence/:id/download', requireTripRead, wrap(async (req, res) => {

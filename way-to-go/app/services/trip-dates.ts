@@ -1,8 +1,8 @@
 // Convierte la hora del lugar, independientemente de la zona horaria del navegador.
 export function tripDateToIso(value: string, timeZone: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) throw new Error('Captura una fecha y hora válida.');
-  const wall = Date.parse(`${value}:00Z`);
-  if (!Number.isFinite(wall) || new Date(wall).toISOString().slice(0, 16) !== value) throw new Error('La fecha no es válida.');
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value)) throw new Error('Captura una fecha y hora válida.');
+  const wall = Date.parse(`${value.length === 16 ? value + ':00' : value}Z`);
+  if (!Number.isFinite(wall) || new Date(wall).toISOString().slice(0, value.length) !== value) throw new Error('La fecha no es válida.');
   const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
   const localMillis = (stamp: number) => {
     const parts = Object.fromEntries(formatter.formatToParts(stamp).map((part) => [part.type, part.value]));

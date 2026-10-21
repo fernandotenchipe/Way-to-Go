@@ -23,9 +23,21 @@ export interface LogisticsTrip {
   unidad: string | null;
   operador_id: string | null;
   operador: string | null;
+  caja_id?: string | null;
+  caja?: string | null;
+  proveedor_id?: string | null;
+  proveedor?: string | null;
+  demo_record?: LogisticsTripRecord;
+  demo_evidence?: LogisticsEvidence[];
   created_at: string;
   updated_at: string;
 }
+
+export interface LogisticsResource { id: string; nombre: string; proveedor_id?: string | null }
+export interface LogisticsTripEvent { id: string; tipo: string; comentario: string | null; ocurrido_at: string; created_at?: string; registrado_por_nombre?: string; estado_nuevo?: string | null; datos?: { antes?: Record<string, unknown>; despues?: Record<string, unknown> } }
+export interface LogisticsTripRecord { tiempos: Record<string, string | null>; eventos: LogisticsTripEvent[]; unidades: LogisticsResource[]; operadores: LogisticsResource[]; cajas: LogisticsResource[]; proveedores: LogisticsResource[] }
+export interface LogisticsEvidence { id: string; tipo_evidencia_id: string; nombre: string; estado: string; obligatoria_facturar?: boolean; entregas: Array<{ archivo_id: string; nombre: string; estado: string; created_at: string; subida_por_nombre?: string; mime_type: string }> | null }
+export interface LogisticsTripSession { nombre: string; canEdit: boolean; canAdvance: boolean; validActor: boolean }
 
 export interface LogisticsResponse<T> {
   success: boolean;
@@ -259,20 +271,35 @@ class LogisticsApi {
     return this.request<LogisticsTrip>(`trips/${encodeURIComponent(folio)}`);
   }
 
+  getTripSession() { return this.request<LogisticsTripSession>('session'); }
+  getTripRecord(folio: string) { return this.request<LogisticsTripRecord>(`trips/${encodeURIComponent(folio)}/record`); }
+  getTripEvidence(folio: string) { return this.request<LogisticsEvidence[]>(`trips/${encodeURIComponent(folio)}/evidence`); }
+  editTripRecord(folio: string, input: { tipo_carga: string; instrucciones: string; motivo: string; updated_at: string }) { return this.request(`trips/${encodeURIComponent(folio)}/record`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  assignTrip(folio: string, input: { modalidad: string; unidad_id: string | null; operador_id: string | null; caja_id: string | null; proveedor_id: string | null; motivo: string; updated_at: string }) { return this.request(`trips/${encodeURIComponent(folio)}/assignment`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  async getEvidenceFile(id: string) {
+    const headers = new Headers();
+    const token = localStorage.getItem('auth_token');
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(`/api/logistica/evidence/${encodeURIComponent(id)}/download`, { headers, cache: 'no-store' });
+    if (!response.ok) { const body = await response.json(); throw new Error(body.error || 'No se pudo abrir el archivo'); }
+    return response.blob();
+  }
+
   createTrip(input: LogisticsTripCreateInput) {
     return this.request<LogisticsTrip>('trips', { method: 'POST', body: JSON.stringify(input) });
   }
 
-  updateTripStatus(folio: string, estado: LogisticsTripStatus, comentario?: string, motivoCancelacion?: string) {
+  updateTripStatus(folio: string, estado: LogisticsTripStatus, comentario?: string, motivoCancelacion?: string, ocurridoAt?: string) {
     return this.request<LogisticsTrip>(`trips/${encodeURIComponent(folio)}/status`, {
-      method: 'PATCH', body: JSON.stringify({ estado, comentario, motivo_cancelacion: motivoCancelacion }),
+      method: 'PATCH', body: JSON.stringify({ estado, comentario, motivo_cancelacion: motivoCancelacion, ocurrido_at: ocurridoAt }),
     });
   }
 
-  uploadEvidence(folio: string, file: File, tipoEvidenciaId: string) {
+  uploadEvidence(folio: string, file: File, tipoEvidenciaId: string, observacion = '') {
     const body = new FormData();
     body.set('file', file);
     body.set('tipo_evidencia_id', tipoEvidenciaId);
+    body.set('observacion', observacion);
     return this.request<Record<string, unknown>>(`trips/${encodeURIComponent(folio)}/evidence`, { method: 'POST', body });
   }
 }

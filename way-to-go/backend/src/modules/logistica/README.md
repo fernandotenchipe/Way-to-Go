@@ -43,7 +43,17 @@ El RFC se valida con formato mexicano y no se puede repetir. Los correos de cada
 
 Para crear un viaje programado deben existir cliente, direcciones, servicio y plantilla de evidencias activos. El servicio crea snapshots de origen/destino, registros complementarios y evento inicial dentro de una transacción. El folio lo asigna PostgreSQL; no se recibe del cliente.
 
-### Captura de clientes y viajes
+### Ficha de viaje
+
+La ficha usa Resumen, Asignación, Avances, Evidencias e Historial. `GET /session` expone solo capacidades del usuario autenticado, y `GET /trips/:folio/record` consulta tiempos, bitácora con responsables y recursos activos. No se cambia la autenticación configurada; `local-dev` permite consultar, pero no es una identidad válida para registrar cambios desde la ficha.
+
+`PATCH /trips/:folio/record` edita carga e instrucciones. `PATCH /trips/:folio/assignment` modifica recursos sin cambiar el estado operativo. Ambas rutas requieren `viajes.editar`, motivo y la versión `updated_at` que se consultó. Rechazan fichas desactualizadas, viajes finalizados y recursos inactivos o de otro proveedor. La asignación serializa por recurso y comprueba cruces de horarios; el cambio y su historial se guardan en una transacción. El paso de borrador a programado no se añade a la interfaz, pues sigue pendiente de definir.
+
+Los avances usan la ruta de estados existente con `ocurrido_at`, validación de orden y permiso `viajes.estatus`. Fin de descarga y entrega quedan registrados juntos en la transición ENTREGADO. Las evidencias admiten adjuntar un tipo activo aunque no esté en la plantilla, usando los valores predeterminados del modelo, sin inventar obligatoriedad fiscal. Cada entrega conserva sus archivos anteriores y genera un evento con observación. No se incorpora aprobación/rechazo de evidencias a esta ficha.
+
+Los folios demo usan el navegador y se identifican explícitamente. En demo, de los archivos solo se conserva el nombre y metadatos; su contenido está disponible durante la sesión. Para un folio real, un error de conexión no se sustituye por datos ficticios. Las pruebas `routes/trip-record.test.js` verifican transacciones, permisos de identidad, cambios concurrentes y recursos con dobles en memoria; no modifican la base conectada.
+
+### Detalles de captura
 
 El alta de cliente acepta `direcciones` (hasta 30 ubicaciones) y conserva compatibilidad con `direccion`. Todas se guardan en la transacción del cliente. Una sola ubicación activa puede ser principal; esto no le asigna un rol de origen o destino. El domicilio de facturación usa los campos existentes `domicilio_legal_*` y se mantiene separado de las ubicaciones operativas.
 
