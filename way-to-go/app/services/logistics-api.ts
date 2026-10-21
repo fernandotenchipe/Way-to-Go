@@ -40,12 +40,13 @@ export interface LogisticsFleetEvent { unidad_id: string; numero_economico: stri
 export interface LogisticsTripEvent { id: string; tipo: string; comentario: string | null; ocurrido_at: string; created_at?: string; registrado_por_nombre?: string; estado_nuevo?: string | null; datos?: { categoria?: string; antes?: Record<string, unknown>; despues?: Record<string, unknown> } }
 export interface LogisticsTripRecord { tiempos: Record<string, string | null>; eventos: LogisticsTripEvent[]; unidades: LogisticsResource[]; operadores: LogisticsResource[]; cajas: LogisticsResource[]; proveedores: LogisticsResource[] }
 export interface LogisticsEvidence { id: string; tipo_evidencia_id: string; nombre: string; estado: string; obligatoria_facturar?: boolean; entregas: Array<{ archivo_id: string; nombre: string; estado: string; created_at: string; subida_por_nombre?: string; mime_type: string }> | null }
-export interface LogisticsTripSession { nombre: string; canEdit: boolean; canAdvance: boolean; validActor: boolean }
+export interface LogisticsTripSession { nombre: string; canEdit: boolean; canEditFleet: boolean; demoFleetOnly?: boolean; canAdvance: boolean; validActor: boolean }
 
 export interface LogisticsResponse<T> {
   success: boolean;
   data: T;
   error?: string;
+  created?: boolean;
 }
 
 export interface LogisticsDashboardTrip {
@@ -300,6 +301,8 @@ class LogisticsApi {
 
   getTripSession() { return this.request<LogisticsTripSession>('session'); }
   getFleet() { return this.request<{ units: LogisticsFleetUnit[]; location: LogisticsFleetLocation | null }>('fleet'); }
+  createFleetUnit(input: { numero_economico: string; placas?: string | null; tipo_unidad: string; marca?: string | null; modelo?: string | null; anio?: number | null; capacidad_kg?: number | null; capacidad_pallets?: number | null; hazmat: boolean; refrigerada: boolean; proveedor_id?: string | null }) { return this.request<LogisticsFleetUnit>('units', { method: 'POST', body: JSON.stringify(input) }); }
+  getFleetProviders() { return this.request<Array<{ id: string; razon_social: string }>>('providers'); }
   getFleetCalendar(from: string, until: string) { const search = new URLSearchParams({ from, until }); return this.request<LogisticsFleetEvent[]>(`fleet/calendar?${search}`); }
   saveFleetLocation(input: { direccion: string; latitud: number; longitud: number }) { return this.request<LogisticsFleetLocation>('fleet/location', { method: 'PUT', body: JSON.stringify(input) }); }
   registerFleetArrival(id: string) { return this.request(`fleet/${encodeURIComponent(id)}/arrival`, { method: 'POST', body: JSON.stringify({}) }); }

@@ -5,7 +5,7 @@ import { scheduleKeys, validateTripSchedule, reserveTripResources } from '../ser
 
 export default function tripRecordRouter({ pool, wrap, fail, isUuid }) {
   const router = express.Router();
-  router.get('/session', (req, res) => res.json({ success: true, data: { nombre: req.user.name, canEdit: isUuid(req.user.id) && req.user.permissions.includes('viajes.editar'), canAdvance: isUuid(req.user.id) && req.user.permissions.includes('viajes.estatus'), validActor: isUuid(req.user.id) } }));
+  router.get('/session', (req, res) => res.json({ success: true, data: { nombre: req.user.name, canEdit: isUuid(req.user.id) && req.user.permissions.includes('viajes.editar'), canEditFleet: (isUuid(req.user.id) && req.user.permissions.includes('flota.editar')) || (process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true'), demoFleetOnly: !isUuid(req.user.id) && process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true', canAdvance: isUuid(req.user.id) && req.user.permissions.includes('viajes.estatus'), validActor: isUuid(req.user.id) } }));
   router.post('/trips/:folio/notes', requireTripEdit, wrap(async (req, res) => {
     if (!isUuid(req.user.id)) return fail(res, 403, 'Inicia sesión con un usuario TMS válido para agregar notas');
     const text = req.body?.texto;
