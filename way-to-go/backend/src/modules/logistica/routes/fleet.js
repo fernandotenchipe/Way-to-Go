@@ -4,7 +4,7 @@ import { requireFleetEdit, requireFleetRead } from '../middleware/auth.js';
 export default function fleetRouter({ pool, wrap, fail }) {
   const router = express.Router();
 
-  router.get('/fleet', requireFleetRead, wrap(async (_req, res) => {
+  router.get('/fleet', requireFleetRead, wrap(async (req, res) => {
     const [units, location] = await Promise.all([
       pool.query(`SELECT u.id,u.numero_economico,u.placas,u.tipo_unidad,u.marca,u.modelo,u.anio,u.capacidad_kg,u.capacidad_pallets,u.hazmat,u.refrigerada,u.proveedor_id,p.razon_social AS proveedor,u.estatus,
         arrival.ocurrido_at AS ultima_llegada_at,arrival_user.nombre AS llegada_por,

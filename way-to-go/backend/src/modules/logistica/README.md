@@ -31,6 +31,7 @@ Las mejoras del perfil de Clientes requieren aplicar manualmente y una sola vez 
 | POST | `/api/logistica/fleet/:id/block` | Bloquear una unidad con motivo, solo después de una llegada registrada |
 | POST | `/api/logistica/fleet/:id/release` | Liberar manualmente un bloqueo activo |
 | GET | `/api/logistica/customers`, `/units`, `/operators`, `/providers`, `/catalogs` | Consultar catálogos |
+| POST | `/api/logistica/units` | Dar de alta una unidad con número económico y tipo obligatorios; `flota.editar` |
 | POST | `/api/logistica/customers` | Crear cliente |
 | PATCH | `/api/logistica/customers/:id` | Editar perfil comercial y datos fiscales del cliente |
 | PATCH | `/api/logistica/customers/:id/active` | Desactivar o reactivar cliente |

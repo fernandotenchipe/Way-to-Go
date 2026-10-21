@@ -8,7 +8,7 @@ import { unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import pool, { query } from '../../../shared/database/db.js';
-import { requireCostRead, requireCreateTrip, requireExtraApproval, requireFinanceRole, requireLogisticsUser, requireTrafficRole, requireTripEdit, requireTripRead } from '../middleware/auth.js';
+import { requireCostRead, requireCreateTrip, requireExtraApproval, requireFinanceRole, requireFleetEdit, requireLogisticsUser, requireTrafficRole, requireTripEdit, requireTripRead } from '../middleware/auth.js';
 
 import { validateAddresses, insertCustomerAddresses } from '../services/customer-addresses.js';
 
@@ -720,6 +720,27 @@ router.patch('/addresses/:id/active', requireTripEdit, wrap(async (req, res) => 
 router.get('/units', requireTripRead, wrap(async (_req, res) => { const { rows } = await query(`SELECT u.*,p.razon_social AS proveedor FROM tms.unidades u LEFT JOIN tms.proveedores p ON p.id=u.proveedor_id ORDER BY u.numero_economico`); res.json({ success: true, data: rows }); }));
 router.get('/operators', requireTripRead, wrap(async (_req, res) => { const { rows } = await query(`SELECT o.*,p.razon_social AS proveedor FROM tms.operadores o LEFT JOIN tms.proveedores p ON p.id=o.proveedor_id ORDER BY o.nombre`); res.json({ success: true, data: rows }); }));
 router.get('/providers', requireTripRead, wrap(async (_req, res) => { const { rows } = await query('SELECT * FROM tms.proveedores ORDER BY razon_social'); res.json({ success: true, data: rows }); }));
+router.post('/units', requireFleetEdit, wrap(async (req, res) => {
+  const body = req.body || {};
+  const numero = typeof body.numero_economico === 'string' ? body.numero_economico.trim() : '';
+  const tipo = typeof body.tipo_unidad === 'string' ? body.tipo_unidad.trim() : '';
+  const optionalText = (value, max) => value == null || (typeof value === 'string' && value.trim().length <= max);
+  const validPositive = (value) => value == null || (Number.isFinite(Number(value)) && Number(value) > 0);
+  if (!numero || numero.length > 80 || !tipo || tipo.length > 100
+    || !optionalText(body.placas, 30) || !optionalText(body.marca, 80) || !optionalText(body.modelo, 80)
+    || (body.anio != null && (!Number.isInteger(Number(body.anio)) || Number(body.anio) < 1900 || Number(body.anio) > 2200))
+    || !validPositive(body.capacidad_kg) || (body.capacidad_pallets != null && (!Number.isInteger(Number(body.capacidad_pallets)) || Number(body.capacidad_pallets) <= 0))
+    || (body.proveedor_id != null && !isUuid(body.proveedor_id))) return fail(res, 400, 'Revisa el número económico, tipo y datos de capacidad de la unidad');
+  const demoBypass = process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true' && numero.toUpperCase().startsWith('DEMO-');
+  if (!isUuid(req.user.id) && !demoBypass) return fail(res, 403, 'Inicia sesión con un usuario TMS válido para dar de alta una unidad');
+  const { rows: [unit] } = await query(`INSERT INTO tms.unidades(numero_economico,placas,tipo_unidad,marca,modelo,anio,capacidad_kg,capacidad_pallets,hazmat,refrigerada,proveedor_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(numero_economico) DO NOTHING RETURNING *`,
+  [numero, body.placas?.trim() || null, tipo, body.marca?.trim() || null, body.modelo?.trim() || null, body.anio ?? null,
+    body.capacidad_kg ?? null, body.capacidad_pallets ?? null, body.hazmat === true, body.refrigerada === true, body.proveedor_id || null]);
+  if (unit) return res.status(201).json({ success: true, data: unit, created: true });
+  const { rows: [existing] } = await query('SELECT * FROM tms.unidades WHERE numero_economico=$1', [numero]);
+  return res.json({ success: true, data: existing, created: false });
+}));
 router.get('/catalogs', requireTripRead, wrap(async (_req, res) => {
   const [services, evidence, costs, extras] = await Promise.all([
     query('SELECT * FROM tms.tipos_servicio WHERE activo ORDER BY nombre'),

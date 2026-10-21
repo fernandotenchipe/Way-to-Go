@@ -38,6 +38,7 @@ export default function FleetScreen() {
   const [units, setUnits] = useState<LogisticsFleetUnit[]>([]);
   const [location, setLocation] = useState<LogisticsFleetLocation | null>(null);
   const [calendar, setCalendar] = useState<LogisticsFleetEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -50,9 +51,11 @@ export default function FleetScreen() {
   const [filterStatus, setFilterStatus] = useState('TODAS');
 
   const load = useCallback(async () => {
+    setLoading(true);
     setError('');
     try { const result = await logisticsApi.getFleet(); setUnits(result.data.units); setLocation(result.data.location); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo consultar la flota.'); }
+    finally { setLoading(false); }
   }, []);
   const loadCalendar = useCallback(async () => {
     const from = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
@@ -93,6 +96,7 @@ export default function FleetScreen() {
     <section className={`${card} p-5`}><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold text-[#0b1f3b]">Calendario de disponibilidad</h2><p className="mt-1 text-sm capitalize text-slate-500">{monthLabel}</p></div><div className="flex gap-2"><button className={subtle} aria-label="Mes anterior" onClick={() => setMonth(value => new Date(value.getFullYear(), value.getMonth()-1, 1))}>←</button><button className={subtle} onClick={() => setMonth(new Date())}>Hoy</button><button className={subtle} aria-label="Mes siguiente" onClick={() => setMonth(value => new Date(value.getFullYear(), value.getMonth()+1, 1))}>→</button></div></div><div className="mt-4 overflow-x-auto"><CatalogTable minWidth="760px" headings={['Unidad','Tipo de evento','Desde','Hasta','Detalle','Responsable']}>{calendar.map((item,index)=><tr key={`${item.unidad_id}-${item.tipo}-${item.desde}-${index}`}><td className="px-5 py-3 font-semibold text-[#0b1f3b]">{item.numero_economico}</td><td className="px-5 py-3 text-sm">{item.tipo === 'BLOQUEO' ? 'Bloqueo por atención' : 'Reserva de viaje'}</td><td className="px-5 py-3 text-sm">{dateText(item.desde)}</td><td className="px-5 py-3 text-sm">{dateText(item.hasta)}</td><td className="px-5 py-3 text-sm">{item.folio ? <Link href={`/logistica/viajes/${item.folio}`} className="underline">{item.folio}</Link> : item.motivo}</td><td className="px-5 py-3 text-sm">{item.responsable || '—'}</td></tr>)}</CatalogTable>{!calendar.length && <p className="p-5 text-sm text-slate-500">Sin reservas ni bloqueos para este mes.</p>}</div></section>
 
     {blockTarget && <div role="dialog" aria-modal="true" aria-labelledby="fleet-block-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><form className={`${card} w-full max-w-lg space-y-4 p-6`} onSubmit={event => { event.preventDefault(); const reason = String(new FormData(event.currentTarget).get('reason') || ''); void act(() => logisticsApi.blockFleetUnit(blockTarget.id, reason), `Unidad ${blockTarget.numero_economico} bloqueada.`); }}><h2 id="fleet-block-title" className="text-lg font-bold text-[#0b1f3b]">Bloquear {blockTarget.numero_economico}</h2><p className="text-sm text-slate-600">Solo puedes bloquearla después de registrar su llegada a WTG. El bloqueo la quitará de las asignaciones disponibles.</p><LogisticsFormField label="Motivo"><textarea name="reason" required maxLength={1000} className={field} placeholder="Describe por qué requiere atención"/></LogisticsFormField><div className="flex justify-end gap-2"><button type="button" className={subtle} onClick={() => setBlockTarget(null)}>Cancelar</button><button disabled={busy} className={primary}>{busy ? 'Guardando…' : 'Confirmar bloqueo'}</button></div></form></div>}
-    {!units.length && !error && <p role="status" className="text-sm text-slate-500">Consultando unidades desde el servicio de Logística…</p>}
+    {loading && !units.length && !error && <p role="status" className="text-sm text-slate-500">Consultando unidades desde el servicio de Logística…</p>}
+    {!loading && !units.length && !error && <p className="text-sm text-slate-500">La API respondió correctamente, pero todavía no hay unidades registradas para mostrar.</p>}
   </div>;
 }
