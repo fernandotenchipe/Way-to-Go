@@ -4,6 +4,12 @@ Este módulo organiza la operación de viajes y su expediente bajo `/api/logisti
 
 ## Base de datos
 
+### Propuesta de Carta Porte
+
+La migración `database/migrations/20261021_carta_porte_catalogos_documentos.sql` contiene las ampliaciones y tablas para catálogos, CFDI, Carta Porte, múltiples mercancías/pedimentos e intentos de timbrado. **Solo se generó el archivo; no se ejecutó.** El [diseño e implementación del backend](docs/carta-porte-backend.md) describe los endpoints montados en `routes/carta-porte.js`, permisos, contratos y conciliación. Los servicios de captura, auditoría, control de revisión, almacenamiento privado local y operaciones fiscales están implementados. La validación fiscal completa, el PAC y el despliegue del worker requieren configuración; no hay timbrado real habilitado. La pantalla conserva su modo demostración.
+
+Las pruebas `node --test tests/logistica/backend/*.test.js`, desde la raíz de la app, incluyen `carta-porte.test.js` y usan dobles en memoria, sin ejecutar migraciones ni conectarse a PostgreSQL. El módulo nuevo devuelve 503 si falta el esquema y exige permisos e identidad TMS real incluso con el bypass de desarrollo activo.
+
 El contrato de datos es el esquema PostgreSQL `tms` del diseño compartido en el chat **Revisar archivos de DB y SQL**. La carpeta `database` conserva el SQL, el diccionario y el documento de diseño. El SQL es una instalación inicial de una sola ejecución; no lo ejecutes como actualización sobre tablas existentes. No se aplicó a ninguna base durante este trabajo.
 
 El esquema usa UUID, folio de viaje generado por secuencia, estados operativos separados de facturación, y vistas para evidencias y preparación de facturación. RLS está habilitado sin políticas y el esquema revoca acceso a `PUBLIC`; la API requiere usuario, rol y permiso definidos en `tms.usuarios`, `usuario_roles` y `rol_permisos`. Las asignaciones rol-permiso siguen pendientes en el diseño, así que las operaciones protegidas responderán sin permiso hasta que exista una matriz aprobada.

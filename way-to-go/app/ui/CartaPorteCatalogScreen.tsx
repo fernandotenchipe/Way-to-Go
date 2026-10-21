@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react';
-import { ArchiveBoxIcon, BuildingOffice2Icon, CubeIcon, IdentificationIcon, MapPinIcon, TruckIcon, UserGroupIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { CatalogPageHeader, CatalogSearch, CatalogTable } from './LogisticsCatalogComponents';
+import { ArchiveBoxIcon, BuildingOffice2Icon, CubeIcon, IdentificationIcon, MapPinIcon, PlusIcon, TruckIcon, UserGroupIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { CatalogPageHeader, CatalogSearch, CatalogTable, LogisticsFormField, logisticsFieldClassName } from './LogisticsCatalogComponents';
 
 type CatalogRow = { name: string; description: string; values: [string, string]; details?: Array<[string, string]> };
 type Catalog = {
@@ -100,6 +100,11 @@ const catalogs: Catalog[] = [
 ];
 
 const card = 'rounded-xl border border-slate-200 bg-white shadow-sm';
+const singularNames: Record<string, string> = {
+  mercancias: 'mercancía', clientes: 'cliente', remitentes: 'remitente o destinatario',
+  ubicaciones: 'ubicación', unidades: 'unidad', remolques: 'remolque',
+  operadores: 'operador', emisor: 'empresa emisora',
+};
 
 function CatalogDetail({ catalog, row, onClose }: { catalog: Catalog; row: CatalogRow; onClose: () => void }) {
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -130,21 +135,37 @@ export default function CartaPorteCatalogScreen() {
   const [selected, setSelected] = useState('mercancias');
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState<CatalogRow | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [examples, setExamples] = useState<Record<string, CatalogRow[]>>({});
   const catalog = catalogs.find((item) => item.id === selected)!;
-  const rows = catalog.rows.filter((row) => [row.name, row.description, ...row.values].join(' ').toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')));
+  const allRows = [...catalog.rows, ...(examples[selected] || [])];
+  const rows = allRows.filter((row) => [row.name, row.description, ...row.values].join(' ').toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')));
 
   return <div className="space-y-6 p-6 lg:p-8">
     <CatalogPageHeader eyebrow="Operación · TMS" title="Catálogo de Carta Porte" description="Prepara y consulta la información que usarás al crear tus viajes." />
     <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>Vista de demostración.</strong> Todos los registros de esta pantalla son ejemplos. Todavía no consulta ni guarda datos del catálogo y no realiza timbrado.</p>
-    <nav aria-label="Catálogos de Carta Porte" className="flex flex-wrap gap-2">{catalogs.map((item) => <button key={item.id} type="button" aria-pressed={selected === item.id} onClick={() => { setSelected(item.id); setQuery(''); setDetail(null); }} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${selected === item.id ? 'border-[#0b1f3b] bg-[#0b1f3b] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}><item.icon className="h-4 w-4" />{item.title}</button>)}</nav>
+    <nav aria-label="Catálogos de Carta Porte" className="flex flex-wrap gap-2">{catalogs.map((item) => <button key={item.id} type="button" aria-pressed={selected === item.id} onClick={() => { setSelected(item.id); setQuery(''); setDetail(null); setAdding(false); }} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${selected === item.id ? 'border-[#0b1f3b] bg-[#0b1f3b] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}><item.icon className="h-4 w-4" />{item.title}</button>)}</nav>
     <section className={`${card} overflow-hidden`} aria-labelledby="carta-porte-catalog-title">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5"><div><h2 id="carta-porte-catalog-title" className="text-lg font-bold text-[#0b1f3b]">{catalog.title}</h2><p className="mt-1 text-sm text-slate-500">{catalog.description}</p></div>{catalog.manage && <Link href={catalog.manage.href} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{catalog.manage.label}</Link>}</div>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5"><div><h2 id="carta-porte-catalog-title" className="text-lg font-bold text-[#0b1f3b]">{catalog.title}</h2><p className="mt-1 text-sm text-slate-500">{catalog.description}</p></div><div className="flex flex-wrap items-center gap-2">{catalog.manage && <Link href={catalog.manage.href} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{catalog.manage.label}</Link>}<button type="button" onClick={() => setAdding(true)} aria-expanded={adding} aria-controls="carta-porte-add-form" className="inline-flex items-center gap-2 rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white"><PlusIcon className="h-4 w-4" />Agregar {singularNames[selected]}</button></div></div>
+      {adding && <form id="carta-porte-add-form" className="space-y-4 border-b border-slate-100 bg-slate-50 p-5" onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const name = String(form.get('name') || '').trim();
+        if (!name) { (event.currentTarget.elements.namedItem('name') as HTMLInputElement).focus(); return; }
+        const row: CatalogRow = { name, description: 'Ejemplo agregado en esta vista', values: [String(form.get('value0') || '').trim() || 'Por completar', String(form.get('value1') || '').trim() || 'Por completar'] };
+        setExamples((current) => ({ ...current, [selected]: [...(current[selected] || []), row] }));
+        setAdding(false); setQuery('');
+      }}>
+        <div><h3 className="text-sm font-bold text-[#0b1f3b]">Agregar {singularNames[selected]}</h3><p className="mt-1 text-xs text-slate-500">Captura inicial de demostración. El ejemplo se agrega a esta tabla y se pierde al recargar; la ficha completa se habilitará después.</p></div>
+        <div className="grid gap-4 sm:grid-cols-3"><LogisticsFormField label={`${catalog.headings[0]} *`}><input name="name" required maxLength={180} className={logisticsFieldClassName} /></LogisticsFormField>{catalog.headings.slice(1).map((heading, index) => <LogisticsFormField key={heading} label={heading}><input name={`value${index}`} maxLength={180} className={logisticsFieldClassName} /></LogisticsFormField>)}</div>
+        <div className="flex gap-2"><button type="submit" className="rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white">Agregar ejemplo</button><button type="button" onClick={() => setAdding(false)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button></div>
+      </form>}
       <div className="p-5"><CatalogSearch value={query} onChange={setQuery} placeholder={`Buscar en ${catalog.title.toLocaleLowerCase('es')}`} /></div>
       <CatalogTable headings={[...catalog.headings, 'Estado', 'Acción']}>
-        {rows.map((row) => <tr key={row.name} className="hover:bg-slate-50/80"><td className="px-5 py-4"><p className="font-bold text-[#0b1f3b]">{row.name}</p><p className="mt-1 text-xs text-slate-500">{row.description}</p></td>{row.values.map((value, index) => <td key={index} className="px-5 py-4 text-slate-600">{value}</td>)}<td className="px-5 py-4"><span className="whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Por completar</span></td><td className="px-5 py-4"><button type="button" aria-label={`Ver ficha de ${row.name}`} onClick={() => setDetail(row)} className="whitespace-nowrap font-semibold text-blue-800 hover:underline">Ver ficha</button></td></tr>)}
+        {rows.map((row, rowIndex) => <tr key={`${row.name}-${rowIndex}`} className="hover:bg-slate-50/80"><td className="px-5 py-4"><p className="font-bold text-[#0b1f3b]">{row.name}</p><p className="mt-1 text-xs text-slate-500">{row.description}</p></td>{row.values.map((value, index) => <td key={index} className="px-5 py-4 text-slate-600">{value}</td>)}<td className="px-5 py-4"><span className="whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Por completar</span></td><td className="px-5 py-4"><button type="button" aria-label={`Ver ficha de ${row.name}`} onClick={() => setDetail(row)} className="whitespace-nowrap font-semibold text-blue-800 hover:underline">Ver ficha</button></td></tr>)}
         {!rows.length && <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">No hay ejemplos que coincidan con la búsqueda.</td></tr>}
       </CatalogTable>
-      <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400" aria-live="polite">{rows.length} de {catalog.rows.length} registros de ejemplo</p>
+      <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400" aria-live="polite">{rows.length} de {allRows.length} registros de ejemplo</p>
     </section>
     <section className={`${card} flex items-start gap-3 p-5`}><TruckIcon className="h-5 w-5 shrink-0 text-slate-500" /><div><h2 className="text-sm font-bold text-[#0b1f3b]">La Carta Porte se completará en el viaje</h2><p className="mt-1 text-sm text-slate-500">El catálogo reunirá los datos reutilizables. Dentro del viaje se confirmará la carga, se completará la información pendiente y se realizará el timbrado.</p></div></section>
     {detail && <CatalogDetail catalog={catalog} row={detail} onClose={() => setDetail(null)} />}
