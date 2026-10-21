@@ -29,12 +29,12 @@ function Pill({ children }: { children: string }) {
 }
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) { return <div className={`${cls} p-5`}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-[#0b1f3b]">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></div>; }
 function Table({ rows, headings, children }: { rows?: Trip[]; headings: string[]; children?: ReactNode }) { return <div className={`${cls} overflow-hidden`}><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500"><tr>{headings.map(h => <th key={h} className="px-5 py-3.5">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{children ?? rows?.map(t => <tr key={t.folio} className="hover:bg-slate-50/80"><td className="px-5 py-4"><Link className="font-bold text-[#0b1f3b] hover:underline" href={`/logistica/viajes/${t.folio}`}>{t.folio}</Link><p className="mt-1 text-xs text-slate-400">{t.client}</p></td><td className="px-5 py-4 text-slate-700">{t.route}</td><td className="px-5 py-4"><span className="font-medium text-slate-700">{t.unit}</span><p className="mt-1 text-xs text-slate-400">{t.driver}</p></td><td className="px-5 py-4"><Pill>{t.status}</Pill></td><td className="px-5 py-4 text-slate-500">{t.update}</td><td className="px-5 py-4 text-slate-600">{t.eta}</td><td className="px-5 py-4"><Link aria-label={`Abrir ${t.folio}`} href={`/logistica/viajes/${t.folio}`} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ChevronRightIcon className="h-5 w-5" /></Link></td></tr>)}</tbody></table></div></div>; }
+function RecentTripList({ rows }: { rows: Trip[] }) { return <div className={`${cls} divide-y divide-slate-100 overflow-hidden`}>{rows.map(t => <Link key={t.folio} href={`/logistica/viajes/${t.folio}`} className="group grid gap-3 px-4 py-4 transition hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-5"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-bold text-[#0b1f3b] group-hover:underline">{t.folio}</span><span className="text-slate-300">·</span><span className="truncate text-sm text-slate-600">{t.client}</span></div><p className="mt-1 truncate text-sm text-slate-700">{t.route}</p></div><div className="flex items-center gap-3"><Pill>{t.status}</Pill><ChevronRightIcon className="h-4 w-4 text-slate-400"/></div><div className="flex gap-4 text-xs text-slate-500 sm:justify-end"><span>{t.update}</span><span>ETA: {t.eta}</span></div></Link>)}</div>; }
 
 export function TripsScreen() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('Todos');
   const [trips, setTrips] = useState<LogisticsTrip[]>([]);
-  const [dashboard, setDashboard] = useState<LogisticsDashboardData['summary'] | null>(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,18 +47,14 @@ export function TripsScreen() {
     setError('');
     try {
       const selectedStatus = Object.entries(tripStatusLabels).find(([, label]) => label === status)?.[0] as LogisticsTrip['estado_operativo'] | undefined;
-      const [response, metrics] = await Promise.all([
-        logisticsApi.getTrips({ limit: 50, offset: nextOffset, ...(query.trim() ? { q: query.trim() } : {}), ...(selectedStatus ? { estado: selectedStatus } : {}) }),
-        nextOffset === 0 ? logisticsApi.getDashboard().catch(() => null) : Promise.resolve(null),
-      ]);
+      const response = await logisticsApi.getTrips({ limit: 50, offset: nextOffset, ...(query.trim() ? { q: query.trim() } : {}), ...(selectedStatus ? { estado: selectedStatus } : {}) });
       if (version !== requestVersion.current) return;
       setTrips(current => append ? [...current, ...response.data] : response.data);
-      if (metrics) setDashboard(metrics.data.summary);
       setOffset(nextOffset + response.data.length);
       setHasMore(response.data.length === 50);
     } catch (reason) {
       if (version !== requestVersion.current) return;
-      setTrips([]); setDashboard(null); setHasMore(false);
+      setTrips([]); setHasMore(false);
       setError(reason instanceof Error ? reason.message : 'No se pudieron consultar los viajes.');
     } finally { if (version === requestVersion.current) { setLoading(false); setLoadingMore(false); } }
   }, [query, status]);
@@ -68,7 +64,6 @@ export function TripsScreen() {
   return <div className="space-y-6 p-6 lg:p-8">
     <Title eyebrow="Operación · TMS" title="Viajes" description="Administra cada servicio desde la programación hasta el cierre." action={<Link href="/logistica/viajes/nuevo" className={button}><PlusIcon className="h-4 w-4"/>Crear viaje</Link>}/>
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>No se pudieron cargar viajes reales: {error}</span><button className={subtle} onClick={() => void load(0)}>Reintentar</button></div>}
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Viajes activos" value={dashboard ? String(dashboard.viajes_activos) : loading ? '…' : '—'} note="Confirmados, programados y en curso"/><Kpi label="En operación" value={dashboard ? String(dashboard.en_operacion) : loading ? '…' : '—'} note="Con avance operativo iniciado"/><Kpi label="Sin actualización" value={dashboard ? String(dashboard.sin_actualizacion) : loading ? '…' : '—'} note="Requieren seguimiento"/><Kpi label="Entregados" value={dashboard ? String(dashboard.entregados) : loading ? '…' : '—'} note="Registrados en la base"/></div>
     <div className="flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar folio, cliente, ruta, operador o carga" className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#c79d00]"/></label><select value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"><option value="Todos">Todos los estados</option>{Object.values(tripStatusLabels).map(label=><option key={label}>{label}</option>)}</select></div>
     {loading && !trips.length ? <p role="status" className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">Cargando viajes de la base…</p> : filtered.length ? <><Table rows={filtered} headings={['Viaje / cliente','Ruta','Unidad / operador','Estatus','Actualización','ETA','']}/><p className="text-xs text-slate-500">Mostrando {filtered.length} viaje{filtered.length === 1 ? '' : 's'}{hasMore ? ' de los registros consultados' : ''}.</p></> : !error && <p className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">{query || status !== 'Todos' ? 'Ningún viaje coincide con la búsqueda o el estado.' : 'Todavía no hay viajes registrados.'}</p>}
     {hasMore && <div className="flex justify-center"><button disabled={loadingMore} className={subtle} onClick={() => void load(offset, true)}>{loadingMore ? 'Cargando…' : 'Cargar más viajes'}</button></div>}
@@ -86,8 +81,8 @@ export function LogisticsDashboard() {
  const loadDashboard = useCallback(async () => {
   setLoading(true); setError('');
   try {
-   const [dashboardResponse, tripsResponse] = await Promise.all([logisticsApi.getDashboard(), logisticsApi.getTrips({ limit: 8 })]);
-   const recentTrips = tripsResponse.data.filter(trip => !['ENTREGADO', 'CANCELADO'].includes(trip.estado_operativo));
+   const [dashboardResponse, tripsResponse] = await Promise.all([logisticsApi.getDashboard(), logisticsApi.getTrips({ limit: 20 })]);
+   const recentTrips = tripsResponse.data.filter(trip => !['ENTREGADO', 'CANCELADO'].includes(trip.estado_operativo)).slice(0, 5);
    setDashboard({ summary: dashboardResponse.data.summary, recent_trips: recentTrips });
   }
   catch (reason) { setDashboard(null); setError(reason instanceof Error ? reason.message : 'No se pudo consultar el dashboard.'); }
@@ -106,8 +101,8 @@ export function LogisticsDashboard() {
    <Kpi label="Listos para facturar" value={summary ? String(summary.listos_para_facturar) : loading ? '…' : '—'} note="Según el expediente operativo"/>
   </div>
   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><QuickCard href="/logistica/viajes" title="Viajes" detail="Programación, asignaciones y estatus"/><QuickCard href="/logistica/evidencias" title="Expedientes" detail="POD y documentos requeridos"/><QuickCard href="/logistica/clientes" title="Clientes y tarifas" detail="Direcciones y convenios vigentes"/><QuickCard href="/logistica/costos" title="Costos y extras" detail="Validación de costos por viaje"/></div>
-  <div className="flex items-end justify-between"><div><h2 className="text-lg font-bold text-[#0b1f3b]">Viajes recientes</h2><p className="mt-1 text-sm text-slate-500">Los viajes creados y actualizados aparecen aquí desde el backend.</p></div><Link href="/logistica/viajes" className="text-sm font-semibold text-[#0b1f3b]">Ver todos →</Link></div>
-  {loading && !dashboard ? <p role="status" className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">Cargando indicadores y viajes…</p> : dashboard && rows.length ? <Table rows={rows} headings={['Viaje / cliente','Ruta','Unidad / operador','Estatus','Actualización','ETA','']}/> : !error && <p className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay viajes activos para mostrar.</p>}
+  <div className="flex items-end justify-between gap-4"><div><h2 className="text-lg font-bold text-[#0b1f3b]">Seguimiento reciente</h2><p className="mt-1 text-sm text-slate-500">Hasta 5 viajes activos para revisar rápidamente.</p></div><Link href="/logistica/viajes" className="shrink-0 text-sm font-semibold text-[#0b1f3b] hover:underline">Ver todos →</Link></div>
+  {loading && !dashboard ? <p role="status" className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">Cargando resumen operativo…</p> : dashboard && rows.length ? <RecentTripList rows={rows}/> : !error && <p className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay viajes activos para mostrar.</p>}
  </div>;
 }
 
