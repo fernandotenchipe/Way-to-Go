@@ -24,6 +24,12 @@ Las mejoras del perfil de Clientes requieren aplicar manualmente y una sola vez 
 | PATCH | `/api/logistica/trips/:folio/status` | Registrar avance operativo y evento |
 | GET | `/api/logistica/trips/:folio/events` | Consultar bitácora |
 | GET, POST | `/api/logistica/trips/:folio/evidence` | Consultar checklist y subir entregas |
+| GET | `/api/logistica/fleet` | Consultar unidades, bloqueo vigente, última llegada, documentos y reserva próxima |
+| GET | `/api/logistica/fleet/calendar?from=...&until=...` | Consultar reservas y bloqueos en un periodo |
+| PUT | `/api/logistica/fleet/location` | Configurar la dirección y coordenadas de las instalaciones WTG |
+| POST | `/api/logistica/fleet/:id/arrival` | Registrar manualmente la llegada de una unidad a WTG |
+| POST | `/api/logistica/fleet/:id/block` | Bloquear una unidad con motivo, solo después de una llegada registrada |
+| POST | `/api/logistica/fleet/:id/release` | Liberar manualmente un bloqueo activo |
 | GET | `/api/logistica/customers`, `/units`, `/operators`, `/providers`, `/catalogs` | Consultar catálogos |
 | POST | `/api/logistica/customers` | Crear cliente |
 | PATCH | `/api/logistica/customers/:id` | Editar perfil comercial y datos fiscales del cliente |
@@ -64,6 +70,8 @@ La pantalla guarda inicialmente `estado_operativo: CONFIRMADO`, sin exigir recur
 Si falla la consulta inicial del servicio, la pantalla identifica el modo demo y usa almacenamiento local separado. Un error durante el guardado conectado no cambia a modo demo ni presenta el viaje como guardado. Los folios `DEMO-*` solo se consultan en el navegador, nunca en la API. Los viajes registrados y las demostraciones se muestran por separado en el listado.
 
 El alta confirmada requiere aplicar manualmente database/migrations/20261021_viajes_confirmados.sql sobre el esquema existente con las migraciones previas de Clientes. Solo altera las reglas y el valor inicial del estado en tms.viajes; conserva las reservas y restricciones de recursos. La API bloquea el alta con 503 antes de insertar datos si falta esta migración. No se ejecutó en Supabase; schema.sql permanece intacto. Notas y auditoría reutilizan viaje_eventos. Las pruebas `node --test tests/logistica/backend/*.test.js` usan dobles en memoria sin conexión PostgreSQL. Desde la raíz de la app, `node --test tests/logistica/frontend/trip-dates.test.ts` verifica zonas horarias y cambios de horario con Node 24.
+
+Flota usa `GET /fleet` para leer recursos existentes y calendario. La migración incremental `database/migrations/20261021_flota_llegadas_bloqueos.sql` crea el punto único de instalaciones WTG, la bitácora de llegadas/bloqueos/liberaciones y los permisos `flota.ver` y `flota.editar`. Debe aplicarse manualmente antes de usar estas pantallas y rutas; no se ejecutó en la base. Asigna esos permisos a los roles autorizados cuando se apruebe la matriz de acceso. El sistema guarda el actor y la hora desde la sesión: bloquear requiere una llegada previa y ningún viaje activo o reservado; liberar es manual. Los datos de quién/cuándo y el historial se exponen solo a usuarios con `flota.editar` hasta que se defina su visibilidad. Las unidades en MANTENIMIENTO quedan excluidas de la selección de asignación existente, y no se habilita GPS.
 
 Los archivos de evidencia se guardan localmente en `backend/uploads/logistica`. La tabla `tms.archivos` registra su metadato. Para producción se debe definir almacenamiento privado y políticas de acceso a archivos.
 

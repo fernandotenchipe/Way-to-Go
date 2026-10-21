@@ -66,3 +66,5 @@ export const requireTripEdit = requirePermission('viajes.editar', 'Se requiere p
 export const requireTrafficRole = requirePermission('viajes.estatus', 'Se requiere permiso para operar viajes');
 export const requireCreateTrip = requirePermission('viajes.crear', 'Se requiere permiso para crear viajes');
 export const requireExtraApproval = requirePermission('extras.autorizar', 'Se requiere permiso para autorizar extras');
+export const requireFleetRead = requirePermission('flota.ver', 'Se requiere permiso para consultar flota');
+export const requireFleetEdit = requirePermission('flota.editar', 'Se requiere permiso para operar flota');

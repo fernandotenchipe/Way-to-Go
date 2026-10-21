@@ -34,6 +34,9 @@ export interface LogisticsTrip {
 }
 
 export interface LogisticsResource { id: string; nombre: string; proveedor_id?: string | null }
+export interface LogisticsFleetUnit { id: string; numero_economico: string; placas: string | null; tipo_unidad: string; marca: string | null; modelo: string | null; anio: number | null; capacidad_kg: number | null; capacidad_pallets: number | null; hazmat: boolean; refrigerada: boolean; proveedor_id: string | null; proveedor: string | null; estatus: 'ACTIVA' | 'MANTENIMIENTO' | 'BAJA'; ultima_llegada_at: string | null; llegada_por: string | null; bloqueo_id: string | null; bloqueada_at: string | null; bloqueo_motivo: string | null; bloqueada_por: string | null; proximo_folio: string | null; proxima_reserva_desde: string | null; proxima_reserva_hasta: string | null; vigentes: number; vencidos: number }
+export interface LogisticsFleetLocation { direccion: string; latitud: number; longitud: number; updated_at: string }
+export interface LogisticsFleetEvent { unidad_id: string; numero_economico: string; tipo: 'VIAJE' | 'BLOQUEO'; desde: string; hasta: string | null; motivo: string | null; folio: string | null; responsable: string | null }
 export interface LogisticsTripEvent { id: string; tipo: string; comentario: string | null; ocurrido_at: string; created_at?: string; registrado_por_nombre?: string; estado_nuevo?: string | null; datos?: { categoria?: string; antes?: Record<string, unknown>; despues?: Record<string, unknown> } }
 export interface LogisticsTripRecord { tiempos: Record<string, string | null>; eventos: LogisticsTripEvent[]; unidades: LogisticsResource[]; operadores: LogisticsResource[]; cajas: LogisticsResource[]; proveedores: LogisticsResource[] }
 export interface LogisticsEvidence { id: string; tipo_evidencia_id: string; nombre: string; estado: string; obligatoria_facturar?: boolean; entregas: Array<{ archivo_id: string; nombre: string; estado: string; created_at: string; subida_por_nombre?: string; mime_type: string }> | null }
@@ -296,6 +299,12 @@ class LogisticsApi {
   }
 
   getTripSession() { return this.request<LogisticsTripSession>('session'); }
+  getFleet() { return this.request<{ units: LogisticsFleetUnit[]; location: LogisticsFleetLocation | null }>('fleet'); }
+  getFleetCalendar(from: string, until: string) { const search = new URLSearchParams({ from, until }); return this.request<LogisticsFleetEvent[]>(`fleet/calendar?${search}`); }
+  saveFleetLocation(input: { direccion: string; latitud: number; longitud: number }) { return this.request<LogisticsFleetLocation>('fleet/location', { method: 'PUT', body: JSON.stringify(input) }); }
+  registerFleetArrival(id: string) { return this.request(`fleet/${encodeURIComponent(id)}/arrival`, { method: 'POST', body: JSON.stringify({}) }); }
+  blockFleetUnit(id: string, motivo: string) { return this.request(`fleet/${encodeURIComponent(id)}/block`, { method: 'POST', body: JSON.stringify({ motivo }) }); }
+  releaseFleetUnit(id: string) { return this.request(`fleet/${encodeURIComponent(id)}/release`, { method: 'POST', body: JSON.stringify({}) }); }
   getTripRecord(folio: string) { return this.request<LogisticsTripRecord>(`trips/${encodeURIComponent(folio)}/record`); }
   getTripEvidence(folio: string) { return this.request<LogisticsEvidence[]>(`trips/${encodeURIComponent(folio)}/evidence`); }
   editTripRecord(folio: string, input: { tipo_carga: string; instrucciones: string; motivo: string; updated_at: string; cita_carga_at?: string; salida_programada_at?: string; entrega_estimada_at?: string; descarga_programada_at?: string | null }) { return this.request(`trips/${encodeURIComponent(folio)}/record`, { method: 'PATCH', body: JSON.stringify(input) }); }
