@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error Node ejecuta este archivo directamente con soporte TypeScript.
-import { tripDateToIso } from './trip-dates.ts';
+import { tripDateToIso } from '../../../app/services/trip-dates.ts';
 
 test('Las citas usan la zona del lugar y permiten comparar ciudades diferentes', () => {
   assert.equal(tripDateToIso('2026-10-20T08:00', 'America/Mexico_City'), '2026-10-20T14:00:00.000Z');

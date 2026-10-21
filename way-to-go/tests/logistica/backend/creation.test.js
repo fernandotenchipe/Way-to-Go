@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import router from '../routes/index.js';
-import pool from '../../../shared/database/db.js';
-import { validateAddresses } from './customer-addresses.js';
+import router from '../../../backend/src/modules/logistica/routes/index.js';
+import pool from '../../../backend/src/shared/database/db.js';
+import { validateAddresses } from '../../../backend/src/modules/logistica/services/customer-addresses.js';
 
 const uuid = (digit) => `${digit.repeat(8)}-${digit.repeat(4)}-4${digit.repeat(3)}-8${digit.repeat(3)}-${digit.repeat(12)}`;
 const address = (nombre) => ({ nombre, calle: 'QA Calle 1', ciudad: 'QA Ciudad', estado: 'QA Estado', pais: 'MX' });

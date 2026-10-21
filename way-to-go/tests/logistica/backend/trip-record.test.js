@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import tripRecordRouter from './trip-record.js';
+import tripRecordRouter from '../../../backend/src/modules/logistica/routes/trip-record.js';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const stamp = '2026-10-21T10:00:00.000Z';
