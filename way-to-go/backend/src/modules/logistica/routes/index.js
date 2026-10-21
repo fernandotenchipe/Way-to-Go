@@ -96,7 +96,8 @@ router.get('/trips', requireTripRead, wrap(async (req, res) => {
     LEFT JOIN tms.unidades u ON u.id=v.unidad_id LEFT JOIN tms.operadores o ON o.id=v.operador_id
     WHERE ($1::text IS NULL OR v.estado_operativo=$1)
       AND ($2::uuid IS NULL OR v.cliente_id=$2)
-      AND ($3::text IS NULL OR v.folio::text ILIKE $3 OR c.razon_social ILIKE $3 OR v.tipo_carga ILIKE $3)
+      AND ($3::text IS NULL OR v.folio::text ILIKE $3 OR c.razon_social ILIKE $3 OR v.tipo_carga ILIKE $3
+        OR v.origen_snapshot::text ILIKE $3 OR v.destino_snapshot::text ILIKE $3 OR o.nombre ILIKE $3)
     ORDER BY v.created_at DESC LIMIT $4 OFFSET $5`, [estado || null, clientId || null, search, limit, offset]);
   res.json({ success: true, data: rows, pagination: { limit, offset, count: rows.length } });
 }));
