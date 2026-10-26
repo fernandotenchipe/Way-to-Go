@@ -34,6 +34,23 @@ export interface LogisticsTrip {
 }
 
 export interface LogisticsResource { id: string; nombre: string; proveedor_id?: string | null }
+export interface LogisticsOperator {
+  id: string; nombre: string; telefono: string | null; email: string | null;
+  tipo: 'PROPIO' | 'PROVEEDOR'; proveedor_id: string | null; proveedor?: string | null;
+  activo: boolean; rfc: string | null; numero_licencia: string | null; licencia_vence_el: string | null;
+  residencia_fiscal_sat: string | null; numero_registro_tributario: string | null;
+  domicilio_fiscal: Record<string, string | null>; updated_at: string;
+  documentos?: number; viaje_folio?: string | null; viaje_estado?: LogisticsTripStatus | null;
+  origen_snapshot?: Record<string, unknown> | null; destino_snapshot?: Record<string, unknown> | null;
+  reserva_desde?: string | null; reserva_hasta?: string | null;
+}
+export type LogisticsOperatorInput = Pick<LogisticsOperator, 'nombre' | 'telefono' | 'email' | 'tipo' | 'proveedor_id' | 'rfc' | 'numero_licencia' | 'licencia_vence_el' | 'residencia_fiscal_sat' | 'numero_registro_tributario' | 'domicilio_fiscal'>;
+export interface LogisticsOperatorDocument { id: string; tipo: string; folio: string | null; nombre_original: string; mime_type: string; size_bytes: number; emitido_el: string | null; vence_el: string | null; created_at: string; validado_at: string | null }
+export interface LogisticsOperatorDetail extends Omit<LogisticsOperator, 'documentos'> {
+  documentos: LogisticsOperatorDocument[];
+  viajes: Array<{ id: string; folio: string; cliente: string; estado_operativo: LogisticsTripStatus; reserva_desde: string | null; reserva_hasta: string | null; origen_snapshot: Record<string, unknown> | null; destino_snapshot: Record<string, unknown> | null; recursos_liberados_at: string | null }>;
+  historial: Array<{ id: string; accion: string; actor: string | null; created_at: string; datos: { antes?: Record<string, unknown>; despues?: Record<string, unknown>; nombre?: string; tipo?: string } }>;
+}
 export interface LogisticsFleetUnit { id: string; numero_economico: string; placas: string | null; tipo_unidad: string; marca: string | null; modelo: string | null; anio: number | null; capacidad_kg: number | null; capacidad_pallets: number | null; hazmat: boolean; refrigerada: boolean; proveedor_id: string | null; proveedor: string | null; estatus: 'ACTIVA' | 'MANTENIMIENTO' | 'BAJA'; ultima_llegada_at: string | null; llegada_por: string | null; bloqueo_id: string | null; bloqueada_at: string | null; bloqueo_motivo: string | null; bloqueada_por: string | null; proximo_folio: string | null; proxima_reserva_desde: string | null; proxima_reserva_hasta: string | null; vigentes: number; vencidos: number }
 export interface LogisticsFleetLocation { direccion: string; latitud: number; longitud: number; updated_at: string }
 export interface LogisticsFleetEvent { unidad_id: string; numero_economico: string; tipo: 'VIAJE' | 'BLOQUEO'; desde: string; hasta: string | null; motivo: string | null; folio: string | null; responsable: string | null }
@@ -300,6 +317,13 @@ class LogisticsApi {
   }
 
   getTripSession() { return this.request<LogisticsTripSession>('session'); }
+  getOperators(filters: { q?: string; status?: 'all' | 'active' | 'inactive'; limit?: number; offset?: number } = {}) { const search = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])); return this.request<LogisticsOperator[]>(`operators/manage?${search}`); }
+  getOperator(id: string) { return this.request<LogisticsOperatorDetail>(`operators/${encodeURIComponent(id)}`); }
+  createOperator(input: LogisticsOperatorInput) { return this.request<LogisticsOperator>('operators', { method: 'POST', body: JSON.stringify(input) }); }
+  updateOperator(id: string, input: LogisticsOperatorInput & { expected_updated_at: string }) { return this.request<LogisticsOperator>(`operators/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  setOperatorActive(id: string, activo: boolean, expected_updated_at: string) { return this.request<LogisticsOperator>(`operators/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ activo, expected_updated_at }) }); }
+  addOperatorDocument(id: string, input: FormData) { return this.request<LogisticsOperatorDocument>(`operators/${encodeURIComponent(id)}/documents`, { method: 'POST', body: input }); }
+  async getOperatorDocument(id: string, documentId: string) { const token = localStorage.getItem('auth_token'); const response = await fetch(`/api/logistica/operators/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}/download`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store' }); if (!response.ok) { const result = await response.json(); throw new Error(result.error || 'No se pudo descargar el documento'); } return response.blob(); }
   getFleet() { return this.request<{ units: LogisticsFleetUnit[]; location: LogisticsFleetLocation | null }>('fleet'); }
   createFleetUnit(input: { numero_economico: string; placas?: string | null; tipo_unidad: string; marca?: string | null; modelo?: string | null; anio?: number | null; capacidad_kg?: number | null; capacidad_pallets?: number | null; hazmat: boolean; refrigerada: boolean; proveedor_id?: string | null }) { return this.request<LogisticsFleetUnit>('units', { method: 'POST', body: JSON.stringify(input) }); }
   getFleetProviders() { return this.request<Array<{ id: string; razon_social: string }>>('providers'); }

@@ -1,6 +1,7 @@
 import express from 'express';
 import tripRecordRouter from './trip-record.js';
 import fleetRouter from './fleet.js';
+import operatorsRouter from './operators.js';
 import cartaPorteRouter from './carta-porte.js';
 import { createCartaPorteStorage } from '../services/carta-porte-storage.js';
 import multer from 'multer';
@@ -63,6 +64,7 @@ const upload = multer({
 
 router.get('/health', (_req, res) => res.json({ success: true, module: 'logistica', database_schema: 'tms', status: 'ready' }));
 router.use(requireLogisticsUser);
+router.use(operatorsRouter({ pool }));
 router.use(cartaPorteRouter({ pool, files: createCartaPorteStorage({ pool }) }));
 const requireActor = (req, res, next) => isUuid(req.user.id) ? next() : fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');
 router.use(tripRecordRouter({ pool, wrap, fail, isUuid }));

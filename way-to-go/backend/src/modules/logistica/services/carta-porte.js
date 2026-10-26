@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { catalogs, children, groups, headerFields, invoiceFields } from './carta-porte-config.js';
 import { reject, uuid, fields, only, object, revision, decimal, formatDecimal, multiplyDecimal } from './carta-porte-input.js';
 import { createFiscalOperations } from './carta-porte-operations.js';
+import { createOperatorService } from './operators.js';
 
 const editable = new Set(['BORRADOR','RECHAZADO']);
 const json = value => JSON.stringify(value);
@@ -35,6 +36,7 @@ function safeCatalog(c, row) {
 }
 
 export function createCartaPorteService({pool, provider = null, files = null}) {
+  const operators=createOperatorService({pool});
   async function transaction(action) {
     const db=await pool.connect();
     try { await db.query('BEGIN'); const result=await action(db); await db.query('COMMIT'); return result; }
@@ -199,6 +201,7 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
       if (!row) reject(404,'NOT_FOUND','Registro no encontrado'); return safeCatalog(c,row);
     },
     async catalogSave(name, resourceId, body, actor, activeOnly=false) {
+      if(name==='operators')return operators.save(resourceId,body,actor,activeOnly);
       const c=Object.hasOwn(catalogs,name)?catalogs[name]:null; if (!c) reject(404,'UNKNOWN_CATALOG','Catálogo inexistente');
       const {expected_updated_at,...input}=object(body);
       if(c.statusField&&activeOnly)reject(409,'USE_FLEET_WORKFLOW','El estado del recurso se gestiona desde Flota y sus bloqueos');
