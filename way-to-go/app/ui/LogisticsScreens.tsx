@@ -78,22 +78,20 @@ export function LogisticsDashboard() {
  const [dashboard, setDashboard] = useState<LogisticsDashboardData | null>(null);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState('');
- const loadDashboard = useCallback(async () => {
-  setLoading(true); setError('');
-  try {
-   const [dashboardResponse, tripsResponse] = await Promise.all([logisticsApi.getDashboard(), logisticsApi.getTrips({ limit: 20 })]);
+ const loadDashboard = useCallback(() => {
+  return Promise.all([logisticsApi.getDashboard(), logisticsApi.getTrips({ limit: 20 })]).then(([dashboardResponse, tripsResponse]) => {
    const recentTrips = tripsResponse.data.filter(trip => !['ENTREGADO', 'CANCELADO'].includes(trip.estado_operativo)).slice(0, 5);
    setDashboard({ summary: dashboardResponse.data.summary, recent_trips: recentTrips });
-  }
-  catch (reason) { setDashboard(null); setError(reason instanceof Error ? reason.message : 'No se pudo consultar el dashboard.'); }
-  finally { setLoading(false); }
+   setError('');
+  }).catch((reason: unknown) => { setDashboard(null); setError(reason instanceof Error ? reason.message : 'No se pudo consultar el dashboard.'); })
+    .finally(() => setLoading(false));
  }, []);
  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
 
  const rows = (dashboard?.recent_trips || []).map(toDashboardTrip);
  const summary = dashboard?.summary;
  return <div className="space-y-6 p-6 lg:p-8"><Title eyebrow="Centro de control TMS" title="Operación logística" description="Sigue los servicios desde su programación hasta el expediente listo para facturar." action={<Link href="/logistica/viajes/nuevo" className={button}><PlusIcon className="h-4 w-4"/>Crear viaje</Link>}/>
-  {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>No se pudieron cargar los datos reales: {error}</span><button type="button" className={subtle} onClick={() => void loadDashboard()}>Reintentar</button></div>}
+  {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>No se pudieron cargar los datos reales: {error}</span><button type="button" className={subtle} onClick={() => { setLoading(true); setError(''); void loadDashboard(); }}>Reintentar</button></div>}
   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
    <Kpi label="Viajes activos" value={summary ? String(summary.viajes_activos) : loading ? '…' : '—'} note="Confirmados, programados y en curso"/>
    <Kpi label="En operación" value={summary ? String(summary.en_operacion) : loading ? '…' : '—'} note="Programados o con avance iniciado"/>

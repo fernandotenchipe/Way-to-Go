@@ -21,6 +21,17 @@ function localInput(zone: string, value?: string | null) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
+async function getTripView(folio: string, demo: boolean) {
+  if (demo) {
+    const trip = findDemoTrip(folio);
+    if (!trip) throw new Error('Este viaje demo no está guardado en este navegador.');
+    const session: LogisticsTripSession = { nombre: 'Usuario demo', canEdit: true, canEditFleet: false, canAdvance: true, validActor: true };
+    return { trip, record: trip.demo_record || emptyDemoRecord(), session, evidence: trip.demo_evidence || [], types: demoTypes };
+  }
+  const [trip, record, session, evidence, catalogs] = await Promise.all([logisticsApi.getTrip(folio), logisticsApi.getTripRecord(folio), logisticsApi.getTripSession(), logisticsApi.getTripEvidence(folio), logisticsApi.getCatalogs()]);
+  return { trip: trip.data, record: record.data, session: session.data, evidence: evidence.data, types: catalogs.data.evidencias };
+}
+
 export default function CreatedTripSummary({ folio }: { folio: string }) {
   const [trip, setTrip] = useState<LogisticsTrip | null>(null);
   const [record, setRecord] = useState<LogisticsTripRecord | null>(null);
@@ -40,20 +51,13 @@ export default function CreatedTripSummary({ folio }: { folio: string }) {
   const requestVersion = useRef(0);
   const tabId = useId();
   const demo = folio.startsWith('DEMO-') || /^VJ-105[4-8]$/.test(folio);
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     const version = ++requestVersion.current;
-    try {
-      if (demo) {
-        const row = findDemoTrip(folio);
-        if (!row) throw new Error('Este viaje demo no está guardado en este navegador.');
-        setTrip(row); setRecord(row.demo_record || emptyDemoRecord()); setEvidence(row.demo_evidence || []); setTypes(demoTypes);
-        setSession({ nombre: 'Usuario demo', canEdit: true, canAdvance: true, validActor: true }); setMode(row.proveedor_id ? 'PROVEEDOR' : 'PROPIO'); setProvider(row.proveedor_id || '');
-      } else {
-        const [value, details, permissions, attachments, catalogs] = await Promise.all([logisticsApi.getTrip(folio), logisticsApi.getTripRecord(folio), logisticsApi.getTripSession(), logisticsApi.getTripEvidence(folio), logisticsApi.getCatalogs()]);
-        if (version !== requestVersion.current) return;
-        setTrip(value.data); setRecord(details.data); setSession(permissions.data); setEvidence(attachments.data); setTypes(catalogs.data.evidencias); setMode(value.data.proveedor_id ? 'PROVEEDOR' : 'PROPIO'); setProvider(value.data.proveedor_id || '');
-      }
-    } catch (reason) { if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : 'No se pudo consultar la ficha.'); }
+    return getTripView(folio, demo).then((view) => {
+      if (version !== requestVersion.current) return;
+      setTrip(view.trip); setRecord(view.record); setSession(view.session); setEvidence(view.evidence); setTypes(view.types);
+      setMode(view.trip.proveedor_id ? 'PROVEEDOR' : 'PROPIO'); setProvider(view.trip.proveedor_id || '');
+    }).catch((reason: unknown) => { if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : 'No se pudo consultar la ficha.'); });
   }, [demo, folio]);
   useEffect(() => { const requests = requestVersion; void load(); return () => { requests.current++; }; }, [load]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);

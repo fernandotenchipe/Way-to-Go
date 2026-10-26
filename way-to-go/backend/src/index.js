@@ -57,6 +57,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
   console.error('Error:', err);
   res.status(500).json({
     success: false,

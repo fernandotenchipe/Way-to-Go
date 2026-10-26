@@ -26,7 +26,7 @@ export default function ClientsScreen() {
   const [connectionMessage, setConnectionMessage] = useState('');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<LogisticsCustomerDetail | null>(null);
+  const [liveDetail, setDetail] = useState<LogisticsCustomerDetail | null>(null);
   const [modal, setModal] = useState<ClientEditorModal | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -34,14 +34,22 @@ export default function ClientsScreen() {
   const [detailTab, setDetailTab] = useState<'resumen' | 'contactos' | 'ubicaciones' | 'comercial' | 'facturacion'>('resumen');
   const [services, setServices] = useState<LogisticsServiceType[]>([]);
 
-  const loadClients = useCallback(async (query = '') => {
-    setMode((current) => current === 'live' ? 'live' : 'loading');
-    try {
-      const result = await logisticsApi.getCustomers(query);
+  const selectedClient = clients.find((client) => client.id === selectedId);
+  const detail: LogisticsCustomerDetail | null = !selectedId ? null : mode === 'demo'
+    ? selectedClient ? { ...selectedClient, direcciones: selectedClient.demo_addresses ?? [], contactos: selectedClient.demo_contacts ?? [], convenios: selectedClient.demo_agreements ?? [] } : null
+    : liveDetail?.id === selectedId ? liveDetail : null;
+
+  function selectClient(id: string | null) {
+    setSelectedId(id);
+    setDetailTab('resumen');
+  }
+
+  const loadClients = useCallback((query = '') => {
+    return logisticsApi.getCustomers(query).then((result) => {
       setClients(result.data);
       setMode('live');
       setConnectionMessage('');
-    } catch (error) {
+    }).catch((error: unknown) => {
       setMode('demo');
       // Stored demo edits should replace their built-in seed row. The same ID
       // can exist in both sources after a client has been edited offline.
@@ -50,31 +58,25 @@ export default function ClientsScreen() {
       const availableDemoClients = [...demoClientsById.values()];
       setClients(availableDemoClients.filter((client) => `${client.razon_social} ${client.rfc ?? ''} ${client.address_preview ?? ''}`.toLowerCase().includes(query.toLowerCase())));
       setConnectionMessage(error instanceof Error ? error.message : 'No fue posible consultar la base de datos.');
-    }
-  }, []);
+    }).then(() => {
+      const createdId = new URLSearchParams(window.location.search).get('created');
+      if (!createdId) return;
+      setSelectedId(createdId);
+      setDetailTab('resumen');
+      setNotice('Cliente registrado. Puedes revisar su ficha y completar sus direcciones.');
+      router.replace('/logistica/clientes', { scroll: false });
+    });
+  }, [router]);
 
   useEffect(() => { void loadClients(); }, [loadClients]);
 
   useEffect(() => { logisticsApi.getCatalogs().then(({ data }) => setServices(data.servicios)).catch(() => setServices([])); }, []);
 
   useEffect(() => {
-    if (mode === 'loading' || typeof window === 'undefined') return;
-    const createdId = new URLSearchParams(window.location.search).get('created');
-    if (!createdId) return;
-    setSelectedId(createdId);
-    setNotice('Cliente registrado. Puedes revisar su ficha y completar sus direcciones.');
-    router.replace('/logistica/clientes', { scroll: false });
-  }, [mode, clients, router]);
-
-  useEffect(() => {
-    if (!selectedId) { setDetail(null); return; }
-    setDetailTab('resumen');
-    const client = clients.find((item) => item.id === selectedId);
-    if (mode === 'demo') {
-      if (client) setDetail({ ...client, direcciones: client.demo_addresses ?? [], contactos: client.demo_contacts ?? [], convenios: client.demo_agreements ?? [] });
-      return;
-    }
-    logisticsApi.getCustomer(selectedId).then((response) => setDetail(response.data)).catch(() => setDetail(null));
+    if (!selectedId || mode !== 'live') return;
+    let active = true;
+    logisticsApi.getCustomer(selectedId).then((response) => { if (active) setDetail(response.data); }).catch(() => { if (active) setDetail(null); });
+    return () => { active = false; };
   }, [selectedId, clients, mode]);
 
   const filtered = useMemo(
@@ -464,7 +466,7 @@ export default function ClientsScreen() {
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold text-[#0b1f3b]">Cartera de clientes</h2><p className="mt-0.5 text-xs text-slate-500">Selecciona un cliente para consultar sus direcciones.</p></div><CatalogSearch value={search} onChange={(value) => { setSearch(value); if (mode === 'live') void loadClients(value); }} placeholder="Buscar cliente, RFC o ciudad" className="sm:w-72"/></div>
         <CatalogTable headings={['Cliente / RFC', 'Ubicación principal', 'Direcciones', 'Estado', '']} minWidth="620px">
           {mode === 'loading' && <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-500">Consultando clientes…</td></tr>}
-          {mode !== 'loading' && filtered.map((client) => <tr key={client.id} onClick={() => setSelectedId(client.id)} className={`cursor-pointer transition hover:bg-slate-50 ${selectedId === client.id ? 'bg-amber-50/70' : ''}`}><td className="px-5 py-4"><p className="font-semibold text-[#0b1f3b]">{client.razon_social}</p><p className="mt-1 text-xs text-slate-400">{client.rfc || 'RFC sin capturar'}</p></td><td className="px-5 py-4 text-slate-600">{client.address_preview || 'Sin dirección registrada'}</td><td className="px-5 py-4 text-slate-600">{client.direcciones_activas ?? client.demo_addresses?.length ?? 0}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${client.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{client.activo ? 'Activo' : 'Inactivo'}</span></td><td className="px-3 py-4 text-right"><ChevronRightIcon className="ml-auto h-4 w-4 text-slate-400"/></td></tr>)}
+          {mode !== 'loading' && filtered.map((client) => <tr key={client.id} onClick={() => selectClient(client.id)} className={`cursor-pointer transition hover:bg-slate-50 ${selectedId === client.id ? 'bg-amber-50/70' : ''}`}><td className="px-5 py-4"><p className="font-semibold text-[#0b1f3b]">{client.razon_social}</p><p className="mt-1 text-xs text-slate-400">{client.rfc || 'RFC sin capturar'}</p></td><td className="px-5 py-4 text-slate-600">{client.address_preview || 'Sin dirección registrada'}</td><td className="px-5 py-4 text-slate-600">{client.direcciones_activas ?? client.demo_addresses?.length ?? 0}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${client.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{client.activo ? 'Activo' : 'Inactivo'}</span></td><td className="px-3 py-4 text-right"><ChevronRightIcon className="ml-auto h-4 w-4 text-slate-400"/></td></tr>)}
           {mode !== 'loading' && filtered.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-500">No hay clientes que coincidan con la búsqueda.</td></tr>}
         </CatalogTable>
         <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">{filtered.length} {filtered.length === 1 ? 'cliente' : 'clientes'}</div>
@@ -472,7 +474,7 @@ export default function ClientsScreen() {
 
       <section className={`${card} max-h-[calc(100vh-2rem)] overflow-y-auto`}>
         {detail ? <>
-          <div className="border-b border-slate-100 p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[#0b1f3b]"><BuildingOffice2Icon className="h-5 w-5"/></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ficha del cliente</p><h2 className="mt-0.5 truncate font-bold text-[#0b1f3b]">{detail.nombre_comercial || detail.razon_social}</h2></div></div><button onClick={() => setSelectedId(null)} aria-label="Cerrar detalle" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-4 w-4"/></button></div><p className="mt-3 text-xs text-slate-500">{detail.razon_social}</p><p className="mt-1 text-xs text-slate-400">RFC · {detail.rfc || 'Sin capturar'}</p><div className="mt-3 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${detail.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{detail.activo ? 'Activo' : 'Inactivo'}</span><button onClick={() => { setFormError(''); setModal({ kind: 'client' }); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar cliente</button><button disabled={saving} onClick={() => void toggleCustomerActive()} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{detail.activo ? 'Desactivar' : 'Reactivar'}</button></div></div>
+          <div className="border-b border-slate-100 p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[#0b1f3b]"><BuildingOffice2Icon className="h-5 w-5"/></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ficha del cliente</p><h2 className="mt-0.5 truncate font-bold text-[#0b1f3b]">{detail.nombre_comercial || detail.razon_social}</h2></div></div><button onClick={() => selectClient(null)} aria-label="Cerrar detalle" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><XMarkIcon className="h-4 w-4"/></button></div><p className="mt-3 text-xs text-slate-500">{detail.razon_social}</p><p className="mt-1 text-xs text-slate-400">RFC · {detail.rfc || 'Sin capturar'}</p><div className="mt-3 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${detail.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{detail.activo ? 'Activo' : 'Inactivo'}</span><button onClick={() => { setFormError(''); setModal({ kind: 'client' }); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><PencilSquareIcon className="h-3.5 w-3.5"/>Editar cliente</button><button disabled={saving} onClick={() => void toggleCustomerActive()} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">{detail.activo ? 'Desactivar' : 'Reactivar'}</button></div></div>
           <nav className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-slate-100 bg-white p-2" aria-label="Secciones de la ficha">{(['resumen', 'contactos', 'ubicaciones', 'comercial', 'facturacion'] as const).map((tab) => <button key={tab} onClick={() => setDetailTab(tab)} className={`whitespace-nowrap rounded-md px-2.5 py-2 text-xs font-semibold capitalize ${detailTab === tab ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-slate-50'}`}>{tab === 'ubicaciones' ? 'Ubicaciones' : tab === 'facturacion' ? 'Facturación' : tab === 'comercial' ? 'Comercial' : tab === 'contactos' ? 'Contactos' : 'Resumen'}</button>)}</nav>
           {detailTab === 'contactos' && <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Contactos</h3><p className="mt-0.5 text-xs text-slate-500">Principal, operaciones, facturación y alta del cliente</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'contact' }); }} aria-label="Agregar contacto" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>{detail.contactos.length ? detail.contactos.map((contact) => <article key={contact.id} className={`mt-3 rounded-lg border p-3 ${contact.activo ? 'border-slate-100 bg-slate-50' : 'border-slate-200 bg-slate-100 opacity-70'}`}><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-700">{contact.nombre}{contact.puesto ? ` · ${contact.puesto}` : ''}</p><p className="mt-1 text-xs text-slate-500">{contact.email || 'Sin correo'}{contact.telefono ? ` · ${contact.telefono}` : ''}</p><p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{contact.tipo_contacto || 'Contacto'}{contact.principal ? ' · Principal' : ''}{detail.contacto_facturacion_id === contact.id ? ' · Facturación' : ''}</p></div><span className="text-[10px] text-slate-500">{contact.activo ? 'Activo' : 'Inactivo'}</span></div><div className="mt-3 flex gap-2"><button onClick={() => { setFormError(''); setModal({ kind: 'contact', contact }); }} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold">Editar</button><button disabled={saving} onClick={() => void toggleContactActive(contact)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold disabled:opacity-50">{contact.activo ? 'Desactivar' : 'Reactivar'}</button></div></article>) : <p className="py-6 text-center text-sm text-slate-500">Aún no hay contactos.</p>}</div>}
           {detailTab === 'ubicaciones' && <div className="p-5"><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-[#0b1f3b]">Ubicaciones operativas</h3><p className="mt-0.5 text-xs text-slate-500">Cada ubicación puede seleccionarse según el servicio.</p></div>{detail.activo && <button onClick={() => { setFormError(''); setModal({ kind: 'address' }); }} aria-label="Agregar ubicación" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-amber-300 hover:bg-amber-50"><PlusIcon className="h-4 w-4"/></button>}</div>

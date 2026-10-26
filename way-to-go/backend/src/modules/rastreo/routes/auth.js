@@ -130,7 +130,7 @@ export const verifyToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({
       success: false,
       error: 'Token inválido'

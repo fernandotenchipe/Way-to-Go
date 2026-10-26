@@ -54,23 +54,25 @@ export default function FleetScreen() {
   const [month, setMonth] = useState(() => { const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), 1); });
   const [filterStatus, setFilterStatus] = useState('TODAS');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try { const result = await logisticsApi.getFleet(); setUnits(result.data.units); setLocation(result.data.location); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo consultar la flota.'); }
-    finally { setLoading(false); }
+  const load = useCallback(() => {
+    return logisticsApi.getFleet().then((result) => { setUnits(result.data.units); setLocation(result.data.location); setError(''); })
+      .catch((reason: unknown) => { setError(reason instanceof Error ? reason.message : 'No se pudo consultar la flota.'); })
+      .finally(() => setLoading(false));
   }, []);
   useEffect(() => { void logisticsApi.getTripSession().then(({ data }) => { setCanEdit(data.canEditFleet); setDemoFleetOnly(data.demoFleetOnly === true); }).catch(() => setCanEdit(false)); void logisticsApi.getFleetProviders().then(({ data }) => setProviders(data)).catch(() => setProviders([])); }, []);
-  const loadCalendar = useCallback(async () => {
+  const loadCalendar = useCallback(() => {
     const from = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
     const until = new Date(month.getFullYear(), month.getMonth() + 1, 1).toISOString();
-    try { setCalendar((await logisticsApi.getFleetCalendar(from, until)).data); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo consultar el calendario.'); }
+    return logisticsApi.getFleetCalendar(from, until).then((result) => setCalendar(result.data))
+      .catch((reason: unknown) => { setError(reason instanceof Error ? reason.message : 'No se pudo consultar el calendario.'); });
   }, [month]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadCalendar(); }, [loadCalendar]);
-  useEffect(() => { if (location) { setAddress(location.direccion); setPoint({ latitud: Number(location.latitud), longitud: Number(location.longitud) }); } }, [location]);
+
+  function refresh() {
+    setLoading(true); setError('');
+    return load();
+  }
 
   const visible = useMemo(() => units.filter(unit => {
     const textMatch = [unit.numero_economico, unit.placas, unit.tipo_unidad, unit.marca, unit.modelo, unit.proveedor].filter(Boolean).join(' ').toLowerCase().includes(query.trim().toLowerCase());
@@ -81,7 +83,7 @@ export default function FleetScreen() {
 
   async function act(action: () => Promise<unknown>, message: string) {
     setBusy(true); setError(''); setNotice('');
-    try { await action(); await load(); await loadCalendar(); setBlockTarget(null); setNotice(message); }
+    try { await action(); await refresh(); await loadCalendar(); setBlockTarget(null); setNotice(message); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar el cambio.'); }
     finally { setBusy(false); }
   }
@@ -89,8 +91,8 @@ export default function FleetScreen() {
   const locationEdit = () => { setAddress(location?.direccion || ''); setPoint(location ? { latitud: Number(location.latitud), longitud: Number(location.longitud) } : { latitud: 19.4326, longitud: -99.1332 }); setEditingLocation(true); };
 
   return <div className="space-y-6 p-6 lg:p-8">
-    <CatalogPageHeader eyebrow="Recursos operativos" title="Flota y disponibilidad" description="Consulta reservas, registra llegadas y administra bloqueos de atención en las instalaciones de WTG." action={<button className={subtle} onClick={() => void load()}>Actualizar</button>}/>
-    {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{error}</span><button className={subtle} onClick={() => { void load(); void loadCalendar(); }}>Reintentar</button></div>}
+    <CatalogPageHeader eyebrow="Recursos operativos" title="Flota y disponibilidad" description="Consulta reservas, registra llegadas y administra bloqueos de atención en las instalaciones de WTG." action={<button className={subtle} onClick={() => void refresh()}>Actualizar</button>}/>
+    {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{error}</span><button className={subtle} onClick={() => { void refresh(); void loadCalendar(); }}>Reintentar</button></div>}
     {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><CatalogMetric label="Unidades activas" value={String(counts.total)} note="Unidades que no están dadas de baja"/><CatalogMetric label="Disponibles" value={String(counts.active)} note="Sin bloqueo de mantenimiento"/><CatalogMetric label="Bloqueadas" value={String(counts.blocked)} note="Requieren liberación manual"/><CatalogMetric label="Reservas del mes" value={String(counts.reservations)} note="Viajes con unidad reservada"/></div>
 
