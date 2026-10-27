@@ -145,6 +145,11 @@ router.post('/trips', requireCreateTrip, requireActor, wrap(async (req, res) => 
     await client.query('BEGIN');
     const { rows: [schema] } = await client.query(`SELECT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='tms.viajes'::regclass AND conname='viajes_estado_operativo_confirmacion_check') AS ready`);
     if (!schema?.ready) { await client.query('ROLLBACK'); return fail(res, 503, 'El alta confirmada requiere aplicar la migración 20261021_viajes_confirmados.sql. No se guardó el viaje.'); }
+    if (operatorId) {
+      const { rows: [operator] } = await client.query('SELECT id, proveedor_id FROM tms.operadores WHERE id=$1 AND activo FOR SHARE', [operatorId]);
+      if (!operator) { await client.query('ROLLBACK'); return fail(res, 400, 'Selecciona un operador activo'); }
+      if ((operator.proveedor_id || null) !== (providerId || null)) { await client.query('ROLLBACK'); return fail(res, 400, 'El proveedor debe coincidir con la modalidad del operador seleccionado'); }
+    } else if (providerId) { await client.query('ROLLBACK'); return fail(res, 400, 'Selecciona un operador para asignar un proveedor'); }
     if (quick) {
       // Serializa altas rápidas del mismo nombre; nunca combina clientes en silencio.
       const normalizedName = quick.razon_social.trim().toLowerCase();

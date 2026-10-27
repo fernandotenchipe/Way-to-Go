@@ -223,7 +223,13 @@ export interface LogisticsTripCreateInput {
   flete_base?: number;
   moneda: string;
   instrucciones: string;
+  operador_id?: string | null;
+  proveedor_id?: string | null;
 }
+
+export interface CartaPorteIssuer { id: string; nombre: string; razon_social: string; rfc: string; activo: boolean }
+export interface CartaPorteSummary { id: string; cfdi_id: string; estado: string; origen: string; revision: number; uuid_fiscal: string | null; created_at: string }
+export interface CartaPorteDocument { id: string; viaje_id: string; cfdi_id: string; cfdi: { id: string; estado: string; origen: string; revision: number; tipo_comprobante: 'I' | 'T' }; figures: Array<{ id?: string; tipo_figura_sat: string; operador_id?: string | null; nombre: string; rfc?: string | null; numero_licencia?: string | null; residencia_fiscal_sat?: string | null; numero_registro_tributario?: string | null; domicilio_snapshot?: Record<string, string | null> }> }
 
 export type LogisticsCustomerUpdateInput = Partial<Omit<LogisticsCustomerCreateInput, 'direccion'>>;
 export type LogisticsAddressUpdateInput = Partial<Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>>;
@@ -317,6 +323,11 @@ class LogisticsApi {
   }
 
   getTripSession() { return this.request<LogisticsTripSession>('session'); }
+  getCartaPorteIssuers() { return this.request<CartaPorteIssuer[]>('carta-porte/catalogs/issuers'); }
+  getTripCartaPortes(folio: string) { return this.request<CartaPorteSummary[]>(`trips/${encodeURIComponent(folio)}/carta-porte`); }
+  createTripCartaPorte(folio: string, input: { empresa_emisora_id: string; tipo_comprobante: 'I' | 'T' }) { return this.request<CartaPorteDocument>(`trips/${encodeURIComponent(folio)}/carta-porte`, { method: 'POST', body: JSON.stringify(input) }); }
+  getCartaPorte(id: string) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}`); }
+  saveCartaPorteFigures(id: string, expected_revision: number, figures: CartaPorteDocument['figures']) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/figures`, { method: 'PUT', body: JSON.stringify({ expected_revision, figures: { upsert: figures, remove: [] } }) }); }
   getOperators(filters: { q?: string; status?: 'all' | 'active' | 'inactive'; limit?: number; offset?: number } = {}) { const search = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])); return this.request<LogisticsOperator[]>(`operators/manage?${search}`); }
   getOperator(id: string) { return this.request<LogisticsOperatorDetail>(`operators/${encodeURIComponent(id)}`); }
   createOperator(input: LogisticsOperatorInput) { return this.request<LogisticsOperator>('operators', { method: 'POST', body: JSON.stringify(input) }); }

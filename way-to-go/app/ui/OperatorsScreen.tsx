@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowDownTrayIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { logisticsApi, type LogisticsOperator, type LogisticsOperatorDetail, type LogisticsOperatorInput } from '../services/logistics-api';
 import { operatorCartaPorteReady, operatorLicenseStatus } from '../services/operator-status';
+import { addDemoOperatorDocument, getDemoOperator, getDemoOperatorDocument, getDemoOperatorProviders, listDemoOperators, saveDemoOperator, setDemoOperatorActive } from '../services/logistics-demo-operators';
 import { tripStatusLabels } from '../services/trip-record';
 import { CatalogPageHeader, CatalogSearch, CatalogTable, LogisticsFormField as Field, LogisticsFormSection as Section, logisticsFieldClassName as field } from './LogisticsCatalogComponents';
 
@@ -12,6 +13,7 @@ const card = 'rounded-xl border border-slate-200 bg-white shadow-sm';
 const primary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#183a64] disabled:opacity-50';
 const secondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
 const tabs = ['Datos generales', 'Carta Porte', 'Licencia y documentos', 'Viajes', 'Historial'] as const;
+const demoMode = process.env.NODE_ENV === 'development';
 type Tab = typeof tabs[number];
 type Provider = { id: string; razon_social: string; activo?: boolean };
 const date = (value: string | null) => value ? value.slice(0, 10).split('-').reverse().join('/') : 'Pendiente';
@@ -77,35 +79,38 @@ export default function OperatorsScreen() {
   const detailPanel = useRef<HTMLElement>(null);
   const load = useCallback(async (from = 0) => {
     const version = ++listVersion.current; setLoading(true); setError('');
-    try { const rows = (await logisticsApi.getOperators({ q: query, status, offset: from, limit: 50 })).data; if (version !== listVersion.current) return; setOperators(current => from ? [...current, ...rows.filter(row => !current.some(existing => existing.id === row.id))] : rows); setOffset(from + rows.length); setHasMore(rows.length === 50); }
+    try { const filters = { q: query, status, offset: from, limit: 50 }; const rows = demoMode ? listDemoOperators(filters) : (await logisticsApi.getOperators(filters)).data; if (version !== listVersion.current) return; setOperators(current => from ? [...current, ...rows.filter(row => !current.some(existing => existing.id === row.id))] : rows); setOffset(from + rows.length); setHasMore(rows.length === 50); }
     catch (reason) { if (version === listVersion.current) { setError(reason instanceof Error ? reason.message : 'No se pudieron consultar operadores.'); if (!from) setOperators([]); } }
     finally { if (version === listVersion.current) setLoading(false); }
   }, [query, status]);
   const open = useCallback(async (id: string) => {
     const version = ++detailVersion.current; selected.current = id; setSelectedId(id); setDetail(null); setDetailLoading(true); setDetailError('');
-    try { const result = await logisticsApi.getOperator(id); if (version === detailVersion.current) setDetail(result.data); }
+    try { const result = demoMode ? getDemoOperator(id) : (await logisticsApi.getOperator(id)).data; if (!result) throw new Error('Operador no encontrado.'); if (version === detailVersion.current) setDetail(result); }
     catch (reason) { if (version === detailVersion.current) setDetailError(reason instanceof Error ? reason.message : 'No se pudo cargar la ficha.'); }
     finally { if (version === detailVersion.current) setDetailLoading(false); }
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 250); return () => { window.clearTimeout(timer); cancelList(); }; }, [load, cancelList]);
   useEffect(() => {
     let alive = true;
-    void logisticsApi.getTripSession().then(({ data }) => { if (alive) setCanEdit(data.canEdit); }).catch(() => { if (alive) setCanEdit(false); });
-    void logisticsApi.getFleetProviders().then(({ data }) => { if (alive) { setProviders(data); setProvidersError(''); } }).catch(() => { if (alive) setProvidersError('No se pudieron cargar proveedores.'); });
+    if (demoMode) { setCanEdit(true); setProviders(getDemoOperatorProviders()); }
+    else {
+      void logisticsApi.getTripSession().then(({ data }) => { if (alive) setCanEdit(data.canEdit); }).catch(() => { if (alive) setCanEdit(false); });
+      void logisticsApi.getFleetProviders().then(({ data }) => { if (alive) { setProviders(data); setProvidersError(''); } }).catch(() => { if (alive) setProvidersError('No se pudieron cargar proveedores.'); });
+    }
     return () => { alive = false; cancelDetail(); };
   }, [cancelDetail]);
   async function save(input: LogisticsOperatorInput) {
     if (busy) return; setBusy(true); setFormError(''); setNotice('');
     try {
-      const result = editor === 'edit' && detail ? await logisticsApi.updateOperator(detail.id, { ...input, expected_updated_at: detail.updated_at }) : await logisticsApi.createOperator(input);
-      setEditor(null); setTab('Datos generales'); await load(); await open(result.data.id); setNotice('Operador guardado.');
+      const result = demoMode ? saveDemoOperator(editor === 'edit' ? detail?.id || null : null, input) : (editor === 'edit' && detail ? (await logisticsApi.updateOperator(detail.id, { ...input, expected_updated_at: detail.updated_at })).data : (await logisticsApi.createOperator(input)).data);
+      setEditor(null); setTab('Datos generales'); await load(); await open(result.id); setNotice('Operador guardado.');
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : 'No se pudo guardar al operador.'); }
     finally { setBusy(false); }
   }
   async function toggleActive() {
     if (!detail || busy || !window.confirm(`${detail.activo ? 'Desactivar' : 'Reactivar'} a ${detail.nombre}? Se conservará su historial.`)) return;
     setBusy(true); setDetailError(''); setNotice('');
-    try { await logisticsApi.setOperatorActive(detail.id, !detail.activo, detail.updated_at); await load(); await open(detail.id); setNotice('Estado del operador actualizado.'); }
+    try { if (demoMode) setDemoOperatorActive(detail.id, !detail.activo); else await logisticsApi.setOperatorActive(detail.id, !detail.activo, detail.updated_at); await load(); await open(detail.id); setNotice('Estado del operador actualizado.'); }
     catch (reason) { setDetailError(reason instanceof Error ? reason.message : 'No se pudo cambiar el estado.'); }
     finally { setBusy(false); }
   }
@@ -116,13 +121,17 @@ export default function OperatorsScreen() {
     for (const key of ['folio', 'emitido_el', 'vence_el']) if (!String(form.get(key) || '').trim()) form.delete(key);
     setBusy(true); setDetailError(''); setNotice('');
     form.set('expected_updated_at', detail.updated_at);
-    try { await logisticsApi.addOperatorDocument(detail.id, form); formElement.reset(); await open(detail.id); await load(); setNotice('Documento adjuntado.'); }
+    try {
+      if (demoMode) await addDemoOperatorDocument(detail.id, file, { tipo: String(form.get('tipo') || 'OTRO'), folio: String(form.get('folio') || '') || null, emitido_el: String(form.get('emitido_el') || '') || null, vence_el: String(form.get('vence_el') || '') || null });
+      else await logisticsApi.addOperatorDocument(detail.id, form);
+      formElement.reset(); await open(detail.id); await load(); setNotice('Documento adjuntado.');
+    }
     catch (reason) { setDetailError(reason instanceof Error ? reason.message : 'No se pudo adjuntar el documento.'); }
     finally { setBusy(false); }
   }
   async function download(documentId: string, name: string) {
     if (!detail || busy) return; setBusy(true); setDetailError('');
-    try { const blob = await logisticsApi.getOperatorDocument(detail.id, documentId); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    try { const blob = demoMode ? await getDemoOperatorDocument(documentId) : await logisticsApi.getOperatorDocument(detail.id, documentId); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
     catch (reason) { setDetailError(reason instanceof Error ? reason.message : 'No se pudo abrir el documento.'); }
     finally { setBusy(false); }
   }
@@ -130,6 +139,7 @@ export default function OperatorsScreen() {
   const foreign = Boolean(detail?.residencia_fiscal_sat && detail.residencia_fiscal_sat !== 'MEX');
   return <div className="space-y-6 p-6 lg:p-8">
     <CatalogPageHeader eyebrow="Recursos operativos · TMS" title="Operadores" description="Administra sus datos, licencias, documentos y asignaciones." action={<button disabled={busy} className={primary} onClick={() => { setFormError(''); setEditor('new'); }}><PlusIcon className="h-4 w-4" />Agregar operador</button>} />
+    {demoMode && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>Modo de demostración local.</strong> Esta pantalla usa operadores ficticios y no consulta el backend ni la base. Los cambios y documentos se guardan solo en este navegador.</p>}
     {!canEdit && <p className="text-sm text-slate-500">Vista de consulta. Para guardar necesitas una sesión TMS válida con permiso para editar viajes.</p>}
     {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error} <button className="ml-2 underline" onClick={() => void load()}>Reintentar</button></p>}

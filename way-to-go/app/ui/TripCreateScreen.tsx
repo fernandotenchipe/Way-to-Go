@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type LogisticsServiceType, type LogisticsTrip, type LogisticsTripCreateInput } from '../services/logistics-api';
 import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
 import { demoClients } from '../services/logistics-demo-seeds';
+import { getDemoOperatorResources } from '../services/logistics-demo-operators';
 import { saveDemoTrip } from '../services/logistics-demo-trips';
 import { tripDateToIso } from '../services/trip-dates';
 import LogisticsAddressFields, { readAddress } from './LogisticsAddressFields';
@@ -21,6 +22,7 @@ export default function TripCreateScreen() {
   const [customers, setCustomers] = useState<LogisticsCustomer[]>([]);
   const [customer, setCustomer] = useState<LogisticsCustomer | null>(null);
   const [services, setServices] = useState<LogisticsServiceType[]>([]);
+  const [operators, setOperators] = useState<Array<{ id: string; nombre: string; proveedor_id?: string | null }>>([]);
   const [addresses, setAddresses] = useState<LogisticsAddress[]>([]);
   const [originId, setOriginId] = useState('');
   const [destinationId, setDestinationId] = useState('');
@@ -36,16 +38,32 @@ export default function TripCreateScreen() {
   useEffect(() => {
     let active = true;
     mounted.current = true;
+    if (process.env.NODE_ENV === 'development') {
+      queueMicrotask(() => {
+        if (!active) return;
+        const merged = new Map([...demoClients, ...getDemoLogisticsCustomers()].map((row) => [row.id, row]));
+        setCustomers([...merged.values()].filter((row) => row.activo));
+        setServices(demoServices);
+        setOperators(getDemoOperatorResources());
+        setMode('demo');
+      });
+      return () => { active = false; mounted.current = false; };
+    }
     Promise.all([logisticsApi.getCustomers(), logisticsApi.getCatalogs()]).then(([clients, catalogs]) => {
       if (!active) return;
       setCustomers(clients.data.filter((row) => row.activo));
       setServices(catalogs.data.servicios.filter((row) => row.activo));
-      setMode('live');
+      return logisticsApi.getOperators({ status: 'active', limit: 100 }).then((operatorRows) => {
+        if (!active) return;
+        setOperators(operatorRows.data.filter((row) => row.activo).map((row) => ({ id: row.id, nombre: row.nombre, proveedor_id: row.proveedor_id })));
+        setMode('live');
+      });
     }).catch((reason: unknown) => {
       if (!active) return;
       const merged = new Map([...demoClients, ...getDemoLogisticsCustomers()].map((row) => [row.id, row]));
       setCustomers([...merged.values()].filter((row) => row.activo));
       setServices(demoServices);
+      setOperators(getDemoOperatorResources());
       setConnectionMessage(reason instanceof Error ? reason.message : 'No se pudo consultar el servicio.');
       setMode('demo');
     });
@@ -98,6 +116,8 @@ export default function TripCreateScreen() {
       const input: LogisticsTripCreateInput = {
         ...(quick ? { cliente_nuevo: { razon_social: value('nuevo_cliente'), direcciones: quickAddresses } } : { cliente_id: customer!.id, origen_id: originId, destino_id: destinationId }),
         estado_operativo: 'CONFIRMADO', tipo_servicio_id: value('servicio'), tipo_carga: value('tipo_carga'), descripcion_carga: value('descripcion_carga'),
+        operador_id: value('operador_id') || null,
+        proveedor_id: operators.find((row) => row.id === value('operador_id'))?.proveedor_id || null,
         cita_carga_at: loading, salida_programada_at: departure, entrega_estimada_at: arrival, descarga_programada_at: unloading,
         reserva_desde: loading, reserva_hasta: unloading || arrival, flete_base: value('flete_base') ? Number(value('flete_base')) : undefined,
         moneda: value('moneda'), instrucciones: value('instrucciones'),
@@ -116,7 +136,9 @@ export default function TripCreateScreen() {
           estado_operativo: 'CONFIRMADO', tipo_servicio_id: input.tipo_servicio_id, tipo_servicio: services.find((row) => row.id === input.tipo_servicio_id)?.nombre || null,
           tipo_carga: input.tipo_carga, cita_carga_at: loading, salida_programada_at: departure, entrega_estimada_at: arrival, descarga_programada_at: unloading,
           origen_snapshot: { ...snapshots[0] }, destino_snapshot: { ...snapshots[1] }, instrucciones: input.instrucciones,
-          unidad_id: null, unidad: null, operador_id: null, operador: null, created_at: now, updated_at: now,
+          unidad_id: null, unidad: null, operador_id: input.operador_id || null, operador: operators.find((row) => row.id === input.operador_id)?.nombre || null,
+          proveedor_id: input.proveedor_id || null, proveedor: null, created_at: now, updated_at: now,
+          demo_record: { tiempos: {}, eventos: [], unidades: [], operadores: operators, cajas: [], proveedores: [] },
         };
         // El modo demo siempre escribe únicamente en el navegador.
         saveDemoTrip(trip);
@@ -135,7 +157,7 @@ export default function TripCreateScreen() {
     {mode === 'live' && <p className="text-sm text-slate-500">Conectado al servicio de Logística. Guardar enviará el registro a la base configurada.</p>}
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
     {mode === 'checking' ? <p role="status">Consultando clientes y servicios…</p> : <form ref={formRef} onSubmit={submit} noValidate className="space-y-5">
-      <ol className="flex flex-wrap gap-3 text-sm">{['Cliente y servicio', 'Recoger y entregar', 'Fechas y confirmación'].map((title, index) => <li key={title} aria-current={step === index ? 'step' : undefined} className={`rounded-lg px-3 py-2 ${step === index ? 'bg-[#0b1f3b] text-white' : 'bg-slate-100 text-slate-600'}`}>{index + 1}. {title}</li>)}</ol>
+      <ol className="flex flex-wrap gap-3 text-sm">{['Cliente y servicio', 'Recoger y entregar', 'Fechas y operador'].map((title, index) => <li key={title} aria-current={step === index ? 'step' : undefined} className={`rounded-lg px-3 py-2 ${step === index ? 'bg-[#0b1f3b] text-white' : 'bg-slate-100 text-slate-600'}`}>{index + 1}. {title}</li>)}</ol>
       <fieldset disabled={saving} className="space-y-5">
         <div data-step="0" hidden={step !== 0}>
           <Section title="Cliente y servicio" description="El alta rápida guarda un cliente con datos mínimos. Su facturación se completa después.">
@@ -165,11 +187,15 @@ export default function TripCreateScreen() {
             <Field label="Inicio de descarga programado (opcional)"><input name="descarga_programada_at" type="datetime-local" className={field} /></Field>
           </Section>
           <details className="mt-4 rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-semibold">Flete e instrucciones (opcionales)</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Flete base"><input name="flete_base" type="number" min="0" step="0.01" className={field} placeholder="Pendiente de cotizar" /></Field><Field label="Moneda"><select name="moneda" className={field}><option>MXN</option><option>USD</option></select></Field><Field label="Instrucciones del servicio"><textarea name="instrucciones" maxLength={2000} className={field} /></Field></div></details>
-          <p className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">Se registrará como <strong>confirmado</strong>. La asignación de transporte puede completarse después en la ficha del viaje. Si omites el flete, quedará pendiente de cotizar con cero provisional hasta cotizar.</p>
+          <Section title="Operador asignado" description="Se usará como figura del operador al preparar la Carta Porte dentro de este viaje.">
+            <Field label="Operador activo *"><select name="operador_id" required className={field}><option value="">Seleccionar operador</option>{operators.map((row) => <option key={row.id} value={row.id}>{row.nombre}{row.proveedor_id ? ' · Proveedor' : ' · Propio'}</option>)}</select></Field>
+            {!operators.length && <p className="col-span-full text-sm text-amber-800">No hay operadores activos. Registra o activa uno en <Link href="/logistica/operadores" className="underline">Operadores</Link>.</p>}
+          </Section>
+          <p className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">Se registrará como <strong>confirmado</strong>. El operador queda asignado desde la creación y se reutiliza al preparar la Carta Porte en este viaje. Si omites el flete, quedará pendiente de cotizar con cero provisional hasta cotizar.</p>
         </div>
       </fieldset>
       {!services.length && <p role="alert" className="text-sm text-amber-800">No hay tipos de servicio activos configurados.</p>}
-      <div className="flex justify-between gap-3"><Link href="/logistica/viajes" className="px-3 py-2 text-sm text-slate-600">Cancelar</Link><div className="flex gap-3">{step > 0 && <button type="button" disabled={saving} onClick={() => setStep(step - 1)} className="px-3 py-2 text-sm font-semibold">Anterior</button>}<button type="submit" disabled={saving || loadingAddresses || !services.length} className={button}>{saving ? 'Guardando…' : step < 2 ? 'Continuar' : mode === 'demo' ? 'Crear viaje confirmado en demo' : 'Crear viaje confirmado'}</button></div></div>
+      <div className="flex justify-between gap-3"><Link href="/logistica/viajes" className="px-3 py-2 text-sm text-slate-600">Cancelar</Link><div className="flex gap-3">{step > 0 && <button type="button" disabled={saving} onClick={() => setStep(step - 1)} className="px-3 py-2 text-sm font-semibold">Anterior</button>}<button type="submit" disabled={saving || loadingAddresses || !services.length || !operators.length} className={button}>{saving ? 'Guardando…' : step < 2 ? 'Continuar' : mode === 'demo' ? 'Crear viaje confirmado en demo' : 'Crear viaje confirmado'}</button></div></div>
     </form>}
   </div>;
 }
