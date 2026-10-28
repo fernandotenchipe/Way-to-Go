@@ -76,7 +76,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
       if (demo) {
         const id = `demo-cp-${crypto.randomUUID()}`;
         const cfdiId = `demo-cfdi-${crypto.randomUUID()}`;
-        const created: CartaPorteDocument = { id, viaje_id: trip.id, cfdi_id: cfdiId, cfdi: { id: cfdiId, estado: 'BORRADOR', origen: 'PROPIO', revision: 1, tipo_comprobante: invoiceType }, figures: [] };
+        const created: CartaPorteDocument = { id, viaje_id: trip.id, cfdi_id: cfdiId, cfdi: { id: cfdiId, estado: 'BORRADOR', origen: 'PROPIO', revision: 1, tipo_comprobante: invoiceType }, transport: trip.unidad_id ? [{ unidad_id: trip.unidad_id }] : [], figures: [] };
         const rows = [created, ...localDocuments(trip.folio)];
         localStorage.setItem(storageKey(trip.folio), JSON.stringify(rows));
         await saveFigure(created);
@@ -99,18 +99,42 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
     finally { setBusy(false); }
   }
 
+  async function syncUnit() {
+    if (!document || !trip.unidad_id) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      if (demo) {
+        const rows = localDocuments(trip.folio);
+        const next = { ...document, transport: [{ unidad_id: trip.unidad_id }] };
+        localStorage.setItem(storageKey(trip.folio), JSON.stringify(rows.map(row => row.id === document.id ? next : row)));
+        setDocument(next);
+      } else {
+        const detail = await logisticsApi.getCartaPorte(document.id);
+        const updated = await logisticsApi.saveCartaPorteTransport(document.id, detail.data.cfdi.revision, trip.unidad_id);
+        setDocument(updated.data);
+        setDocuments(rows => rows.map(row => row.id === document.id ? { ...row, revision: updated.data.cfdi.revision } : row));
+      }
+      setNotice('Unidad asignada vinculada al borrador de Carta Porte.');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo vincular la unidad.'); }
+    finally { setBusy(false); }
+  }
+
   const figure = document?.figures?.find(row => row.tipo_figura_sat === '01');
   const alreadyLinked = Boolean(figure && figure.operador_id === trip.operador_id);
+  const transport = document?.transport?.[0];
+  const unitLinked = Boolean(transport && transport.unidad_id === trip.unidad_id);
   return <section className="rounded-xl border border-slate-200 bg-white p-5">
     <h2 className="font-bold text-[#0b1f3b]">Carta Porte del viaje</h2>
-    <p className="mt-2 text-sm text-slate-600">La Carta Porte se prepara dentro de este viaje. El operador asignado se incorpora como figura 01; el timbrado no se realiza desde aquí.</p>
+    <p className="mt-2 text-sm text-slate-600">La Carta Porte se prepara dentro de este viaje. La unidad y el operador asignados aportan sus datos reutilizables al borrador. Al completar el traslado se podrá validar y timbrar desde el flujo del viaje.</p>
     {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     {notice && <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
     {!trip.operador_id && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Asigna un operador en la pestaña Asignación antes de crear la Carta Porte.</p>}
+    {!trip.unidad_id && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">La unidad se puede asignar después. Hazlo en Asignación antes de completar la Carta Porte.</p>}
     {loading ? <p role="status" className="mt-4 text-sm text-slate-500">Consultando documentos…</p> : <>
       {documents.length > 0 && <div className="mt-4 rounded-lg border border-slate-200 p-4"><p className="text-sm font-semibold">Borrador más reciente · {document?.cfdi.estado || documents[0].estado}</p><p className="mt-1 text-xs text-slate-500">Revisión {document?.cfdi.revision ?? documents[0].revision} · {document?.cfdi.tipo_comprobante === 'T' ? 'Traslado' : 'Ingreso'}</p>{figure ? <p className="mt-3 text-sm">Figura 01: <strong>{figure.nombre}</strong>{alreadyLinked ? ' · vinculada al operador asignado' : ' · requiere sincronización con la asignación actual'}</p> : <p className="mt-3 text-sm text-amber-800">Aún no tiene figura de operador.</p>}{!alreadyLinked && trip.operador_id && <button type="button" className={`${button} mt-4`} disabled={busy} onClick={() => void syncOperator()}>{busy ? 'Guardando…' : 'Vincular operador asignado'}</button>}</div>}
+      {documents.length > 0 && trip.unidad_id && <div className="mt-3 rounded-lg border border-slate-200 p-4 text-sm"><p>Unidad asignada: <strong>{trip.unidad || trip.unidad_id}</strong>{unitLinked ? ' · vinculada al borrador' : ' · pendiente de vincular'}</p>{transport?.placas && <p className="mt-1 text-xs text-slate-500">Placas guardadas en el borrador: {transport.placas}</p>}{!unitLinked && ['BORRADOR', 'RECHAZADO'].includes(document?.cfdi.estado || '') && <button type="button" className={`${button} mt-3`} disabled={busy} onClick={() => void syncUnit()}>{busy ? 'Guardando…' : 'Vincular unidad asignada'}</button>}</div>}
       {!documents.length && <p className="mt-4 text-sm text-slate-500">Aún no hay una Carta Porte para este viaje.</p>}
-      {demo ? <p className="mt-4 text-xs text-amber-800">Modo demostración: el borrador y el vínculo se guardan solo en este navegador.</p> : <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm">Empresa emisora<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={issuerId} onChange={event => setIssuerId(event.target.value)}><option value="">Seleccionar</option>{issuers.map(row => <option key={row.id} value={row.id}>{row.razon_social || row.nombre}</option>)}</select></label><label className="text-sm">Tipo de comprobante<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceType} onChange={event => setInvoiceType(event.target.value as 'I' | 'T')}><option value="I">Ingreso</option><option value="T">Traslado</option></select></label></div>}
+      {demo ? <p className="mt-4 text-xs text-amber-800">Modo demostración: el borrador, el operador y la referencia de la unidad se guardan solo en este navegador. Los datos del vehículo se copiarán al usar el servicio real.</p> : <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm">Empresa emisora<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={issuerId} onChange={event => setIssuerId(event.target.value)}><option value="">Seleccionar</option>{issuers.map(row => <option key={row.id} value={row.id}>{row.razon_social || row.nombre}</option>)}</select></label><label className="text-sm">Tipo de comprobante<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={invoiceType} onChange={event => setInvoiceType(event.target.value as 'I' | 'T')}><option value="I">Ingreso</option><option value="T">Traslado</option></select></label></div>}
       {!documents.length && <button type="button" className={`${button} mt-4`} disabled={busy || !trip.operador_id || (!demo && (!issuerId || !issuers.length))} onClick={() => void createDraft()}>{busy ? 'Creando borrador…' : 'Crear borrador de Carta Porte'}</button>}
       {documents.length > 1 && <p className="mt-3 text-xs text-slate-500">Este viaje tiene {documents.length} documentos de Carta Porte.</p>}
     </>}

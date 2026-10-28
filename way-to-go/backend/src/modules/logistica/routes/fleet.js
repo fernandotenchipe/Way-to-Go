@@ -1,12 +1,17 @@
 import express from 'express';
 import { requireFleetEdit, requireFleetRead } from '../middleware/auth.js';
+import { saveFleetUnit } from '../services/fleet-unit-data.js';
+
+const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 export default function fleetRouter({ pool, wrap, fail }) {
   const router = express.Router();
 
   router.get('/fleet', requireFleetRead, wrap(async (req, res) => {
     const [units, location] = await Promise.all([
-      pool.query(`SELECT u.id,u.numero_economico,u.placas,u.tipo_unidad,u.marca,u.modelo,u.anio,u.capacidad_kg,u.capacidad_pallets,u.hazmat,u.refrigerada,u.proveedor_id,p.razon_social AS proveedor,u.estatus,
+      pool.query(`SELECT u.id,u.numero_economico,u.placas,u.tipo_unidad,u.marca,u.modelo,u.anio,u.capacidad_kg,u.capacidad_pallets,u.hazmat,u.refrigerada,u.proveedor_id,p.razon_social AS proveedor,u.estatus,u.updated_at,
+        u.configuracion_vehicular_sat,u.permiso_sict_sat,u.numero_permiso_sict,u.peso_vacio_kg,u.peso_bruto_permitido_t,u.vin,u.largo_m,u.ancho_m,u.alto_m,
+        COALESCE(insurance.seguros,'[]'::jsonb) AS seguros,
         arrival.ocurrido_at AS ultima_llegada_at,arrival_user.nombre AS llegada_por,
         block.id AS bloqueo_id,block.ocurrido_at AS bloqueada_at,block.motivo AS bloqueo_motivo,block_user.nombre AS bloqueada_por,
         trip.folio::text AS proximo_folio,trip.cita_carga_at AS proxima_reserva_desde,trip.entrega_estimada_at AS proxima_reserva_hasta,
@@ -18,6 +23,7 @@ export default function fleetRouter({ pool, wrap, fail }) {
         LEFT JOIN tms.usuarios block_user ON block_user.id=block.registrado_por
         LEFT JOIN LATERAL (SELECT v.folio,v.cita_carga_at,v.entrega_estimada_at FROM tms.viajes v WHERE v.unidad_id=u.id AND v.estado_operativo NOT IN ('ENTREGADO','CANCELADO') AND v.recursos_liberados_at IS NULL AND v.reserva_hasta>now() ORDER BY v.reserva_desde LIMIT 1) trip ON true
         LEFT JOIN LATERAL (SELECT count(*) FILTER(WHERE d.vence_el IS NULL OR d.vence_el>=current_date)::int AS vigentes,count(*) FILTER(WHERE d.vence_el<current_date)::int AS vencidos FROM tms.unidad_documentos d WHERE d.unidad_id=u.id) docs ON true
+        LEFT JOIN LATERAL (SELECT jsonb_agg(to_jsonb(s) - 'archivo_id' ORDER BY s.tipo) AS seguros FROM (SELECT DISTINCT ON (tipo) id,tipo,aseguradora,poliza,vigente_desde,vigente_hasta FROM tms.unidad_seguros WHERE unidad_id=u.id AND activo ORDER BY tipo,updated_at DESC,id DESC) s) insurance ON true
         ORDER BY u.numero_economico`),
       pool.query('SELECT direccion,latitud,longitud,updated_at FROM tms.ubicacion_wtg WHERE id=1'),
     ]);
@@ -25,6 +31,19 @@ export default function fleetRouter({ pool, wrap, fail }) {
     const visibleUnits = canSeeArrivalAudit ? units.rows : units.rows.map(unit => ({ ...unit, ultima_llegada_at: null, llegada_por: null, bloqueada_at: null, bloqueada_por: null }));
     res.json({ success: true, data: { units: visibleUnits, location: location.rows[0] || null } });
   }));
+
+  const saveUnit = async (req, res, id = null) => {
+    if (!uuid(req.user.id) && !(process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true')) return fail(res, 403, 'Inicia sesión con un usuario TMS válido');
+    try {
+      const data = await saveFleetUnit(pool, req.body, id, req.body?.expected_updated_at);
+      return res.status(id ? 200 : 201).json({ success: true, data, created: !id });
+    } catch (error) {
+      if (error.status) return fail(res, error.status, error.message);
+      throw error;
+    }
+  };
+  router.post('/fleet/units', requireFleetEdit, wrap((req, res) => saveUnit(req, res)));
+  router.patch('/fleet/units/:id', requireFleetEdit, wrap((req, res) => saveUnit(req, res, req.params.id)));
 
   router.put('/fleet/location', requireFleetEdit, wrap(async (req, res) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.user.id)) return fail(res, 403, 'Se requiere una sesión TMS válida para configurar la ubicación');

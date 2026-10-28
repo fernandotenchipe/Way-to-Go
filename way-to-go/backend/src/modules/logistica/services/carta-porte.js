@@ -105,10 +105,15 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
       if (!rows[0]) reject(422,'INACTIVE_UNIT','Unidad no disponible');
       for (const [key,origin] of Object.entries({placas:'placas',anio_modelo:'anio',configuracion_vehicular_sat:'configuracion_vehicular_sat',permiso_sict_sat:'permiso_sict_sat',numero_permiso_sict:'numero_permiso_sict'})) if (refresh||!(key in row)) row[key]=rows[0][origin];
       for (const [prefix,type] of [['rc','RESPONSABILIDAD_CIVIL'],['ambiental','AMBIENTAL'],['carga','CARGA']]) {
+        if (refresh || !(`seguro_${prefix}_id` in row)) {
+          const {rows: policies}=await db.query("SELECT id FROM tms.unidad_seguros WHERE unidad_id=$1 AND tipo=$2 AND activo AND (vigente_desde IS NULL OR vigente_desde<=current_date) AND (vigente_hasta IS NULL OR vigente_hasta>=current_date) ORDER BY updated_at DESC,id DESC LIMIT 1",[row.unidad_id,type]);
+          row[`seguro_${prefix}_id`]=policies[0]?.id||null;
+        }
         if (row[`seguro_${prefix}_id`]) {
-          const policy=await source(db,'unidad_seguros',row[`seguro_${prefix}_id`]);
+          const policy=await source(db,'unidad_seguros',row[`seguro_${prefix}_id`],false);
           if (policy.unidad_id!==row.unidad_id || policy.tipo!==type) reject(422,'INSURANCE_MISMATCH','Seguro de otra unidad o cobertura');
-          row[`aseguradora_${prefix}`]=policy.aseguradora; row[`poliza_${prefix}`]=policy.poliza;
+          if (refresh || !(`aseguradora_${prefix}` in row)) row[`aseguradora_${prefix}`]=policy.aseguradora;
+          if (refresh || !(`poliza_${prefix}` in row)) row[`poliza_${prefix}`]=policy.poliza;
         }
       }
     }
@@ -259,6 +264,10 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
         const f=await insert(db,'cfdi',{viaje_id:t.id,empresa_emisora_id:issuer.id,cliente_id:customer.id,tipo_comprobante:input.tipo_comprobante,creado_por:actor,
           emisor_snapshot:json({rfc:issuer.rfc,nombre:issuer.razon_social,regimen_fiscal_sat:issuer.regimen_fiscal_sat,domicilio:issuer.domicilio}),receptor_snapshot:json(fiscalCustomer(customer)),lugar_expedicion_cp:issuer.lugar_expedicion_cp,uso_cfdi_sat:customer.uso_cfdi,forma_pago_sat:customer.forma_pago,metodo_pago_sat:customer.metodo_pago});
         const cp=await insert(db,'cartas_porte',{cfdi_id:f.id,viaje_id:t.id});
+        if (t.unidad_id) {
+          const transport=await snapshots(db,'transport',{unidad_id:t.unidad_id});
+          await insert(db,'cp_autotransporte',{carta_porte_id:cp.id,...transport});
+        }
         await audit(db,actor,'cartas_porte',cp.id,'CREAR',f.id); return aggregate(db,cp.id);
       });
     },
