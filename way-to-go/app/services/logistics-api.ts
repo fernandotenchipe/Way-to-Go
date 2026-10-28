@@ -59,7 +59,7 @@ export interface LogisticsFleetEvent { unidad_id: string; numero_economico: stri
 export interface LogisticsTripEvent { id: string; tipo: string; comentario: string | null; ocurrido_at: string; created_at?: string; registrado_por_nombre?: string; estado_nuevo?: string | null; datos?: { categoria?: string; antes?: Record<string, unknown>; despues?: Record<string, unknown> } }
 export interface LogisticsTripRecord { tiempos: Record<string, string | null>; eventos: LogisticsTripEvent[]; unidades: LogisticsResource[]; operadores: LogisticsResource[]; cajas: LogisticsResource[]; proveedores: LogisticsResource[] }
 export interface LogisticsEvidence { id: string; tipo_evidencia_id: string; nombre: string; estado: string; obligatoria_facturar?: boolean; entregas: Array<{ archivo_id: string; nombre: string; estado: string; created_at: string; subida_por_nombre?: string; mime_type: string }> | null }
-export interface LogisticsTripSession { nombre: string; canEdit: boolean; canEditFleet: boolean; demoFleetOnly?: boolean; canAdvance: boolean; validActor: boolean }
+export interface LogisticsTripSession { nombre: string; canEdit: boolean; canEditFleet: boolean; demoFleetOnly?: boolean; canEditOperators?: boolean; demoOperatorsOnly?: boolean; canAdvance: boolean; validActor: boolean }
 
 export interface LogisticsResponse<T> {
   success: boolean;
