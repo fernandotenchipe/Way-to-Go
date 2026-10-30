@@ -1,6 +1,7 @@
 import express from 'express';
 import tripRecordRouter from './trip-record.js';
 import fleetRouter from './fleet.js';
+import fleetBoxesRouter from './fleet-boxes.js';
 import operatorsRouter from './operators.js';
 import cartaPorteRouter from './carta-porte.js';
 import { createCartaPorteStorage } from '../services/carta-porte-storage.js';
@@ -69,6 +70,7 @@ router.use(cartaPorteRouter({ pool, files: createCartaPorteStorage({ pool }) }))
 const requireActor = (req, res, next) => isUuid(req.user.id) ? next() : fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');
 router.use(tripRecordRouter({ pool, wrap, fail, isUuid }));
 router.use(fleetRouter({ pool, wrap, fail }));
+router.use(fleetBoxesRouter({ pool }));
 
 router.get('/dashboard', requireTripRead, wrap(async (_req, res) => {
   const { rows: [summary] } = await query(`

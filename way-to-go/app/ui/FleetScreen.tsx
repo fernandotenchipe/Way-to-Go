@@ -6,6 +6,7 @@ import { logisticsApi, type LogisticsFleetEvent, type LogisticsFleetLocation, ty
 import { CatalogMetric, CatalogPageHeader, CatalogSearch, CatalogTable, LogisticsFormField } from './LogisticsCatalogComponents';
 import FleetUnitEditor from './FleetUnitEditor';
 import FleetUnitDetail from './FleetUnitDetail';
+import FleetBoxesScreen from './FleetBoxesScreen';
 
 const card = 'rounded-xl border border-slate-200 bg-white shadow-sm';
 const primary = 'rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
@@ -37,6 +38,7 @@ function LocationMap({ point, onChange }: { point: { latitud: number; longitud: 
 }
 
 export default function FleetScreen() {
+  const [resourceTab, setResourceTab] = useState<'units' | 'boxes'>('units');
   const [units, setUnits] = useState<LogisticsFleetUnit[]>([]);
   const [location, setLocation] = useState<LogisticsFleetLocation | null>(null);
   const [calendar, setCalendar] = useState<LogisticsFleetEvent[]>([]);
@@ -111,8 +113,11 @@ export default function FleetScreen() {
   const monthLabel = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(month);
   const locationEdit = () => { setAddress(location?.direccion || ''); setPoint(location ? { latitud: Number(location.latitud), longitud: Number(location.longitud) } : { latitud: 19.4326, longitud: -99.1332 }); setEditingLocation(true); };
 
+  if (resourceTab === 'boxes') return <FleetBoxesScreen onUnits={() => setResourceTab('units')} />;
+
   return <div className="space-y-6 p-6 lg:p-8">
     <CatalogPageHeader eyebrow="Recursos operativos" title="Flota y disponibilidad" description="Consulta reservas, registra llegadas y administra bloqueos de atención en las instalaciones de WTG." action={<button className={subtle} onClick={() => void refresh()}>Actualizar</button>}/>
+    <div className="flex gap-5 border-b border-slate-200"><button className="border-b-2 border-amber-500 pb-3 text-sm font-bold text-[#0b1f3b]" aria-current="page">Unidades motrices</button><button className="pb-3 text-sm text-slate-600" onClick={() => setResourceTab('boxes')}>Cajas y remolques</button></div>
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{error}</span><button className={subtle} onClick={() => { void refresh(); void loadCalendar(); }}>Reintentar</button></div>}
     {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><CatalogMetric label="Unidades activas" value={String(counts.total)} note="Unidades que no están dadas de baja"/><CatalogMetric label="Disponibles" value={String(counts.active)} note="Sin bloqueo de mantenimiento"/><CatalogMetric label="Bloqueadas" value={String(counts.blocked)} note="Requieren liberación manual"/><CatalogMetric label="Reservas del mes" value={String(counts.reservations)} note="Viajes con unidad reservada"/></div>
