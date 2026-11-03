@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
 import { setupWebSocket } from './modules/rastreo/websocket/wsServer.js';
+import { isLocalTmsAccessEnabled } from './modules/logistica/middleware/auth.js';
 
 // Import routes
 import trucksRouter from './modules/rastreo/routes/trucks.js';
@@ -15,6 +16,18 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const localTmsRequested = process.env.LOGISTICA_LOCAL_TMS_ACCESS === 'true';
+const localDemoRequested = process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true';
+if (localTmsRequested) {
+  const frontendHost = (() => {
+    try { return new URL(process.env.FRONTEND_URL || '').hostname; } catch { return null; }
+  })();
+  if (!isLocalTmsAccessEnabled() || process.env.LOGISTICA_AUTH_DISABLED === 'true'
+    || !['localhost', '127.0.0.1', '[::1]'].includes(frontendHost)
+    || !process.env.LOGISTICA_LOCAL_TMS_USER_EMAIL?.trim()) {
+    throw new Error('Acceso TMS local requiere NODE_ENV=development, LOGISTICA_AUTH_DISABLED=false, FRONTEND_URL local y LOGISTICA_LOCAL_TMS_USER_EMAIL');
+  }
+}
 
 // Middleware
 app.use(cors({
@@ -72,7 +85,7 @@ const server = http.createServer(app);
 setupWebSocket(server);
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, localTmsRequested || localDemoRequested ? '127.0.0.1' : undefined, () => {
   console.log(`
 ╔════════════════════════════════════════════╗
 ║   WAY TO GO API Server                     ║
