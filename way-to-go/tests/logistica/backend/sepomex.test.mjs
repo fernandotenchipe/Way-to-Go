@@ -42,6 +42,27 @@ test('código postal exacto conserva ceros iniciales, deduplica filas visibles y
   assert.deepEqual(query.values, [version.id, '01000']);
   assert.match(query.sql, /SELECT DISTINCT/);
   assert.match(query.sql, /version_id = \$1 AND codigo_postal = \$2/);
+  assert.match(query.sql, /id_asentamiento_cpcons/);
+  assert.match(query.sql, /ORDER BY asentamiento, clave_estado, clave_municipio, id_asentamiento_cpcons/);
+});
+
+test('la consulta por código postal incluye en SELECT las columnas usadas en ORDER BY con DISTINCT', async () => {
+  const calls = [];
+  const pool = { async query(sql, values = []) {
+    calls.push({ sql, values });
+    if (sql.includes('FROM tms.sepomex_versiones')) return { rows: [version] };
+    const selected = sql.match(/SELECT DISTINCT([\s\S]*?)FROM tms\.sepomex_asentamientos/i)?.[1] || '';
+    const ordered = sql.match(/ORDER BY([\s\S]*)$/i)?.[1] || '';
+    for (const column of ordered.split(',').map(value => value.trim())) {
+      if (!new RegExp(`\\b${column}\\b`).test(selected)) {
+        throw Object.assign(new Error('for SELECT DISTINCT, ORDER BY expressions must appear in select list'), { code: '42P10' });
+      }
+    }
+    return { rows: [{ ...settlement, codigo_postal_oficina: '01000', id_asentamiento_cpcons: '0001' }] };
+  } };
+  const result = await createSepomexService({ pool }).postalCode('01000');
+  assert.equal(result.asentamientos[0].id_asentamiento_cpcons, '0001');
+  assert.equal(calls.length, 2);
 });
 
 test('búsqueda de asentamientos pagina, filtra por estado y usa parámetros en SQL', async () => {

@@ -102,7 +102,8 @@ export function createSepomexService({ pool }) {
         const version = await latestVersion(pool);
         const { rows } = await pool.query(`
           SELECT DISTINCT codigo_postal, asentamiento, tipo_asentamiento, municipio, estado,
-            ciudad, codigo_postal_oficina, clave_estado, clave_municipio, clave_ciudad
+            ciudad, codigo_postal_oficina, clave_estado, clave_municipio, clave_ciudad,
+            id_asentamiento_cpcons
           FROM tms.sepomex_asentamientos
           WHERE version_id = $1 AND codigo_postal = $2
           ORDER BY asentamiento, clave_estado, clave_municipio, id_asentamiento_cpcons
