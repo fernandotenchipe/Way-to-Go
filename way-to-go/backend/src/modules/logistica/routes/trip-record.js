@@ -2,9 +2,18 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { requireTripRead, requireTripEdit } from '../middleware/auth.js';
 import { scheduleKeys, validateTripSchedule, reserveTripResources } from '../services/trip-schedule.js';
+import { createTripCargoService } from '../services/trip-cargo.js';
 
 export default function tripRecordRouter({ pool, wrap, fail, isUuid }) {
   const router = express.Router();
+  const cargoService=createTripCargoService({pool});
+  const cargoRoute=action=>async(req,res,next)=>{
+    try { const data=await action(req,res);if(!res.headersSent)res.json({success:true,data}); }
+    catch(error) {
+      if(error.status)return res.status(error.status).json({success:false,code:error.code||'INVALID_REQUEST',error:error.message,...(error.fields?.length?{fields:error.fields}:{})});
+      next(error);
+    }
+  };
   router.get('/session', (req, res) => {
     const localDemo = process.env.NODE_ENV !== 'production' && process.env.LOGISTICA_AUTH_DISABLED === 'true';
     const validActor = isUuid(req.user.id);
@@ -19,6 +28,11 @@ export default function tripRecordRouter({ pool, wrap, fail, isUuid }) {
       validActor,
     } });
   });
+  router.get('/trips/:folio/cargo',requireTripRead,cargoRoute(req=>cargoService.list(req.params.folio)));
+  router.put('/trips/:folio/cargo',requireTripEdit,cargoRoute((req,res)=>{
+    if(!isUuid(req.user.id))return fail(res,403,'Inicia sesión con un usuario TMS válido para guardar mercancías');
+    return cargoService.save(req.params.folio,req.body||{},req.get('Idempotency-Key'),req.user.id);
+  }));
   router.post('/trips/:folio/notes', requireTripEdit, wrap(async (req, res) => {
     if (!isUuid(req.user.id)) return fail(res, 403, 'Inicia sesión con un usuario TMS válido para agregar notas');
     const text = req.body?.texto;

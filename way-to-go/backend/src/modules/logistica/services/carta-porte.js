@@ -3,6 +3,7 @@ import { catalogs, children, groups, headerFields, invoiceFields } from './carta
 import { reject, uuid, fields, only, object, revision, decimal, formatDecimal, multiplyDecimal } from './carta-porte-input.js';
 import { createFiscalOperations } from './carta-porte-operations.js';
 import { createOperatorService } from './operators.js';
+import { findInvalidTripCargoSatKeys, mapTripCargoToCartaPorte, readTripCargoRows, tripPrefillMissing } from './trip-cargo.js';
 
 const editable = new Set(['BORRADOR','RECHAZADO']);
 const json = value => JSON.stringify(value);
@@ -67,6 +68,15 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
     const {rows: invoices}=await db.query('SELECT * FROM tms.cfdi WHERE id=$1',[cp.cfdi_id]);
     const data={...cp,cfdi:invoices[0]};
     for (const [key,c] of Object.entries(children)) data[key]=(await db.query(`SELECT * FROM tms.${c.table} WHERE ${c.scope}=$1 ORDER BY created_at`,[c.scope==='cfdi_id'?cp.cfdi_id:cp.id])).rows;
+    const parseSnapshot=value=>{if(value&&typeof value==='object')return value;if(typeof value==='string'){try{return JSON.parse(value);}catch{}}return {};};
+    const locations=data.locations||[];
+    const location=(type)=>{const row=locations.find(item=>item.tipo===type);if(!row)return null;const address=parseSnapshot(row.domicilio_snapshot);return {...address,ciudad:address.ciudad??address.municipio,fecha_hora:row.fecha_hora};};
+    const receiver=parseSnapshot(data.cfdi?.receptor_snapshot);
+    const figure=(data.figures||[]).find(item=>item.tipo_figura_sat==='01');
+    data.precarga={faltantes:tripPrefillMissing({
+      customer:{rfc:receiver.rfc,regimen_fiscal:receiver.regimen_fiscal_sat,domicilio_legal_codigo_postal:receiver.domicilio_fiscal_cp},
+      origin:location('Origen'),destination:location('Destino'),transport:data.transport?.[0]||null,operator:figure||null,cargo:data.merchandise||[],
+    })};
     return data;
   }
   async function source(db, table, resourceId, active=true) {
@@ -77,6 +87,55 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
   function fiscalCustomer(c) {
     return {rfc:c.rfc,nombre:c.razon_social,regimen_fiscal_sat:c.regimen_fiscal,domicilio_fiscal_cp:c.domicilio_legal_codigo_postal,
       residencia_fiscal_sat:c.residencia_fiscal_sat,numero_registro_tributario:c.numero_registro_tributario};
+  }
+  async function tripPrefill(db,t,cp,customer,transport) {
+    const sourceCargoRows=await readTripCargoRows(db,t.id);
+    const invalidKeys=await findInvalidTripCargoSatKeys(db,sourceCargoRows);
+    const cargoRows=sourceCargoRows.map((cargo,index)=>{
+      const filtered={...cargo};
+      for(const invalid of invalidKeys)if(invalid.index===index)filtered[invalid.field]=null;
+      return filtered;
+    });
+    const {rows:[times]}=await db.query('SELECT salida_programada_at,descarga_programada_at FROM tms.viaje_tiempos WHERE viaje_id=$1',[t.id]);
+    const addressRows=(await db.query(`SELECT v.tipo,v.posicion,v.fecha_hora,a.*,p.id AS participante_id,d.id AS cp_direccion_id
+      FROM (VALUES ('Origen',$1::uuid,$2::uuid,$3::timestamptz,1),('Destino',$4::uuid,$5::uuid,$6::timestamptz,2)) v(tipo,cliente_id,direccion_id,fecha_hora,posicion)
+      JOIN tms.clientes c ON c.id=v.cliente_id
+      JOIN tms.cliente_direcciones a ON a.id=v.direccion_id AND a.cliente_id=c.id
+      LEFT JOIN tms.cp_participantes p ON p.cliente_id=c.id
+      LEFT JOIN tms.cp_direcciones d ON d.cliente_direccion_id=a.id`,
+      [t.cliente_id,t.origen_id,t.cita_carga_at||times?.salida_programada_at,t.cliente_id,t.destino_id,times?.descarga_programada_at||t.entrega_estimada_at])).rows;
+    for (const a of addressRows) {
+      let p=a.participante_id;
+      if (!p) {
+        const inserted=await db.query(`INSERT INTO tms.cp_participantes(cliente_id,nombre,rfc)
+          SELECT id,razon_social,rfc FROM tms.clientes WHERE id=$1 ON CONFLICT(cliente_id) DO NOTHING RETURNING id`,[t.cliente_id]);
+        p=inserted.rows[0]?.id||(await db.query('SELECT id FROM tms.cp_participantes WHERE cliente_id=$1',[t.cliente_id])).rows[0]?.id;
+      }
+      let d=a.cp_direccion_id;
+      if (!d) {
+        const inserted=await db.query(`INSERT INTO tms.cp_direcciones(participante_id,cliente_direccion_id,nombre,calle,numero_exterior,numero_interior,colonia,localidad,municipio,estado,pais,codigo_postal,referencia,pais_sat,estado_sat,municipio_sat,localidad_sat,colonia_sat,zona_horaria)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          ON CONFLICT(cliente_direccion_id) DO NOTHING RETURNING id`,[p,a.id,a.nombre,a.calle,a.numero_exterior,a.numero_interior,a.colonia,a.localidad,a.ciudad,a.estado,a.pais,a.codigo_postal,a.referencia,a.pais_sat,a.estado_sat,a.municipio_sat,a.localidad_sat,a.colonia_sat,a.zona_horaria]);
+        d=inserted.rows[0]?.id||(await db.query('SELECT id FROM tms.cp_direcciones WHERE cliente_direccion_id=$1',[a.id])).rows[0]?.id;
+      }
+      if (p&&d) {
+        const location=await snapshots(db,'locations',{carta_porte_id:cp.id,posicion:a.posicion,tipo:a.tipo,identificador_sat:a.tipo==='Origen'?'OR000001':'DE000001',participante_id:p,direccion_id:d,fecha_hora:a.fecha_hora});
+        await insert(db,'cp_ubicaciones',location);
+      }
+    }
+    const origin=addressRows.find(x=>x.tipo==='Origen');
+    const destination=addressRows.find(x=>x.tipo==='Destino');
+    let operator=null;
+    if (t.operador_id) {
+      operator=(await db.query('SELECT * FROM tms.operadores WHERE id=$1 AND activo=true',[t.operador_id])).rows[0]||null;
+      if(operator) await insert(db,'cp_figuras',await snapshots(db,'figures',{tipo_figura_sat:'01',operador_id:operator.id}));
+    }
+    for(const item of mapTripCargoToCartaPorte(cargoRows,cp.id))await insert(db,'cp_mercancias',item);
+    const firstDescribedCargo=cargoRows.find(cargo=>cargo.descripcion||cargo.mercancia);
+    const headerDescription=firstDescribedCargo?.descripcion||firstDescribedCargo?.mercancia;
+    if(headerDescription)await update(db,'cartas_porte',{descripcion_carga:headerDescription},'id=$1',[cp.id]);
+    const mappedCargo=cargoRows.map(cargo=>({...cargo,descripcion:cargo.descripcion||cargo.mercancia}));
+    return {missing:tripPrefillMissing({customer,origin,destination,transport,operator,cargo:mappedCargo})};
   }
   async function participant(db, pId) {
     const p=await source(db,'cp_participantes',pId);
@@ -92,7 +151,9 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
         if (a.participante_id!==row.participante_id) reject(422,'ADDRESS_OWNER','La dirección no pertenece al participante');
         const addr=a.cliente_direccion_id?await source(db,'cliente_direcciones',a.cliente_direccion_id):a;
         if (a.cliente_direccion_id) { const p=await source(db,'cp_participantes',a.participante_id); if (p.cliente_id!==addr.cliente_id) reject(422,'ADDRESS_OWNER','Cliente y dirección no coinciden'); }
-        row.domicilio_snapshot=json(Object.fromEntries(['calle','numero_exterior','numero_interior','colonia','localidad','municipio','estado','pais','codigo_postal','referencia','pais_sat','estado_sat','municipio_sat','localidad_sat','colonia_sat'].map(k=>[k,addr[k]??null])));
+        const domicile=Object.fromEntries(['calle','numero_exterior','numero_interior','colonia','localidad','municipio','estado','pais','codigo_postal','referencia','pais_sat','estado_sat','municipio_sat','localidad_sat','colonia_sat'].map(k=>[k,addr[k]??null]));
+        domicile.ciudad=addr.ciudad??addr.municipio??null;
+        row.domicilio_snapshot=json(domicile);
         row.zona_horaria=addr.zona_horaria;
       }
     }
@@ -264,11 +325,16 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
         const f=await insert(db,'cfdi',{viaje_id:t.id,empresa_emisora_id:issuer.id,cliente_id:customer.id,tipo_comprobante:input.tipo_comprobante,creado_por:actor,
           emisor_snapshot:json({rfc:issuer.rfc,nombre:issuer.razon_social,regimen_fiscal_sat:issuer.regimen_fiscal_sat,domicilio:issuer.domicilio}),receptor_snapshot:json(fiscalCustomer(customer)),lugar_expedicion_cp:issuer.lugar_expedicion_cp,uso_cfdi_sat:customer.uso_cfdi,forma_pago_sat:customer.forma_pago,metodo_pago_sat:customer.metodo_pago});
         const cp=await insert(db,'cartas_porte',{cfdi_id:f.id,viaje_id:t.id});
+        let transport=null;
         if (t.unidad_id) {
-          const transport=await snapshots(db,'transport',{unidad_id:t.unidad_id});
+          transport=await snapshots(db,'transport',{unidad_id:t.unidad_id});
           await insert(db,'cp_autotransporte',{carta_porte_id:cp.id,...transport});
         }
-        await audit(db,actor,'cartas_porte',cp.id,'CREAR',f.id); return aggregate(db,cp.id);
+        const prefill=await tripPrefill(db,t,cp,customer,transport);
+        await audit(db,actor,'cartas_porte',cp.id,'CREAR',f.id,{precarga_faltante:prefill.missing});
+        const document=await aggregate(db,cp.id);
+        document.precarga.faltantes=[...new Set([...document.precarga.faltantes,...prefill.missing])];
+        return document;
       });
     },
     async patch(cpId,body,actor) {
