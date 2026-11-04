@@ -41,6 +41,12 @@ test('proveedor local enumera catálogos y pagina sin exponer reglas originales'
   assert.equal(page.paginacion.total, 1);
   assert.equal(page.resultados[0].clave, 'G01');
   assert.equal('reglas' in page.resultados[0], false);
+  const first = await provider.search('c_UsoCFDI', { page: 1, limit: 1, vigente: false });
+  const second = await provider.search('c_UsoCFDI', { page: 2, limit: 1, vigente: false });
+  assert.equal(first.paginacion.total, 2);
+  assert.equal(first.resultados[0].clave, 'G01');
+  assert.equal(second.resultados[0].clave, 'P01');
+  assert.equal((await provider.search('c_UsoCFDI', { q: 'P01', vigente: false })).resultados[0].clave, 'P01');
 });
 
 test('proveedor local conserva ceros iniciales, filtra vigencia y exige contexto en claves ambiguas', async (t) => {
@@ -73,6 +79,27 @@ test('rutas CFDI exigen permiso TMS y entregan respuestas paginadas', async (t) 
   const authorized = await invoke(['carta_porte.catalogos.ver']);
   assert.equal(authorized.body.success, true);
   assert.equal(authorized.body.data.resultados[0].clave, 'G01');
+});
+
+test('rutas CFDI convierten archivos faltantes a 503 y contexto inválido a 400', async () => {
+  const provider = {
+    async search() { throw Object.assign(new Error('archivo no encontrado'), { code: 'ENOENT' }); },
+    async getByKey() { assert.fail('No debe consultar con un contexto mal formado'); },
+  };
+  const router = cfdiCatalogRouter({ provider });
+  const invoke = async (routePath, params, query) => {
+    const route = router.stack.find((layer) => layer.route?.path === routePath).route;
+    const req = { params, query, user: { permissions: ['carta_porte.catalogos.ver'] } };
+    const res = { statusCode: 200, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; return this; } };
+    for (const layer of route.stack) { let next = false; await layer.handle(req, res, () => { next = true; }); if (!next) break; }
+    return res;
+  };
+  const missing = await invoke('/cfdi/catalogs/:catalog', { catalog: 'c_UsoCFDI' }, {});
+  assert.equal(missing.statusCode, 503);
+  assert.equal(missing.body.code, 'CATALOG_UNAVAILABLE');
+  const invalidContext = await invoke('/cfdi/catalogs/:catalog/keys/:key', { catalog: 'c_RegimenFiscal', key: '601' }, { contexto: '{' });
+  assert.equal(invalidContext.statusCode, 400);
+  assert.equal(invalidContext.body.code, 'INVALID_CONTEXT');
 });
 
 test('proveedor PostgreSQL comparte contrato y parametriza búsqueda, vigencia y paginación', async () => {

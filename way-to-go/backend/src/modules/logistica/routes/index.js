@@ -5,6 +5,7 @@ import fleetBoxesRouter from './fleet-boxes.js';
 import operatorsRouter from './operators.js';
 import cartaPorteRouter from './carta-porte.js';
 import cfdiCatalogRouter from './cfdi-catalogs.js';
+import sepomexRouter from './sepomex.js';
 import { createCfdiCatalogProvider } from '../services/cfdi-catalogs.js';
 import { createCartaPorteStorage } from '../services/carta-porte-storage.js';
 import multer from 'multer';
@@ -69,6 +70,7 @@ router.get('/health', (_req, res) => res.json({ success: true, module: 'logistic
 router.use(requireLogisticsUser);
 router.use(operatorsRouter({ pool }));
 router.use(cfdiCatalogRouter({ provider: createCfdiCatalogProvider({ pool }) }));
+router.use(sepomexRouter({ pool }));
 router.use(cartaPorteRouter({ pool, files: createCartaPorteStorage({ pool }) }));
 const requireActor = (req, res, next) => isUuid(req.user.id) ? next() : fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');
 router.use(tripRecordRouter({ pool, wrap, fail, isUuid }));
