@@ -72,6 +72,17 @@ export interface LogisticsResponse<T> {
   created?: boolean;
 }
 
+export interface CfdiCatalogEntry { catalogo: string; registros: number }
+export interface CfdiCatalogRow {
+  catalogo: string; clave: string; clave_contexto: Record<string, string | null>; descripcion: string;
+  vigente_desde: string | null; vigente_hasta: string | null; reglas?: Record<string, unknown>;
+}
+export interface CfdiCatalogSearch {
+  catalogo: string; resultados: CfdiCatalogRow[];
+  paginacion: { pagina: number; limite: number; total: number; paginas: number };
+  vigente: boolean; fecha_consulta: string;
+}
+
 export interface LogisticsDashboardTrip {
   folio: string;
   estado_operativo: LogisticsTripStatus;
@@ -268,6 +279,22 @@ class LogisticsApi {
 
   getCatalogs() {
     return this.request<{ servicios: LogisticsServiceType[]; evidencias: Array<{ id: string; nombre: string; codigo?: string }>; costos: unknown[]; extras: unknown[] }>('catalogs');
+  }
+
+  getCfdiCatalogs() {
+    return this.request<CfdiCatalogEntry[]>('cfdi/catalogs');
+  }
+
+  searchCfdiCatalog(catalog: string, filters: { q?: string; page?: number; limit?: number; vigente?: boolean; fecha?: string } = {}) {
+    const search = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => value != null && search.set(key, String(value)));
+    return this.request<CfdiCatalogSearch>(`cfdi/catalogs/${encodeURIComponent(catalog)}${search.size ? `?${search}` : ''}`);
+  }
+
+  getCfdiCatalogKey(catalog: string, key: string, contexto?: Record<string, string | null>) {
+    const search = new URLSearchParams();
+    if (contexto) search.set('contexto', JSON.stringify(contexto));
+    return this.request<CfdiCatalogRow>(`cfdi/catalogs/${encodeURIComponent(catalog)}/keys/${encodeURIComponent(key)}${search.size ? `?${search}` : ''}`);
   }
 
   createCustomer(input: LogisticsCustomerCreateInput) {

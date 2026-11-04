@@ -19,6 +19,7 @@
 
 # production
 /build
+/backend/private-data/
 
 # misc
 .DS_Store

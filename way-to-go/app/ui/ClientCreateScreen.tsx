@@ -9,6 +9,7 @@ import { logisticsApi, type LogisticsAddress, type LogisticsCustomer, type Logis
 import { getDemoLogisticsCustomers, saveDemoLogisticsCustomer, type DemoLogisticsCustomer } from '../services/logistics-demo-customers';
 import { hasDuplicateCustomerRfc, isValidContactEmail, isValidMexicanRfc, normalizeCustomerRfc } from '../services/customer-validation';
 import { CatalogPageHeader, LogisticsFormField, LogisticsFormSection, logisticsFieldClassName } from './LogisticsCatalogComponents';
+import CfdiCatalogSelect from './CfdiCatalogSelect';
 
 import LogisticsAddressFields, { readAddress, isAddressStarted, isAddressComplete } from './LogisticsAddressFields';
 
@@ -233,10 +234,10 @@ export default function ClientCreateScreen() {
         </LogisticsFormSection>
 
         <LogisticsFormSection title="Datos de facturación y pago" description="Opcionales; puedes agregarlos cuando el cliente confirme sus condiciones.">
-          <LogisticsFormField label="Régimen fiscal receptor"><input name="regimen_fiscal" maxLength={80} className={field} placeholder="Según constancia de situación fiscal"/></LogisticsFormField>
-          <LogisticsFormField label="Uso CFDI"><input name="uso_cfdi" maxLength={40} className={field} placeholder="Clave o descripción"/></LogisticsFormField>
-          <LogisticsFormField label="Forma de pago"><input name="forma_pago" maxLength={60} className={field} placeholder="Forma acordada"/></LogisticsFormField>
-          <LogisticsFormField label="Método de pago"><input name="metodo_pago" maxLength={60} className={field} placeholder="Método acordado"/></LogisticsFormField>
+          <CfdiCatalogSelect catalog="c_RegimenFiscal" name="regimen_fiscal" label="Régimen fiscal receptor"/>
+          <CfdiCatalogSelect catalog="c_UsoCFDI" name="uso_cfdi" label="Uso CFDI"/>
+          <CfdiCatalogSelect catalog="c_FormaPago" name="forma_pago" label="Forma de pago"/>
+          <CfdiCatalogSelect catalog="c_MetodoPago" name="metodo_pago" label="Método de pago"/>
           <LogisticsFormField label="Condiciones de pago"><input name="condiciones_pago" maxLength={500} className={field} placeholder="Plazo o notas de crédito"/></LogisticsFormField>
         </LogisticsFormSection>
 

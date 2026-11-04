@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { LogisticsAddress, LogisticsCustomerAgreement, LogisticsCustomerContact, LogisticsCustomerDetail, LogisticsServiceType } from '../services/logistics-api';
 import { LogisticsFormField, LogisticsFormSection, logisticsFieldClassName } from './LogisticsCatalogComponents';
+import CfdiCatalogSelect from './CfdiCatalogSelect';
 
 export type ClientEditorModal = { kind: 'client' } | { kind: 'address'; address?: LogisticsAddress } | { kind: 'contact'; contact?: LogisticsCustomerContact } | { kind: 'agreement'; agreement?: LogisticsCustomerAgreement };
 
@@ -67,10 +68,10 @@ export default function ClientRecordDialog({
               <div className="flex flex-wrap gap-4 pb-2 text-sm text-slate-700"><label className="flex items-center gap-2"><input type="checkbox" name="servicios_acordados" value="IMPORTACION" defaultChecked={customer.servicios_acordados?.includes('IMPORTACION')} className="accent-[#0b1f3b]"/>Importación</label><label className="flex items-center gap-2"><input type="checkbox" name="servicios_acordados" value="EXPORTACION" defaultChecked={customer.servicios_acordados?.includes('EXPORTACION')} className="accent-[#0b1f3b]"/>Exportación</label></div>
             </LogisticsFormSection>
             <LogisticsFormSection title="Facturación y pago" description="Puedes dejar vacíos los datos que aún no estén definidos.">
-              <LogisticsFormField label="Régimen fiscal receptor"><input name="regimen_fiscal" maxLength={80} defaultValue={customer.regimen_fiscal ?? ''} className={logisticsFieldClassName} placeholder="Según constancia fiscal" /></LogisticsFormField>
-              <LogisticsFormField label="Uso CFDI"><input name="uso_cfdi" maxLength={40} defaultValue={customer.uso_cfdi ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
-              <LogisticsFormField label="Forma de pago"><input name="forma_pago" maxLength={60} defaultValue={customer.forma_pago ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
-              <LogisticsFormField label="Método de pago"><input name="metodo_pago" maxLength={60} defaultValue={customer.metodo_pago ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
+              <CfdiCatalogSelect catalog="c_RegimenFiscal" name="regimen_fiscal" label="Régimen fiscal receptor" defaultValue={customer.regimen_fiscal}/>
+              <CfdiCatalogSelect catalog="c_UsoCFDI" name="uso_cfdi" label="Uso CFDI" defaultValue={customer.uso_cfdi}/>
+              <CfdiCatalogSelect catalog="c_FormaPago" name="forma_pago" label="Forma de pago" defaultValue={customer.forma_pago}/>
+              <CfdiCatalogSelect catalog="c_MetodoPago" name="metodo_pago" label="Método de pago" defaultValue={customer.metodo_pago}/>
               <LogisticsFormField label="Condiciones de pago"><input name="condiciones_pago" maxLength={500} defaultValue={customer.condiciones_pago ?? ''} className={logisticsFieldClassName} /></LogisticsFormField>
             </LogisticsFormSection>
           </> : editingContact ? <LogisticsFormSection title="Datos del contacto" description="La baja es lógica y conserva los datos históricos.">
