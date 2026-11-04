@@ -23,6 +23,9 @@ const schemaRows = family => tableNames(family).map(relname => ({
 test('dry-run no exige credenciales ni activa la carga real', () => {
   const dry = parseArgs(['--mode', 'dry-run', '--report', 'reporte.json']);
   assert.equal(dry.mode, 'dry-run');
+  const copyCheck = parseArgs(['--mode', 'dry-run', '--family', 'CARTA_PORTE', '--official-copy', 'copia.xls', '--report', 'reporte.json']);
+  assert.equal(copyCheck.officialCopy, 'copia.xls');
+  assert.throws(() => parseArgs(['--mode', 'dry-run', '--family', 'CFDI', '--official-copy', 'copia.xls', '--report', 'reporte.json']), /solo se admite/);
   assert.throws(() => parseArgs(['--mode', 'import', '--report', 'reporte.json', '--confirm-write']), /development/);
   assert.throws(() => parseArgs(['--mode', 'dry-run', '--report', 'reporte.json', '--actor-id', actor.actorId]), /Argumento inválido/);
 });

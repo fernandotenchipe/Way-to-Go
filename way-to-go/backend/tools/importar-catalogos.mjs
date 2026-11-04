@@ -111,6 +111,7 @@ export function parseArgs(argv) {
   }
   if (!['dry-run', 'import', 'preflight'].includes(options.mode)) throw new Error('Indica --mode dry-run, preflight o import');
   if (![...families, 'ALL'].includes(options.family)) throw new Error('Familia inválida');
+  if (options.officialCopy && options.family !== 'CARTA_PORTE') throw new Error('--official-copy solo se admite con --family CARTA_PORTE');
   options.batchSize = Number(options.batchSize);
   if (!Number.isInteger(options.batchSize) || options.batchSize < 100 || options.batchSize > 1000) throw new Error('El lote debe medir entre 100 y 1000 filas');
   if (!options.report) throw new Error('Indica --report con ruta JSON de salida');
@@ -153,6 +154,7 @@ export async function digest(file) {
 async function runPreparer(options, mode, stage, report) {
   const args = [preparer, '--mode', mode, '--family', options.family, '--report', report];
   if (stage) args.push('--stage', stage);
+  if (options.officialCopy) args.push('--official-copy', options.officialCopy);
   for (const [key, flag] of [['cartaPorte', '--carta-porte'], ['cfdi', '--cfdi'], ['sepomex', '--sepomex']]) {
     if (options[key]) args.push(flag, options[key]);
   }
@@ -678,11 +680,18 @@ async function main() {
     output.transformados = prepared.totales.transformados;
     output.catalogos = prepared.conteos;
     output.sha256 = prepared.sha256;
+    if (options.officialCopy) output.comparacion_copia_oficial = prepared.comparacion_copia_oficial;
     if (prepared.totales.rechazados || prepared.totales.transformados !== prepared.totales.esperados) throw new Error('La preparación no conservó todos los registros');
     await verifyPreparedJsonl(prepared);
     if (options.officialCopy) {
-      if (path.resolve(options.officialCopy) === path.resolve(prepared.archivo_original)) throw new Error('La copia oficial SAT debe ser un archivo independiente del XLS inventariado');
-      if (await digest(options.officialCopy) !== prepared.sha256) throw new Error('La copia obtenida del SAT no coincide byte a byte con el XLS inventariado');
+      const comparison = prepared.comparacion_copia_oficial;
+      if (!comparison?.aceptada || comparison.procedencia_sat_demostrada !== false) {
+        throw new Error('Falta evidencia completa y aceptada de comparación de la copia oficial');
+      }
+      if (await digest(prepared.archivo_original) !== comparison.sha256_original ||
+          await digest(options.officialCopy) !== comparison.sha256_copia) {
+        throw new Error('El original o la copia cambió después de la comparación; repite la preparación');
+      }
     }
     const archiveBytes = (await stat(prepared.archivo_original)).size +
       (prepared.manifiesto_jsonl ? (await stat(prepared.manifiesto_jsonl)).size : 0);
@@ -700,6 +709,7 @@ async function main() {
     output.error = sanitizeError(error);
     if (error.preparation) {
       output.preparacion = error.preparation;
+      output.comparacion_copia_oficial = error.preparation.familias?.find(item => item.comparacion_copia_oficial)?.comparacion_copia_oficial;
       output.leidos = error.preparation.familias?.reduce((sum, item) => sum + item.totales.leidos, 0) ?? 0;
       output.rechazados = error.preparation.familias?.reduce((sum, item) => sum + item.totales.rechazados, 0) ?? 0;
     }

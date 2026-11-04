@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
 import re
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -178,6 +180,143 @@ def prepare(family: str, path: Path, inventory: dict, stage: Path | None = None)
     return result
 
 
+def _same_typed_value(left: object, right: object) -> bool:
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, float) and math.isnan(left):
+        return isinstance(right, float) and math.isnan(right)
+    return left == right
+
+
+def _same_cell(left: xlrd.sheet.Cell, right: xlrd.sheet.Cell) -> bool:
+    return left.ctype == right.ctype and _same_typed_value(left.value, right.value)
+
+
+def compare_workbooks(original_path: Path, copy_path: Path, expected_sheets: list[dict]) -> dict:
+    """Compara el contenido leído del XLS sin tratarlo como prueba de procedencia."""
+    original_path = original_path.resolve(strict=True)
+    copy_path = copy_path.resolve(strict=True)
+    original_sha = file_sha(original_path)
+    copy_sha = file_sha(copy_path)
+    physically_distinct = not os.path.samefile(original_path, copy_path)
+    evidence = {
+        "archivo_original": str(original_path), "sha256_original": original_sha,
+        "copia": str(copy_path), "sha256_copia": copy_sha,
+        "archivos_fisicos_distintos": physically_distinct,
+        "mismos_nombres_y_orden_de_hojas": False, "mismas_dimensiones": False,
+        "mismos_encabezados": False, "mismo_sistema_de_fechas": False,
+        "tipos_y_valores_de_todas_las_celdas_iguales": False,
+        "hojas_comparadas": 0, "celdas_comparadas": 0,
+        "diferencias_total": 0, "diferencias": [],
+        "sha256_original_tras_comparacion": None, "sha256_copia_tras_comparacion": None,
+        "procedencia_sat_demostrada": False,
+        "nota": "La igualdad del contenido leído no demuestra que la copia provenga del SAT.",
+    }
+    if not physically_distinct:
+        evidence["diferencias"].append({"tipo": "identidad_fisica", "detalle": "La copia y el original apuntan al mismo archivo físico."})
+        evidence["diferencias_total"] = 1
+        evidence["aceptada"] = False
+        return evidence
+
+    original = xlrd.open_workbook(str(original_path), on_demand=True)
+    copied = xlrd.open_workbook(str(copy_path), on_demand=True)
+    header_rows = {item["sheet"]: int(item["header_row"]) - 1 for item in expected_sheets}
+    same_names_order = original.sheet_names() == copied.sheet_names()
+    evidence["mismos_nombres_y_orden_de_hojas"] = same_names_order
+    evidence["mismo_sistema_de_fechas"] = original.datemode == copied.datemode
+    dimensions_equal = same_names_order and original.nsheets == copied.nsheets
+    headers_equal = same_names_order
+    cell_values_equal = same_names_order
+    differences = evidence["diferencias"]
+    difference_count = 0
+
+    def record_difference(detail: dict) -> None:
+        nonlocal difference_count
+        difference_count += 1
+        if len(differences) < 100:
+            differences.append(detail)
+
+    if not same_names_order:
+        record_difference({"tipo": "hojas", "original": original.sheet_names(), "copia": copied.sheet_names()})
+    if original.datemode != copied.datemode:
+        record_difference({"tipo": "sistema_de_fechas", "original": original.datemode, "copia": copied.datemode})
+
+    copy_by_name = {copied.sheet_by_index(index).name: copied.sheet_by_index(index) for index in range(copied.nsheets)}
+    compared_cells = 0
+    for original_index in range(original.nsheets):
+        source_sheet = original.sheet_by_index(original_index)
+        copied_sheet = copy_by_name.get(source_sheet.name)
+        if copied_sheet is None:
+            dimensions_equal = False
+            headers_equal = False
+            cell_values_equal = False
+            continue
+        evidence["hojas_comparadas"] += 1
+        dims_match = source_sheet.nrows == copied_sheet.nrows and source_sheet.ncols == copied_sheet.ncols
+        if not dims_match:
+            dimensions_equal = False
+            record_difference({"tipo": "dimensiones", "hoja": source_sheet.name,
+                "original": {"filas": source_sheet.nrows, "columnas": source_sheet.ncols},
+                "copia": {"filas": copied_sheet.nrows, "columnas": copied_sheet.ncols}})
+        header_row = header_rows.get(source_sheet.name)
+        if header_row is not None:
+            if header_row >= source_sheet.nrows or header_row >= copied_sheet.nrows:
+                headers_equal = False
+                record_difference({"tipo": "encabezado_ausente", "hoja": source_sheet.name,
+                    "fila_excel": header_row + 1})
+            else:
+                header_match = source_sheet.ncols == copied_sheet.ncols and all(
+                    _same_cell(source_sheet.cell(header_row, column), copied_sheet.cell(header_row, column))
+                    for column in range(min(source_sheet.ncols, copied_sheet.ncols)))
+                if not header_match:
+                    headers_equal = False
+                    record_difference({"tipo": "encabezado_distinto", "hoja": source_sheet.name,
+                        "fila_excel": header_row + 1})
+        for row in range(max(source_sheet.nrows, copied_sheet.nrows)):
+            for column in range(max(source_sheet.ncols, copied_sheet.ncols)):
+                compared_cells += 1
+                in_source = row < source_sheet.nrows and column < source_sheet.ncols
+                in_copy = row < copied_sheet.nrows and column < copied_sheet.ncols
+                if not in_source or not in_copy:
+                    cell_values_equal = False
+                    record_difference({"tipo": "celda_ausente", "hoja": source_sheet.name,
+                        "fila_excel": row + 1, "columna_excel": column + 1,
+                        "en_original": in_source, "en_copia": in_copy})
+                    continue
+                left, right = source_sheet.cell(row, column), copied_sheet.cell(row, column)
+                if not _same_cell(left, right):
+                    cell_values_equal = False
+                    record_difference({"tipo": "celda_distinta", "hoja": source_sheet.name,
+                        "fila_excel": row + 1, "columna_excel": column + 1,
+                        "original": {"tipo_excel": left.ctype, "valor": left.value},
+                        "copia": {"tipo_excel": right.ctype, "valor": right.value}})
+    original.release_resources()
+    copied.release_resources()
+    evidence["mismas_dimensiones"] = dimensions_equal
+    evidence["mismos_encabezados"] = headers_equal
+    evidence["tipos_y_valores_de_todas_las_celdas_iguales"] = cell_values_equal
+    evidence["celdas_comparadas"] = compared_cells
+    evidence["diferencias_total"] = difference_count
+    evidence["sha256_original_tras_comparacion"] = file_sha(original_path)
+    evidence["sha256_copia_tras_comparacion"] = file_sha(copy_path)
+    hashes_stable = (evidence["sha256_original_tras_comparacion"] == original_sha and
+                     evidence["sha256_copia_tras_comparacion"] == copy_sha)
+    evidence["archivos_sin_cambios_durante_comparacion"] = hashes_stable
+    evidence["sha256_distintos"] = original_sha != copy_sha
+    evidence["aceptada"] = all((physically_distinct, same_names_order, dimensions_equal,
+        headers_equal, evidence["mismo_sistema_de_fechas"], cell_values_equal, hashes_stable))
+    return evidence
+
+
+def validate_official_copy(original_path: Path, copy_path: Path, expected_sheets: list[dict]) -> dict:
+    evidence = compare_workbooks(original_path, copy_path, expected_sheets)
+    if not evidence["aceptada"]:
+        error = ValueError("La copia SAT no coincide completamente en hojas, dimensiones, encabezados, tipos y valores del XLS original")
+        error.evidence = evidence
+        raise error
+    return evidence
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("dry-run", "prepare"), required=True)
@@ -188,16 +327,28 @@ def main() -> None:
     parser.add_argument("--inventory", type=Path, default=INVENTORY)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--stage", type=Path)
+    parser.add_argument("--official-copy", type=Path)
     args = parser.parse_args()
     if args.mode == "prepare" and (args.stage is None or args.family == "ALL"):
         parser.error("prepare requiere --stage y una sola --family")
+    if args.official_copy is not None and args.family != "CARTA_PORTE":
+        parser.error("--official-copy solo se admite con --family CARTA_PORTE")
     inventory = json.loads(args.inventory.read_text(encoding="utf-8"))
     paths = {"CARTA_PORTE": args.carta_porte, "CFDI": args.cfdi, "SEPOMEX": args.sepomex}
     families = list(SOURCES) if args.family == "ALL" else [args.family]
     results = []
     try:
         for family in families:
-            results.append(prepare(family, paths[family], inventory, args.stage))
+            result = prepare(family, paths[family], inventory, args.stage)
+            results.append(result)
+            if args.official_copy is not None:
+                try:
+                    result["comparacion_copia_oficial"] = validate_official_copy(
+                        paths[family], args.official_copy, next(item["sheets"] for item in inventory["sources"] if item["family"] == family))
+                except ValueError as exc:
+                    if getattr(exc, "evidence", None) is not None:
+                        result["comparacion_copia_oficial"] = exc.evidence
+                    raise
         report = {"modo": args.mode, "familias": results, "total_leidos": sum(r["totales"]["leidos"] for r in results),
                   "total_transformados": sum(r["totales"]["transformados"] for r in results),
                   "total_rechazados": sum(r["totales"]["rechazados"] for r in results)}

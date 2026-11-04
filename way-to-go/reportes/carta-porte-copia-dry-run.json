@@ -1,0 +1,4357 @@
+{
+  "modo": "dry-run",
+  "familias": [
+    {
+      "familia": "CARTA_PORTE",
+      "sha256": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+      "fuente_url": "http://omawww.sat.gob.mx/tramitesyservicios/Paginas/documentos/CatalogosCartaPorte31.xls",
+      "fecha_fuente": "2024-12-13",
+      "archivo_original": "C:\\Users\\ferte\\Downloads\\CatalogosCartaPorte31.xls",
+      "conteos": {
+        "c_RegimenAduanero": {
+          "esperados": 10,
+          "leidos": 10,
+          "transformados": 10,
+          "rechazados": 0
+        },
+        "c_CveTransporte": {
+          "esperados": 4,
+          "leidos": 4,
+          "transformados": 4,
+          "rechazados": 0
+        },
+        "c_TipoEstacion": {
+          "esperados": 3,
+          "leidos": 3,
+          "transformados": 3,
+          "rechazados": 0
+        },
+        "c_Estaciones": {
+          "esperados": 5280,
+          "leidos": 5280,
+          "transformados": 5280,
+          "rechazados": 0
+        },
+        "c_ClaveUnidadPeso": {
+          "esperados": 472,
+          "leidos": 472,
+          "transformados": 472,
+          "rechazados": 0
+        },
+        "c_ClaveProdServCP": {
+          "esperados": 48757,
+          "leidos": 48757,
+          "transformados": 48757,
+          "rechazados": 0
+        },
+        "c_MaterialPeligroso": {
+          "esperados": 2346,
+          "leidos": 2346,
+          "transformados": 2346,
+          "rechazados": 0
+        },
+        "c_TipoEmbalaje": {
+          "esperados": 59,
+          "leidos": 59,
+          "transformados": 59,
+          "rechazados": 0
+        },
+        "c_TipoPermiso": {
+          "esperados": 26,
+          "leidos": 26,
+          "transformados": 26,
+          "rechazados": 0
+        },
+        "c_Colonia": {
+          "esperados": 145366,
+          "leidos": 145366,
+          "transformados": 145366,
+          "rechazados": 0
+        },
+        "c_Localidad": {
+          "esperados": 664,
+          "leidos": 664,
+          "transformados": 664,
+          "rechazados": 0
+        },
+        "c_Municipio": {
+          "esperados": 2463,
+          "leidos": 2463,
+          "transformados": 2463,
+          "rechazados": 0
+        },
+        "c_SectorCOFEPRIS": {
+          "esperados": 5,
+          "leidos": 5,
+          "transformados": 5,
+          "rechazados": 0
+        },
+        "c_FormaFarmaceutica": {
+          "esperados": 20,
+          "leidos": 20,
+          "transformados": 20,
+          "rechazados": 0
+        },
+        "c_CondicionesEspeciales": {
+          "esperados": 4,
+          "leidos": 4,
+          "transformados": 4,
+          "rechazados": 0
+        },
+        "c_TipoMateria": {
+          "esperados": 5,
+          "leidos": 5,
+          "transformados": 5,
+          "rechazados": 0
+        },
+        "c_DocumentoAduanero": {
+          "esperados": 20,
+          "leidos": 20,
+          "transformados": 20,
+          "rechazados": 0
+        },
+        "c_ParteTransporte": {
+          "esperados": 12,
+          "leidos": 12,
+          "transformados": 12,
+          "rechazados": 0
+        },
+        "c_FiguraTransporte": {
+          "esperados": 5,
+          "leidos": 5,
+          "transformados": 5,
+          "rechazados": 0
+        },
+        "c_ConfigAutotransporte": {
+          "esperados": 34,
+          "leidos": 34,
+          "transformados": 34,
+          "rechazados": 0
+        },
+        "c_SubTipoRem": {
+          "esperados": 31,
+          "leidos": 31,
+          "transformados": 31,
+          "rechazados": 0
+        },
+        "c_RegistroISTMO": {
+          "esperados": 6,
+          "leidos": 6,
+          "transformados": 6,
+          "rechazados": 0
+        },
+        "c_ConfigMaritima": {
+          "esperados": 15,
+          "leidos": 15,
+          "transformados": 15,
+          "rechazados": 0
+        },
+        "c_ClaveTipoCarga": {
+          "esperados": 6,
+          "leidos": 6,
+          "transformados": 6,
+          "rechazados": 0
+        },
+        "c_ContenedorMaritimo": {
+          "esperados": 12,
+          "leidos": 12,
+          "transformados": 12,
+          "rechazados": 0
+        },
+        "c_NumAutorizacionNaviero": {
+          "esperados": 339,
+          "leidos": 339,
+          "transformados": 339,
+          "rechazados": 0
+        },
+        "c_CodigoTransporteAereo": {
+          "esperados": 173,
+          "leidos": 173,
+          "transformados": 173,
+          "rechazados": 0
+        },
+        "c_TipoDeServicio": {
+          "esperados": 4,
+          "leidos": 4,
+          "transformados": 4,
+          "rechazados": 0
+        },
+        "c_DerechosDePaso": {
+          "esperados": 119,
+          "leidos": 119,
+          "transformados": 119,
+          "rechazados": 0
+        },
+        "c_TipoCarro": {
+          "esperados": 11,
+          "leidos": 11,
+          "transformados": 11,
+          "rechazados": 0
+        },
+        "c_Contenedor": {
+          "esperados": 5,
+          "leidos": 5,
+          "transformados": 5,
+          "rechazados": 0
+        },
+        "c_TipoDeTrafico": {
+          "esperados": 4,
+          "leidos": 4,
+          "transformados": 4,
+          "rechazados": 0
+        }
+      },
+      "totales": {
+        "esperados": 206280,
+        "leidos": 206280,
+        "transformados": 206280,
+        "rechazados": 0
+      },
+      "errores": [],
+      "metadatos": {
+        "archivo_original": "CatalogosCartaPorte31.xls",
+        "catalogos": {
+          "c_RegimenAduanero": {
+            "catalogo": "c_RegimenAduanero",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "ImpoExpo",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Régimen Aduanero"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "ImpoExpo"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_CveTransporte": {
+            "catalogo": "c_CveTransporte",
+            "encabezados": [
+              "Clave transporte",
+              "Descripción del tipo de transporte",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de la clave del transporte."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave transporte"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción del tipo de transporte"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoEstacion": {
+            "catalogo": "c_TipoEstacion",
+            "encabezados": [
+              "Clave de estación",
+              "Descripción del tipo de estación",
+              "Clave transporte",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo de estación."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave de estación"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción del tipo de estación"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave transporte"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Estaciones ": {
+            "catalogo": "c_Estaciones",
+            "encabezados": [
+              "Clave identificación",
+              "Descripción",
+              "Clave transporte",
+              "Nacionalidad",
+              "Designador IATA",
+              "Línea férrea",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de puertos marítimos, estaciones aeroportuarias y estaciones férreas."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave identificación"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave transporte"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nacionalidad"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Designador IATA"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Línea férrea"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ClaveUnidadPeso": {
+            "catalogo": "c_ClaveUnidadPeso",
+            "encabezados": [
+              "Clave unidad",
+              "Nombre",
+              "Descripción",
+              "Nota",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia",
+              "Símbolo",
+              "Bandera"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de unidades de medida y embalaje."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "1.0"
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave unidad"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nombre"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nota"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Símbolo"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Bandera"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ClaveProdServCP": {
+            "catalogo": "c_ClaveProdServCP",
+            "encabezados": [
+              "c_ClaveProdServ",
+              "Descripción",
+              "Palabras similares",
+              "Material Peligroso",
+              "FechaInicioVigencia",
+              "FechaFinVigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de productos Carta Porte."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "0"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "17/06/2024"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_ClaveProdServ"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Palabras similares"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Material Peligroso"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "FechaInicioVigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "FechaFinVigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_MaterialPeligroso": {
+            "catalogo": "c_MaterialPeligroso",
+            "encabezados": [
+              "Clave material peligroso",
+              "Descripción",
+              "Clase o div.",
+              "Peligro \nsecundario",
+              "Nombre técnico",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de materiales peligrosos."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave material peligroso"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clase o div."
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Peligro \nsecundario"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nombre técnico"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoEmbalaje": {
+            "catalogo": "c_TipoEmbalaje",
+            "encabezados": [
+              "Clave de designación",
+              "Descripción",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo de embalaje."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "1.0"
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave de designación "
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoPermiso": {
+            "catalogo": "c_TipoPermiso",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Clave transporte",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo tipo permiso."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave transporte"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Colonia_1": {
+            "catalogo": "c_Colonia",
+            "encabezados": [
+              "c_Colonia",
+              "c_CodigoPostal",
+              "Nombre del asentamiento",
+              ""
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de colonias."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 3,
+                  "valor": 45490.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Colonia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_CodigoPostal"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nombre del asentamiento"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Colonia_2": {
+            "catalogo": "c_Colonia",
+            "encabezados": [
+              "c_Colonia",
+              "c_CodigoPostal",
+              "Nombre del asentamiento",
+              ""
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de colonias."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 3,
+                  "valor": 45490.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": ""
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Colonia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_CodigoPostal"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nombre del asentamiento"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Colonia_3": {
+            "catalogo": "c_Colonia",
+            "encabezados": [
+              "c_Colonia",
+              "c_CodigoPostal",
+              "Nombre del asentamiento",
+              ""
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de colonias."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 3,
+                  "valor": 45490.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Colonia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_CodigoPostal"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nombre del asentamiento"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Localidad": {
+            "catalogo": "c_Localidad",
+            "encabezados": [
+              "c_Localidad",
+              "c_Estado",
+              "Descripción",
+              "Fecha inicio vigencia",
+              "Fecha fin vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de localidades. "
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 3,
+                  "valor": 45490.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Localidad"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Estado"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Municipio": {
+            "catalogo": "c_Municipio",
+            "encabezados": [
+              "c_Municipio",
+              "c_Estado",
+              "Descripción",
+              "Fecha inicio vigencia",
+              "Fecha fin vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de municipios."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 3,
+                  "valor": 45490.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Municipio"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "c_Estado"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_SectorCOFEPRIS": {
+            "catalogo": "c_SectorCOFEPRIS",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Sector COFEPRIS"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_FormaFarmaceutica": {
+            "catalogo": "c_FormaFarmaceutica",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Forma Farmacéutica"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_CondicionesEspeciales": {
+            "catalogo": "c_CondicionesEspeciales",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Condiciones especiales del Transporte"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoMateria": {
+            "catalogo": "c_TipoMateria",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Tipo Materia"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_DocumentoAduanero": {
+            "catalogo": "c_DocumentoAduanero",
+            "encabezados": [
+              "Clave",
+              "Descripcion",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Documentos Aduaneros"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripcion"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ParteTransporte": {
+            "catalogo": "c_ParteTransporte",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de partes del transporte rentadas o prestadas."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_FiguraTransporte": {
+            "catalogo": "c_FiguraTransporte",
+            "encabezados": [
+              "Clave figura transporte",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de figura transporte."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 2.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45499.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave figura transporte"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ConfigAutotransporte": {
+            "catalogo": "c_ConfigAutotransporte",
+            "encabezados": [
+              "Clave nomenclatura",
+              "Descripción",
+              "Número de ejes",
+              "Número de llantas",
+              "Remolque",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de configuración autotransporte federal."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave nomenclatura"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Número de ejes"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Número de llantas"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Remolque"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          " c_SubTipoRem": {
+            "catalogo": "c_SubTipoRem",
+            "encabezados": [
+              "Clave tipo remolque",
+              "Remolque o semirremolque",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo de remolque."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": " Clave tipo remolque"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Remolque o semirremolque"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_RegistroISTMO": {
+            "catalogo": "c_RegistroISTMO",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de Ubicaciones Polos ISTMO"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ConfigMaritima": {
+            "catalogo": "c_ConfigMaritima",
+            "encabezados": [
+              "Clave configuración marítima",
+              "Descripción",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de configuración marítima."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave configuración marítima"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ClaveTipoCarga": {
+            "catalogo": "c_ClaveTipoCarga",
+            "encabezados": [
+              "Clave tipo carga",
+              "Descripción",
+              "Fecha inicio de vigencia",
+              "Fecha fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo del tipo de carga."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave tipo carga"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_ContenedorMaritimo": {
+            "catalogo": "c_ContenedorMaritimo",
+            "encabezados": [
+              "Clave del contenedor marítimo",
+              "Descripción",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de contenedores marítimos."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave del contenedor marítimo"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_NumAutorizacionNaviero": {
+            "catalogo": "c_NumAutorizacionNaviero",
+            "encabezados": [
+              "Número de autorización",
+              "Inicio de vigencia",
+              "Fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de número autorización agente naviero consignatario. "
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 5.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45639.0
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Número de autorización"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_CodigoTransporteAereo": {
+            "catalogo": "c_CodigoTransporteAereo",
+            "encabezados": [
+              "Clave identificación",
+              "Nacionalidad",
+              "Nombre de la aerolínea",
+              "Designador OACI",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo código transporte aéreo."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 2.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45574.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave identificación"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nacionalidad"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Nombre de la aerolínea"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Designador OACI"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoDeServicio": {
+            "catalogo": "c_TipoDeServicio",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Contenedor",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo servicio."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Contenedor"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_DerechosDePaso": {
+            "catalogo": "c_DerechosDePaso",
+            "encabezados": [
+              "Clave del derecho de paso",
+              "Derecho de paso",
+              "Entre",
+              "Hasta",
+              "Otorga/Recibe",
+              "Concesionario",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo derechos de paso."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave del derecho de paso"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Derecho de paso"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Entre"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Hasta"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Otorga/Recibe"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Concesionario"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoCarro": {
+            "catalogo": "c_TipoCarro",
+            "encabezados": [
+              "Clave",
+              "Tipo de carro",
+              "Contenedor",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo de carro."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Tipo de carro"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Contenedor"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_Contenedor": {
+            "catalogo": "c_Contenedor",
+            "encabezados": [
+              "Clave",
+              "Tipo de contenedor",
+              "Descripción",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo de contenedor."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Tipo de contenedor"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          },
+          "c_TipoDeTrafico": {
+            "catalogo": "c_TipoDeTrafico",
+            "encabezados": [
+              "Clave",
+              "Descripción",
+              "Fecha de inicio de vigencia",
+              "Fecha de fin de vigencia"
+            ],
+            "fila_encabezado": 5,
+            "filas_previas_originales": [
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Catálogo de tipo de tráfico ferroviario."
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Versión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Revisión"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de publicación"
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 2,
+                  "valor": 1.0
+                },
+                {
+                  "tipo_excel": 2,
+                  "valor": 0.0
+                },
+                {
+                  "tipo_excel": 3,
+                  "valor": 45460.0
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                },
+                {
+                  "tipo_excel": 0,
+                  "valor": null
+                }
+              ],
+              [
+                {
+                  "tipo_excel": 1,
+                  "valor": "Clave"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Descripción"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de inicio de vigencia"
+                },
+                {
+                  "tipo_excel": 1,
+                  "valor": "Fecha de fin de vigencia"
+                }
+              ]
+            ],
+            "avisos_no_registrales": []
+          }
+        }
+      },
+      "registros_jsonl": null,
+      "manifiesto_jsonl": null,
+      "comparacion_copia_oficial": {
+        "archivo_original": "C:\\Users\\ferte\\Downloads\\CatalogosCartaPorte31.xls",
+        "sha256_original": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+        "copia": "C:\\Users\\ferte\\Downloads\\CatalogosCartaPorte31_copia.xls",
+        "sha256_copia": "7ded79c0e86b0e4fc71bc236c5eea3042d3700c1cbc53ed6f4c9aef383be3a5f",
+        "archivos_fisicos_distintos": true,
+        "mismos_nombres_y_orden_de_hojas": true,
+        "mismas_dimensiones": true,
+        "mismos_encabezados": true,
+        "mismo_sistema_de_fechas": true,
+        "tipos_y_valores_de_todas_las_celdas_iguales": true,
+        "hojas_comparadas": 34,
+        "celdas_comparadas": 957276,
+        "diferencias_total": 0,
+        "diferencias": [],
+        "sha256_original_tras_comparacion": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+        "sha256_copia_tras_comparacion": "7ded79c0e86b0e4fc71bc236c5eea3042d3700c1cbc53ed6f4c9aef383be3a5f",
+        "procedencia_sat_demostrada": false,
+        "nota": "La igualdad del contenido leído no demuestra que la copia provenga del SAT.",
+        "archivos_sin_cambios_durante_comparacion": true,
+        "sha256_distintos": true,
+        "aceptada": true
+      }
+    }
+  ],
+  "total_leidos": 206280,
+  "total_transformados": 206280,
+  "total_rechazados": 0
+}

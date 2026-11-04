@@ -1,0 +1,815 @@
+{
+  "modo": "import",
+  "familia": "CARTA_PORTE",
+  "estado": "importada",
+  "leidos": 206280,
+  "importados": 206280,
+  "rechazados": 0,
+  "esperados": 206280,
+  "transformados": 206280,
+  "catalogos": {
+    "c_RegimenAduanero": {
+      "esperados": 10,
+      "leidos": 10,
+      "transformados": 10,
+      "rechazados": 0
+    },
+    "c_CveTransporte": {
+      "esperados": 4,
+      "leidos": 4,
+      "transformados": 4,
+      "rechazados": 0
+    },
+    "c_TipoEstacion": {
+      "esperados": 3,
+      "leidos": 3,
+      "transformados": 3,
+      "rechazados": 0
+    },
+    "c_Estaciones": {
+      "esperados": 5280,
+      "leidos": 5280,
+      "transformados": 5280,
+      "rechazados": 0
+    },
+    "c_ClaveUnidadPeso": {
+      "esperados": 472,
+      "leidos": 472,
+      "transformados": 472,
+      "rechazados": 0
+    },
+    "c_ClaveProdServCP": {
+      "esperados": 48757,
+      "leidos": 48757,
+      "transformados": 48757,
+      "rechazados": 0
+    },
+    "c_MaterialPeligroso": {
+      "esperados": 2346,
+      "leidos": 2346,
+      "transformados": 2346,
+      "rechazados": 0
+    },
+    "c_TipoEmbalaje": {
+      "esperados": 59,
+      "leidos": 59,
+      "transformados": 59,
+      "rechazados": 0
+    },
+    "c_TipoPermiso": {
+      "esperados": 26,
+      "leidos": 26,
+      "transformados": 26,
+      "rechazados": 0
+    },
+    "c_Colonia": {
+      "esperados": 145366,
+      "leidos": 145366,
+      "transformados": 145366,
+      "rechazados": 0
+    },
+    "c_Localidad": {
+      "esperados": 664,
+      "leidos": 664,
+      "transformados": 664,
+      "rechazados": 0
+    },
+    "c_Municipio": {
+      "esperados": 2463,
+      "leidos": 2463,
+      "transformados": 2463,
+      "rechazados": 0
+    },
+    "c_SectorCOFEPRIS": {
+      "esperados": 5,
+      "leidos": 5,
+      "transformados": 5,
+      "rechazados": 0
+    },
+    "c_FormaFarmaceutica": {
+      "esperados": 20,
+      "leidos": 20,
+      "transformados": 20,
+      "rechazados": 0
+    },
+    "c_CondicionesEspeciales": {
+      "esperados": 4,
+      "leidos": 4,
+      "transformados": 4,
+      "rechazados": 0
+    },
+    "c_TipoMateria": {
+      "esperados": 5,
+      "leidos": 5,
+      "transformados": 5,
+      "rechazados": 0
+    },
+    "c_DocumentoAduanero": {
+      "esperados": 20,
+      "leidos": 20,
+      "transformados": 20,
+      "rechazados": 0
+    },
+    "c_ParteTransporte": {
+      "esperados": 12,
+      "leidos": 12,
+      "transformados": 12,
+      "rechazados": 0
+    },
+    "c_FiguraTransporte": {
+      "esperados": 5,
+      "leidos": 5,
+      "transformados": 5,
+      "rechazados": 0
+    },
+    "c_ConfigAutotransporte": {
+      "esperados": 34,
+      "leidos": 34,
+      "transformados": 34,
+      "rechazados": 0
+    },
+    "c_SubTipoRem": {
+      "esperados": 31,
+      "leidos": 31,
+      "transformados": 31,
+      "rechazados": 0
+    },
+    "c_RegistroISTMO": {
+      "esperados": 6,
+      "leidos": 6,
+      "transformados": 6,
+      "rechazados": 0
+    },
+    "c_ConfigMaritima": {
+      "esperados": 15,
+      "leidos": 15,
+      "transformados": 15,
+      "rechazados": 0
+    },
+    "c_ClaveTipoCarga": {
+      "esperados": 6,
+      "leidos": 6,
+      "transformados": 6,
+      "rechazados": 0
+    },
+    "c_ContenedorMaritimo": {
+      "esperados": 12,
+      "leidos": 12,
+      "transformados": 12,
+      "rechazados": 0
+    },
+    "c_NumAutorizacionNaviero": {
+      "esperados": 339,
+      "leidos": 339,
+      "transformados": 339,
+      "rechazados": 0
+    },
+    "c_CodigoTransporteAereo": {
+      "esperados": 173,
+      "leidos": 173,
+      "transformados": 173,
+      "rechazados": 0
+    },
+    "c_TipoDeServicio": {
+      "esperados": 4,
+      "leidos": 4,
+      "transformados": 4,
+      "rechazados": 0
+    },
+    "c_DerechosDePaso": {
+      "esperados": 119,
+      "leidos": 119,
+      "transformados": 119,
+      "rechazados": 0
+    },
+    "c_TipoCarro": {
+      "esperados": 11,
+      "leidos": 11,
+      "transformados": 11,
+      "rechazados": 0
+    },
+    "c_Contenedor": {
+      "esperados": 5,
+      "leidos": 5,
+      "transformados": 5,
+      "rechazados": 0
+    },
+    "c_TipoDeTrafico": {
+      "esperados": 4,
+      "leidos": 4,
+      "transformados": 4,
+      "rechazados": 0
+    }
+  },
+  "sha256": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+  "comparacion_copia_oficial": {
+    "archivo_original": "C:\\Users\\ferte\\Downloads\\CatalogosCartaPorte31.xls",
+    "sha256_original": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+    "copia": "C:\\Users\\ferte\\Downloads\\CatalogosCartaPorte31_copia.xls",
+    "sha256_copia": "7ded79c0e86b0e4fc71bc236c5eea3042d3700c1cbc53ed6f4c9aef383be3a5f",
+    "archivos_fisicos_distintos": true,
+    "mismos_nombres_y_orden_de_hojas": true,
+    "mismas_dimensiones": true,
+    "mismos_encabezados": true,
+    "mismo_sistema_de_fechas": true,
+    "tipos_y_valores_de_todas_las_celdas_iguales": true,
+    "hojas_comparadas": 34,
+    "celdas_comparadas": 957276,
+    "diferencias_total": 0,
+    "diferencias": [],
+    "sha256_original_tras_comparacion": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+    "sha256_copia_tras_comparacion": "7ded79c0e86b0e4fc71bc236c5eea3042d3700c1cbc53ed6f4c9aef383be3a5f",
+    "procedencia_sat_demostrada": false,
+    "nota": "La igualdad del contenido leído no demuestra que la copia provenga del SAT.",
+    "archivos_sin_cambios_durante_comparacion": true,
+    "sha256_distintos": true,
+    "aceptada": true
+  },
+  "preflight": {
+    "actor": "c0415bc2-492a-41c1-9741-96f517ea352f",
+    "rol_postgresql": "postgres",
+    "rol_conexion": "postgres",
+    "tablas": [
+      {
+        "nombre": "archivos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "bucket": "text",
+          "estado": "text",
+          "sha256": "text",
+          "mime_type": "text",
+          "created_at": "timestamp with time zone",
+          "size_bytes": "bigint",
+          "subido_por": "uuid",
+          "updated_at": "timestamp with time zone",
+          "storage_path": "text",
+          "nombre_original": "text"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "bucket": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "estado": {
+            "type": "text",
+            "default": "'PENDIENTE'::text",
+            "not_null": true
+          },
+          "sha256": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "mime_type": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "size_bytes": {
+            "type": "bigint",
+            "default": null,
+            "not_null": true
+          },
+          "subido_por": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "storage_path": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "nombre_original": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "bucket",
+            "storage_path"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "cp_sat_claves",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "clave": "text",
+          "reglas": "jsonb",
+          "catalogo": "text",
+          "version_id": "uuid",
+          "descripcion": "text",
+          "vigente_desde": "date",
+          "vigente_hasta": "date",
+          "clave_contexto": "jsonb"
+        },
+        "definiciones_columnas": {
+          "clave": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "reglas": {
+            "type": "jsonb",
+            "default": "'{}'::jsonb",
+            "not_null": true
+          },
+          "catalogo": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "version_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "descripcion": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "vigente_desde": {
+            "type": "date",
+            "default": null,
+            "not_null": false
+          },
+          "vigente_hasta": {
+            "type": "date",
+            "default": null,
+            "not_null": false
+          },
+          "clave_contexto": {
+            "type": "jsonb",
+            "default": "'{}'::jsonb",
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "version_id",
+          "catalogo",
+          "clave",
+          "clave_contexto"
+        ],
+        "unique_keys": [],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "cp_sat_versiones",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "sha256": "text",
+          "familia": "text",
+          "revision": "text",
+          "metadatos": "jsonb",
+          "created_at": "timestamp with time zone",
+          "fuente_url": "text",
+          "version_cfdi": "text",
+          "vigente_desde": "date",
+          "vigente_hasta": "date",
+          "version_complemento": "text"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "sha256": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "familia": {
+            "type": "text",
+            "default": "'CARTA_PORTE'::text",
+            "not_null": true
+          },
+          "revision": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "metadatos": {
+            "type": "jsonb",
+            "default": "'{}'::jsonb",
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "fuente_url": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "version_cfdi": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "vigente_desde": {
+            "type": "date",
+            "default": null,
+            "not_null": true
+          },
+          "vigente_hasta": {
+            "type": "date",
+            "default": null,
+            "not_null": false
+          },
+          "version_complemento": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "version_complemento",
+            "version_cfdi",
+            "revision"
+          ],
+          [
+            "familia",
+            "sha256"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "permisos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "codigo": "text",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone",
+          "descripcion": "text"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "codigo": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "descripcion": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "codigo"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "rol_permisos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "rol_id": "uuid",
+          "created_at": "timestamp with time zone",
+          "permiso_id": "uuid",
+          "updated_at": "timestamp with time zone"
+        },
+        "definiciones_columnas": {
+          "rol_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "permiso_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "rol_id",
+          "permiso_id"
+        ],
+        "unique_keys": [],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "usuario_roles",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "rol_id": "uuid",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone",
+          "usuario_id": "uuid"
+        },
+        "definiciones_columnas": {
+          "rol_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "usuario_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "usuario_id",
+          "rol_id"
+        ],
+        "unique_keys": [],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "usuarios",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "email": "text",
+          "activo": "boolean",
+          "nombre": "text",
+          "telefono": "text",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone",
+          "auth_subject": "uuid"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "email": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "activo": {
+            "type": "boolean",
+            "default": "true",
+            "not_null": true
+          },
+          "nombre": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "telefono": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "auth_subject": {
+            "type": "uuid",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "auth_subject"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      }
+    ],
+    "indices": [
+      {
+        "nombre": "archivos_bucket_storage_path_key",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX archivos_bucket_storage_path_key ON tms.archivos USING btree (bucket, storage_path)"
+      },
+      {
+        "nombre": "cp_sat_claves_catalogo_clave_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX cp_sat_claves_catalogo_clave_idx ON tms.cp_sat_claves USING btree (lower(catalogo), clave, version_id)"
+      },
+      {
+        "nombre": "cp_sat_claves_clave_trgm_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX cp_sat_claves_clave_trgm_idx ON tms.cp_sat_claves USING gin (clave gin_trgm_ops)"
+      },
+      {
+        "nombre": "cp_sat_claves_contexto_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX cp_sat_claves_contexto_idx ON tms.cp_sat_claves USING btree (version_id, catalogo, clave_contexto, clave)"
+      },
+      {
+        "nombre": "cp_sat_claves_descripcion_trgm_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX cp_sat_claves_descripcion_trgm_idx ON tms.cp_sat_claves USING gin (descripcion gin_trgm_ops)"
+      },
+      {
+        "nombre": "cp_sat_claves_pkey",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX cp_sat_claves_pkey ON tms.cp_sat_claves USING btree (version_id, catalogo, clave, clave_contexto)"
+      },
+      {
+        "nombre": "cp_sat_versiones_cp_revision_uidx",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX cp_sat_versiones_cp_revision_uidx ON tms.cp_sat_versiones USING btree (lower(btrim(version_complemento)), lower(btrim(version_cfdi)), lower(btrim(revision))) WHERE (familia = 'CARTA_PORTE'::text)"
+      },
+      {
+        "nombre": "cp_sat_versiones_familia_sha256_key",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX cp_sat_versiones_familia_sha256_key ON tms.cp_sat_versiones USING btree (familia, sha256)"
+      },
+      {
+        "nombre": "cp_sat_versiones_familia_vigencia_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX cp_sat_versiones_familia_vigencia_idx ON tms.cp_sat_versiones USING btree (familia, vigente_desde DESC, vigente_hasta)"
+      }
+    ],
+    "funciones": [
+      {
+        "signature": "jsonb_to_recordset(jsonb)",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "hashtextextended(text,bigint)",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "pg_advisory_xact_lock(bigint)",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "gen_random_uuid()",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "row_security_active(oid)",
+        "disponible": true,
+        "ejecutable": true
+      }
+    ],
+    "timeouts": {
+      "statement_timeout": "2min",
+      "idle_in_transaction_session_timeout": "0",
+      "lock_timeout": "0",
+      "transaction_timeout": "0"
+    },
+    "compatibilidad": {
+      "jsonb_to_recordset": true,
+      "hashtextextended": true,
+      "server_version_num": "170011"
+    },
+    "versiones_existentes": {
+      "CARTA_PORTE": [],
+      "CFDI": [],
+      "SEPOMEX": [
+        {
+          "familia": "SEPOMEX",
+          "sha256": "5d5e29332b6f699d0ef5a4bf1c06ca12089605cd58012b5950d995b0f0a1fd1a",
+          "version_cfdi": null,
+          "version_complemento": null,
+          "revision": null
+        }
+      ]
+    }
+  },
+  "version_id": "edf31d04-86e4-4780-9bbb-6121bc6b5d38",
+  "existentes": 0,
+  "archivos": [
+    {
+      "archivo_id": "244cc470-76df-4f87-ae43-45806d985fc6",
+      "bucket": "logistica-catalogos",
+      "storage_path": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe.xls",
+      "sha256": "2ea8101bc84df18773f47dd8d5aa1309c81854e51e1e5b55387e0f1aeed18afe",
+      "size_bytes": 21213184
+    }
+  ]
+}

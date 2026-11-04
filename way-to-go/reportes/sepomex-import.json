@@ -1,0 +1,795 @@
+{
+  "modo": "import",
+  "familia": "SEPOMEX",
+  "estado": "importada",
+  "leidos": 159378,
+  "importados": 159378,
+  "rechazados": 0,
+  "esperados": 159378,
+  "transformados": 159378,
+  "catalogos": {
+    "Aguascalientes": {
+      "esperados": 1509,
+      "leidos": 1509,
+      "transformados": 1509,
+      "rechazados": 0
+    },
+    "Baja_California": {
+      "esperados": 2682,
+      "leidos": 2682,
+      "transformados": 2682,
+      "rechazados": 0
+    },
+    "Baja_California_Sur": {
+      "esperados": 1080,
+      "leidos": 1080,
+      "transformados": 1080,
+      "rechazados": 0
+    },
+    "Campeche": {
+      "esperados": 1308,
+      "leidos": 1308,
+      "transformados": 1308,
+      "rechazados": 0
+    },
+    "Coahuila_de_Zaragoza": {
+      "esperados": 4487,
+      "leidos": 4487,
+      "transformados": 4487,
+      "rechazados": 0
+    },
+    "Colima": {
+      "esperados": 923,
+      "leidos": 923,
+      "transformados": 923,
+      "rechazados": 0
+    },
+    "Chiapas": {
+      "esperados": 9747,
+      "leidos": 9747,
+      "transformados": 9747,
+      "rechazados": 0
+    },
+    "Chihuahua": {
+      "esperados": 10132,
+      "leidos": 10132,
+      "transformados": 10132,
+      "rechazados": 0
+    },
+    "Distrito_Federal": {
+      "esperados": 1531,
+      "leidos": 1531,
+      "transformados": 1531,
+      "rechazados": 0
+    },
+    "Durango": {
+      "esperados": 7147,
+      "leidos": 7147,
+      "transformados": 7147,
+      "rechazados": 0
+    },
+    "Guanajuato": {
+      "esperados": 10339,
+      "leidos": 10339,
+      "transformados": 10339,
+      "rechazados": 0
+    },
+    "Guerrero": {
+      "esperados": 5419,
+      "leidos": 5419,
+      "transformados": 5419,
+      "rechazados": 0
+    },
+    "Hidalgo": {
+      "esperados": 6241,
+      "leidos": 6241,
+      "transformados": 6241,
+      "rechazados": 0
+    },
+    "Jalisco": {
+      "esperados": 6546,
+      "leidos": 6546,
+      "transformados": 6546,
+      "rechazados": 0
+    },
+    "México": {
+      "esperados": 8362,
+      "leidos": 8362,
+      "transformados": 8362,
+      "rechazados": 0
+    },
+    "Michoacán_de_Ocampo": {
+      "esperados": 10405,
+      "leidos": 10405,
+      "transformados": 10405,
+      "rechazados": 0
+    },
+    "Morelos": {
+      "esperados": 1887,
+      "leidos": 1887,
+      "transformados": 1887,
+      "rechazados": 0
+    },
+    "Nayarit": {
+      "esperados": 2067,
+      "leidos": 2067,
+      "transformados": 2067,
+      "rechazados": 0
+    },
+    "Nuevo_León": {
+      "esperados": 5478,
+      "leidos": 5478,
+      "transformados": 5478,
+      "rechazados": 0
+    },
+    "Oaxaca": {
+      "esperados": 7356,
+      "leidos": 7356,
+      "transformados": 7356,
+      "rechazados": 0
+    },
+    "Puebla": {
+      "esperados": 6401,
+      "leidos": 6401,
+      "transformados": 6401,
+      "rechazados": 0
+    },
+    "Querétaro": {
+      "esperados": 3279,
+      "leidos": 3279,
+      "transformados": 3279,
+      "rechazados": 0
+    },
+    "Quintana_Roo": {
+      "esperados": 1222,
+      "leidos": 1222,
+      "transformados": 1222,
+      "rechazados": 0
+    },
+    "San_Luis_Potosí": {
+      "esperados": 6374,
+      "leidos": 6374,
+      "transformados": 6374,
+      "rechazados": 0
+    },
+    "Sinaloa": {
+      "esperados": 4565,
+      "leidos": 4565,
+      "transformados": 4565,
+      "rechazados": 0
+    },
+    "Sonora": {
+      "esperados": 8826,
+      "leidos": 8826,
+      "transformados": 8826,
+      "rechazados": 0
+    },
+    "Tabasco": {
+      "esperados": 2898,
+      "leidos": 2898,
+      "transformados": 2898,
+      "rechazados": 0
+    },
+    "Tamaulipas": {
+      "esperados": 3636,
+      "leidos": 3636,
+      "transformados": 3636,
+      "rechazados": 0
+    },
+    "Tlaxcala": {
+      "esperados": 1432,
+      "leidos": 1432,
+      "transformados": 1432,
+      "rechazados": 0
+    },
+    "Veracruz_de_Ignacio_de_la_Llave": {
+      "esperados": 11567,
+      "leidos": 11567,
+      "transformados": 11567,
+      "rechazados": 0
+    },
+    "Yucatán": {
+      "esperados": 1737,
+      "leidos": 1737,
+      "transformados": 1737,
+      "rechazados": 0
+    },
+    "Zacatecas": {
+      "esperados": 2795,
+      "leidos": 2795,
+      "transformados": 2795,
+      "rechazados": 0
+    }
+  },
+  "sha256": "5d5e29332b6f699d0ef5a4bf1c06ca12089605cd58012b5950d995b0f0a1fd1a",
+  "preflight": {
+    "actor": "c0415bc2-492a-41c1-9741-96f517ea352f",
+    "rol_postgresql": "postgres",
+    "rol_conexion": "postgres",
+    "tablas": [
+      {
+        "nombre": "archivos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "bucket": "text",
+          "estado": "text",
+          "sha256": "text",
+          "mime_type": "text",
+          "created_at": "timestamp with time zone",
+          "size_bytes": "bigint",
+          "subido_por": "uuid",
+          "updated_at": "timestamp with time zone",
+          "storage_path": "text",
+          "nombre_original": "text"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "bucket": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "estado": {
+            "type": "text",
+            "default": "'PENDIENTE'::text",
+            "not_null": true
+          },
+          "sha256": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "mime_type": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "size_bytes": {
+            "type": "bigint",
+            "default": null,
+            "not_null": true
+          },
+          "subido_por": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "storage_path": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "nombre_original": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "bucket",
+            "storage_path"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "permisos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "codigo": "text",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone",
+          "descripcion": "text"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "codigo": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "descripcion": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "codigo"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "rol_permisos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "rol_id": "uuid",
+          "created_at": "timestamp with time zone",
+          "permiso_id": "uuid",
+          "updated_at": "timestamp with time zone"
+        },
+        "definiciones_columnas": {
+          "rol_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "permiso_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "rol_id",
+          "permiso_id"
+        ],
+        "unique_keys": [],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "sepomex_asentamientos",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "zona": "text",
+          "ciudad": "text",
+          "estado": "text",
+          "oficina": "text",
+          "municipio": "text",
+          "version_id": "uuid",
+          "asentamiento": "text",
+          "clave_ciudad": "text",
+          "clave_estado": "text",
+          "codigo_postal": "text",
+          "clave_municipio": "text",
+          "tipo_asentamiento": "text",
+          "clave_codigo_postal": "text",
+          "codigo_postal_oficina": "text",
+          "id_asentamiento_cpcons": "text",
+          "clave_tipo_asentamiento": "text"
+        },
+        "definiciones_columnas": {
+          "zona": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "ciudad": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "estado": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "oficina": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "municipio": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "version_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "asentamiento": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "clave_ciudad": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "clave_estado": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "codigo_postal": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "clave_municipio": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "tipo_asentamiento": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "clave_codigo_postal": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "codigo_postal_oficina": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "id_asentamiento_cpcons": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "clave_tipo_asentamiento": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "version_id",
+          "clave_estado",
+          "clave_municipio",
+          "id_asentamiento_cpcons"
+        ],
+        "unique_keys": [],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "sepomex_versiones",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "sha256": "text",
+          "metadatos": "jsonb",
+          "created_at": "timestamp with time zone",
+          "fuente_url": "text",
+          "fecha_fuente": "date",
+          "publicado_at": "timestamp with time zone"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "sha256": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "metadatos": {
+            "type": "jsonb",
+            "default": "'{}'::jsonb",
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "fuente_url": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "fecha_fuente": {
+            "type": "date",
+            "default": null,
+            "not_null": true
+          },
+          "publicado_at": {
+            "type": "timestamp with time zone",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "sha256"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "usuario_roles",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "rol_id": "uuid",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone",
+          "usuario_id": "uuid"
+        },
+        "definiciones_columnas": {
+          "rol_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "usuario_id": {
+            "type": "uuid",
+            "default": null,
+            "not_null": true
+          }
+        },
+        "primary_key": [
+          "usuario_id",
+          "rol_id"
+        ],
+        "unique_keys": [],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      },
+      {
+        "nombre": "usuarios",
+        "rls_habilitada": true,
+        "rls_efectiva": false,
+        "columnas": {
+          "id": "uuid",
+          "email": "text",
+          "activo": "boolean",
+          "nombre": "text",
+          "telefono": "text",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone",
+          "auth_subject": "uuid"
+        },
+        "definiciones_columnas": {
+          "id": {
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "not_null": true
+          },
+          "email": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "activo": {
+            "type": "boolean",
+            "default": "true",
+            "not_null": true
+          },
+          "nombre": {
+            "type": "text",
+            "default": null,
+            "not_null": true
+          },
+          "telefono": {
+            "type": "text",
+            "default": null,
+            "not_null": false
+          },
+          "created_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "updated_at": {
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "not_null": true
+          },
+          "auth_subject": {
+            "type": "uuid",
+            "default": null,
+            "not_null": false
+          }
+        },
+        "primary_key": [
+          "id"
+        ],
+        "unique_keys": [
+          [
+            "auth_subject"
+          ]
+        ],
+        "permisos": {
+          "select": true,
+          "insert": true
+        }
+      }
+    ],
+    "indices": [
+      {
+        "nombre": "archivos_bucket_storage_path_key",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX archivos_bucket_storage_path_key ON tms.archivos USING btree (bucket, storage_path)"
+      },
+      {
+        "nombre": "sepomex_asentamientos_colonia_trgm_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX sepomex_asentamientos_colonia_trgm_idx ON tms.sepomex_asentamientos USING gin (asentamiento gin_trgm_ops)"
+      },
+      {
+        "nombre": "sepomex_asentamientos_cp_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX sepomex_asentamientos_cp_idx ON tms.sepomex_asentamientos USING btree (version_id, codigo_postal, asentamiento)"
+      },
+      {
+        "nombre": "sepomex_asentamientos_municipio_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX sepomex_asentamientos_municipio_idx ON tms.sepomex_asentamientos USING btree (version_id, clave_estado, clave_municipio, codigo_postal)"
+      },
+      {
+        "nombre": "sepomex_asentamientos_municipio_trgm_idx",
+        "valido": true,
+        "listo": true,
+        "unico": false,
+        "definicion": "CREATE INDEX sepomex_asentamientos_municipio_trgm_idx ON tms.sepomex_asentamientos USING gin (municipio gin_trgm_ops)"
+      },
+      {
+        "nombre": "sepomex_asentamientos_pkey",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX sepomex_asentamientos_pkey ON tms.sepomex_asentamientos USING btree (version_id, clave_estado, clave_municipio, id_asentamiento_cpcons)"
+      },
+      {
+        "nombre": "sepomex_versiones_sha256_key",
+        "valido": true,
+        "listo": true,
+        "unico": true,
+        "definicion": "CREATE UNIQUE INDEX sepomex_versiones_sha256_key ON tms.sepomex_versiones USING btree (sha256)"
+      }
+    ],
+    "funciones": [
+      {
+        "signature": "jsonb_to_recordset(jsonb)",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "hashtextextended(text,bigint)",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "pg_advisory_xact_lock(bigint)",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "gen_random_uuid()",
+        "disponible": true,
+        "ejecutable": true
+      },
+      {
+        "signature": "row_security_active(oid)",
+        "disponible": true,
+        "ejecutable": true
+      }
+    ],
+    "timeouts": {
+      "statement_timeout": "2min",
+      "idle_in_transaction_session_timeout": "0",
+      "lock_timeout": "0",
+      "transaction_timeout": "0"
+    },
+    "compatibilidad": {
+      "jsonb_to_recordset": true,
+      "hashtextextended": true,
+      "server_version_num": "170011"
+    },
+    "versiones_existentes": {
+      "CARTA_PORTE": [],
+      "CFDI": [],
+      "SEPOMEX": []
+    }
+  },
+  "version_id": "f6d6e047-5340-409d-a8e2-1b11cf286cc0",
+  "existentes": 0,
+  "archivos": [
+    {
+      "archivo_id": "02e315ae-9874-4c27-ba26-f262b12cc535",
+      "bucket": "logistica-catalogos",
+      "storage_path": "5d5e29332b6f699d0ef5a4bf1c06ca12089605cd58012b5950d995b0f0a1fd1a.xls",
+      "sha256": "5d5e29332b6f699d0ef5a4bf1c06ca12089605cd58012b5950d995b0f0a1fd1a",
+      "size_bytes": 72515584
+    },
+    {
+      "archivo_id": "21bdaadb-fcfb-41eb-a711-044e8fb56aa3",
+      "bucket": "logistica-catalogos",
+      "storage_path": "5d5e29332b6f699d0ef5a4bf1c06ca12089605cd58012b5950d995b0f0a1fd1a-sepomex-manifiesto.jsonl",
+      "sha256": "c49e745448b9ebf2622a2b485d9d39d20cf525f0415fff234f29f937404befa4",
+      "size_bytes": 32681532
+    }
+  ]
+}
