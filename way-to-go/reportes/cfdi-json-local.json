@@ -1,7 +1,7 @@
 {
   "estado": "listo",
   "modo": "local_json",
-  "excel": "C:\\Users\\ferte\\Downloads\\catCFDI_V_4_20261029.xls",
+  "excel": "C:\\fer\\wtg\\Way-to-Go\\way-to-go\\backend\\private-data\\source-downloads\\catCFDI_V_4_20261029.xls",
   "sha256_excel": "ca9536cc4e4af64e2f2e0afc527f08bd0d1601e9d30a25d93dc4dcc4e256573b",
   "conteos": {
     "esperados": 362381,
@@ -36,8 +36,8 @@
     "c_TipoRelacion": 7,
     "c_UsoCFDI": 24
   },
-  "directorio_privado": "C:\\Users\\ferte\\OneDrive\\Documentos\\GitHub\\Way-to-Go\\way-to-go\\backend\\private-data\\cfdi\\4.0\\ca9536cc4e4af64e2f2e0afc527f08bd0d1601e9d30a25d93dc4dcc4e256573b",
-  "manifest": "C:\\Users\\ferte\\OneDrive\\Documentos\\GitHub\\Way-to-Go\\way-to-go\\backend\\private-data\\cfdi\\4.0\\ca9536cc4e4af64e2f2e0afc527f08bd0d1601e9d30a25d93dc4dcc4e256573b\\manifest.json",
+  "directorio_privado": "C:\\fer\\wtg\\Way-to-Go\\way-to-go\\backend\\private-data\\cfdi\\4.0\\ca9536cc4e4af64e2f2e0afc527f08bd0d1601e9d30a25d93dc4dcc4e256573b",
+  "manifest": "C:\\fer\\wtg\\Way-to-Go\\way-to-go\\backend\\private-data\\cfdi\\4.0\\ca9536cc4e4af64e2f2e0afc527f08bd0d1601e9d30a25d93dc4dcc4e256573b\\manifest.json",
   "sha256_manifest": "eddac09388053338d5bcc58c9172cb617a4818c9e153c4963cfa299575703714",
   "archivos_jsonl": 25,
   "integridad_verificada": true,

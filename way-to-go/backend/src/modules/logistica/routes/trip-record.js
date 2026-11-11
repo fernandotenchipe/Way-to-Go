@@ -1,6 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { requireTripRead, requireTripEdit } from '../middleware/auth.js';
+import { updateTripCustomer, TripCustomerError } from '../services/trip-customer.js';
 import { scheduleKeys, validateTripSchedule, reserveTripResources } from '../services/trip-schedule.js';
 import { createTripCargoService } from '../services/trip-cargo.js';
 
@@ -54,6 +55,16 @@ export default function tripRecordRouter({ pool, wrap, fail, isUuid }) {
       pool.query('SELECT id,razon_social AS nombre FROM tms.proveedores WHERE activo ORDER BY razon_social'),
     ]);
     res.json({ success: true, data: { tiempos: times.rows[0] || {}, eventos: events.rows, unidades: units.rows, operadores: operators.rows, cajas: boxes.rows, proveedores: providers.rows } });
+  }));
+  router.patch('/trips/:folio/customer', requireTripEdit, wrap(async (req, res) => {
+    if (!isUuid(req.user?.id)) return fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');
+    try {
+      const data = await updateTripCustomer({ pool, folio: req.params.folio, body: req.body, actor: req.user.id });
+      return res.json({ success: true, data });
+    } catch (error) {
+      if (error instanceof TripCustomerError) return fail(res, error.status, error.message);
+      throw error;
+    }
   }));
   for (const operation of ['record', 'assignment']) router.patch(`/trips/:folio/${operation}`, requireTripEdit, wrap(async (req, res) => {
     if (!isUuid(req.user.id)) return fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');

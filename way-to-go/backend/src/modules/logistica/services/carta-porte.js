@@ -4,6 +4,7 @@ import { reject, uuid, fields, only, object, revision, decimal, formatDecimal, m
 import { createFiscalOperations } from './carta-porte-operations.js';
 import { createOperatorService } from './operators.js';
 import { findInvalidTripCargoSatKeys, mapTripCargoToCartaPorte, readTripCargoRows, tripPrefillMissing } from './trip-cargo.js';
+import { createCfdiCatalogProvider } from './cfdi-catalogs.js';
 
 const editable = new Set(['BORRADOR','RECHAZADO']);
 const json = value => JSON.stringify(value);
@@ -36,7 +37,7 @@ function safeCatalog(c, row) {
   return Object.fromEntries(['id',c.statusField||'activo','created_at','updated_at',...Object.keys(c.fields)].map(k=>[k,row[k]]));
 }
 
-export function createCartaPorteService({pool, provider = null, files = null}) {
+export function createCartaPorteService({pool, provider = null, files = null, cfdiCatalogProvider=createCfdiCatalogProvider({pool})}) {
   const operators=createOperatorService({pool});
   async function transaction(action) {
     const db=await pool.connect();
@@ -90,7 +91,7 @@ export function createCartaPorteService({pool, provider = null, files = null}) {
   }
   async function tripPrefill(db,t,cp,customer,transport) {
     const sourceCargoRows=await readTripCargoRows(db,t.id);
-    const invalidKeys=await findInvalidTripCargoSatKeys(db,sourceCargoRows);
+    const invalidKeys=await findInvalidTripCargoSatKeys(db,sourceCargoRows,{catalogProvider:cfdiCatalogProvider});
     const cargoRows=sourceCargoRows.map((cargo,index)=>{
       const filtered={...cargo};
       for(const invalid of invalidKeys)if(invalid.index===index)filtered[invalid.field]=null;

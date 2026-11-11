@@ -1,4 +1,5 @@
 import { fields, only, reject, uuid } from './carta-porte-input.js';
+import { createCfdiCatalogProvider } from './cfdi-catalogs.js';
 
 export const CARTA_PORTE_31_CATALOG_VERSION = 'edf31d04-86e4-4780-9bbb-6121bc6b5d38';
 
@@ -83,11 +84,21 @@ export function tripPrefillMissing({customer,origin,destination,transport,operat
   return [...new Set([...missing,...tripCargoMissingFields(cargo)])];
 }
 
-export async function findInvalidTripCargoSatKeys(db,items) {
+export async function findInvalidTripCargoSatKeys(db,items,{catalogProvider=createCfdiCatalogProvider({pool:db})}={}) {
   const requested=[];
   for(const [index,item] of items.entries())for(const [field,catalog] of Object.entries(satFields))
     if(item[field])requested.push({index,field,catalog,key:item[field]});
   if(!requested.length)return [];
+  const unitKeys=requested.filter(row=>row.field==='clave_unidad_sat');
+  const cartaPorteKeys=requested.filter(row=>row.field!=='clave_unidad_sat');
+  const invalid=[];
+  for(const row of unitKeys) {
+    let match;
+    try { match=await catalogProvider.getByKey('c_ClaveUnidad',row.key,{vigente:true}); }
+    catch { reject(503,'SAT_CATALOG_UNAVAILABLE','No está disponible c_ClaveUnidad en el proveedor CFDI configurado'); }
+    if(!match)invalid.push({index:row.index,field:row.field,catalog:row.catalog,key:row.key});
+  }
+  if(!cartaPorteKeys.length)return invalid;
   const {rows}=await db.query(`WITH requested AS (
       SELECT * FROM unnest($2::text[],$3::text[],$4::text[],$5::integer[]) AS item(field,catalog,sat_key,item_index)
     ), version AS (
@@ -102,16 +113,17 @@ export async function findInvalidTripCargoSatKeys(db,items) {
           AND (c.vigente_hasta IS NULL OR c.vigente_hasta>=CURRENT_DATE)) AS key_valid
     FROM requested r`,[
     CARTA_PORTE_31_CATALOG_VERSION,
-    requested.map(row=>row.field),requested.map(row=>row.catalog),requested.map(row=>row.key),requested.map(row=>row.index),
+    cartaPorteKeys.map(row=>row.field),cartaPorteKeys.map(row=>row.catalog),cartaPorteKeys.map(row=>row.key),cartaPorteKeys.map(row=>row.index),
   ]);
   const unavailable=rows.find(row=>!row.version_ready||!row.catalog_ready);
   if(unavailable)reject(503,'SAT_CATALOG_UNAVAILABLE',`No está disponible ${unavailable.catalog} en la versión Carta Porte 3.1 configurada`);
-  return rows.filter(row=>!row.key_valid).map(row=>({index:row.item_index,field:row.field,catalog:row.catalog,key:row.sat_key}));
+  invalid.push(...rows.filter(row=>!row.key_valid).map(row=>({index:row.item_index,field:row.field,catalog:row.catalog,key:row.sat_key})));
+  return invalid;
 }
 
-export async function validateTripCargoSatKey(db,field,key) {
+export async function validateTripCargoSatKey(db,field,key,options) {
   if(!satFields[field])reject(400,'UNKNOWN_SAT_FIELD','Campo SAT de mercancía no admitido');
-  const [invalid]=await findInvalidTripCargoSatKeys(db,[{[field]:key}]);
+  const [invalid]=await findInvalidTripCargoSatKeys(db,[{[field]:key}],options);
   if(invalid)reject(422,'INVALID_SAT_KEY',`La clave no existe o no está vigente en ${invalid.catalog}`,[{path:field,code:'INVALID_SAT_KEY',message:`Clave no válida para ${invalid.catalog}`}]);
   return true;
 }
@@ -134,7 +146,7 @@ function normalizeItem(input,{isNew=false}={}) {
   return {id:input.id,data};
 }
 
-export function createTripCargoService({pool}) {
+export function createTripCargoService({pool,catalogProvider=createCfdiCatalogProvider({pool})}) {
   async function ensureSchema(db) {
     if(!await tripCargoModelReady(db))reject(503,'CARGO_MIGRATION_REQUIRED','Aplica y verifica la migración 20261104_viaje_carga_mercancias.sql antes de usar este servicio');
   }
@@ -191,7 +203,7 @@ export function createTripCargoService({pool}) {
           const merged={...existing.get(item.id),...item.data};
           if(merged.clave_material_peligroso_sat&&merged.hazmat!==true)reject(422,'HAZMAT_MISMATCH','La clave de material peligroso requiere hazmat=true');
         }
-        const invalidKeys=await findInvalidTripCargoSatKeys(db,normalized.map(item=>item.data));
+        const invalidKeys=await findInvalidTripCargoSatKeys(db,normalized.map(item=>item.data),{catalogProvider});
         if(invalidKeys.length){const invalid=invalidKeys[0];reject(422,'INVALID_SAT_KEY',`La clave no existe o no está vigente en ${invalid.catalog}`,[{path:`mercancias[${invalid.index}].${invalid.field}`,code:'INVALID_SAT_KEY',message:`Clave no válida para ${invalid.catalog}`}]);}
         for(const itemId of removals)await db.query('DELETE FROM tms.viaje_carga_mercancias WHERE viaje_id=$1 AND id=$2',[journey.id,itemId]);
         let nextPosition=Math.max(0,...before.map(item=>Number(item.posicion)||0))+1;
