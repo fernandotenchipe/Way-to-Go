@@ -22,7 +22,7 @@ const body = {
 function makePool({ inactiveCustomer = false, invalidDestinationOwner = false, finalized = false } = {}) {
   const initial = {
     trips: [
-      { id: ids.trip1, folio: '4', cliente_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', origen_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', destino_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', estado_operativo: finalized ? 'ENTREGADO' : 'CONFIRMADO', updated_at: updatedAt },
+      { id: ids.trip1, folio: '4', cliente_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', origen_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', destino_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', estado_operativo: finalized === true ? 'ENTREGADO' : finalized || 'CONFIRMADO', updated_at: updatedAt },
       { id: ids.trip2, folio: '2', cliente_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', origen_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', destino_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', estado_operativo: 'CONFIRMADO', updated_at: updatedAt },
     ],
     customerActive: !inactiveCustomer,
@@ -120,9 +120,11 @@ test('rechaza ficha obsoleta y viaje finalizado sin cambiar registros', async ()
   await assert.rejects(updateTripCustomer({ pool: stale.pool, folio: '4', body: { ...body, updated_at: '2026-11-10T19:00:00.000Z' }, actor: ids.actor }), error => error.status === 409);
   assert.ok(stale.state.calls.some(call => call.sql === 'ROLLBACK'));
 
-  const finalized = makePool({ finalized: true });
-  await assert.rejects(updateTripCustomer({ pool: finalized.pool, folio: '4', body, actor: ids.actor }), error => error.status === 409);
-  assert.equal(finalized.state.trips[0].cliente_id, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  for (const status of ['ENTREGADO', 'CANCELADO']) {
+    const finalized = makePool({ finalized: status });
+    await assert.rejects(updateTripCustomer({ pool: finalized.pool, folio: '4', body, actor: ids.actor }), error => error.status === 409);
+    assert.equal(finalized.state.trips[0].cliente_id, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  }
 });
 
 test('aísla el cambio al folio solicitado y no modifica otro viaje ni Carta Porte', async () => {

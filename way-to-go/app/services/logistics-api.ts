@@ -1,3 +1,5 @@
+import type { CartaPorteFiscalScenario, CreateTripCartaPorteFiscalInput } from './carta-porte-fiscal';
+
 export type LogisticsTripStatus =
   | 'BORRADOR' | 'CONFIRMADO' | 'PROGRAMADO' | 'EN_CAMINO_A_CARGA' | 'LLEGO_A_CARGA' | 'EN_CARGA'
   | 'SALIO_CARGADO_EN_RUTA' | 'LLEGO_A_DESTINO' | 'EN_DESCARGA' | 'ENTREGADO' | 'CANCELADO';
@@ -149,6 +151,17 @@ export interface LogisticsAddress {
   principal?: boolean;
   tipo_ubicacion?: string | null;
   tipo_zona?: string | null;
+  numero_exterior?: string | null;
+  numero_interior?: string | null;
+  colonia?: string | null;
+  localidad?: string | null;
+  municipio?: string | null;
+  pais_sat?: string | null;
+  estado_sat?: string | null;
+  municipio_sat?: string | null;
+  localidad_sat?: string | null;
+  colonia_sat?: string | null;
+  referencia?: string | null;
 }
 
 export interface LogisticsCustomerContact {
@@ -246,7 +259,106 @@ export interface LogisticsTripCreateInput {
 
 export interface CartaPorteIssuer { id: string; nombre: string; razon_social: string; rfc: string; activo: boolean }
 export interface CartaPorteSummary { id: string; cfdi_id: string; estado: string; origen: string; revision: number; uuid_fiscal: string | null; created_at: string }
-export interface CartaPorteDocument { id: string; viaje_id: string; cfdi_id: string; cfdi: { id: string; estado: string; origen: string; revision: number; tipo_comprobante: 'I' | 'T' }; transport?: Array<{ unidad_id: string | null; placas?: string | null; configuracion_vehicular_sat?: string | null; permiso_sict_sat?: string | null; numero_permiso_sict?: string | null }>; figures: Array<{ id?: string; tipo_figura_sat: string; operador_id?: string | null; nombre: string; rfc?: string | null; numero_licencia?: string | null; residencia_fiscal_sat?: string | null; numero_registro_tributario?: string | null; domicilio_snapshot?: Record<string, string | null> }> }
+export type { CartaPorteFiscalScenario } from './carta-porte-fiscal';
+export interface CartaPorteAddressSnapshot extends Record<string, unknown> {
+  nombre?: string | null; calle?: string | null; numero_exterior?: string | null; numero_interior?: string | null;
+  colonia?: string | null; localidad?: string | null; municipio?: string | null; estado?: string | null;
+  pais?: string | null; codigo_postal?: string | null; pais_sat?: string | null; estado_sat?: string | null;
+  municipio_sat?: string | null; localidad_sat?: string | null; colonia_sat?: string | null;
+}
+export interface CartaPorteFiscalPartySnapshot {
+  nombre?: string | null; rfc?: string | null; regimen_fiscal_sat?: string | null; domicilio_fiscal_cp?: string | null;
+  residencia_fiscal_sat?: string | null; numero_registro_tributario?: string | null;
+  domicilio?: CartaPorteAddressSnapshot | null;
+}
+export interface CartaPorteInvoice {
+  id: string; viaje_id?: string | null; empresa_emisora_id?: string | null; cliente_id?: string | null;
+  tipo_comprobante: 'I' | 'T'; estado: string; origen: string; revision: number; uuid_fiscal: string | null;
+  fecha_expedicion?: string | null; lugar_expedicion_cp?: string | null; uso_cfdi_sat?: string | null;
+  forma_pago_sat?: string | null; metodo_pago_sat?: string | null; exportacion_sat?: string | null;
+  moneda?: string | null; tipo_cambio?: string | number | null;
+  subtotal?: string | number | null; descuento?: string | number | null;
+  impuestos_trasladados?: string | number | null; impuestos_retenidos?: string | number | null; total?: string | number | null;
+  emisor_snapshot?: CartaPorteFiscalPartySnapshot | null; receptor_snapshot?: CartaPorteFiscalPartySnapshot | null;
+  created_at?: string; updated_at?: string;
+}
+export interface CartaPorteLocation {
+  id: string; tipo: 'Origen' | 'Destino'; posicion: number; identificador_sat: string;
+  participante_id?: string | null; direccion_id?: string | null; fecha_hora?: string | null;
+  distancia_recorrida_km?: string | number | null; zona_horaria?: string | null;
+  participante_snapshot?: { nombre?: string | null; rfc?: string | null } | null;
+  domicilio_snapshot?: CartaPorteAddressSnapshot | null;
+}
+export interface CartaPorteMerchandise {
+  id: string; posicion: number; descripcion: string; cantidad?: string | number | null; unidad?: string | null;
+  peso_kg?: string | number | null; bienes_transp_sat?: string | null; clave_unidad_sat?: string | null;
+  material_peligroso?: boolean | null; clave_material_peligroso_sat?: string | null;
+  embalaje_sat?: string | null; descripcion_embalaje?: string | null; valor_mercancia?: string | number | null;
+  moneda_sat?: string | null; fraccion_arancelaria?: string | null; uuid_comercio_exterior?: string | null;
+}
+export interface CartaPorteTransport {
+  id?: string; unidad_id: string | null; placas?: string | null; configuracion_vehicular_sat?: string | null;
+  permiso_sict_sat?: string | null; numero_permiso_sict?: string | null; peso_bruto_vehicular_t?: string | number | null;
+  aseguradora_rc?: string | null; poliza_rc?: string | null; aseguradora_ambiental?: string | null;
+  poliza_ambiental?: string | null; aseguradora_carga?: string | null; poliza_carga?: string | null;
+}
+export interface CartaPorteFigure {
+  id?: string; tipo_figura_sat: string; operador_id?: string | null; participante_id?: string | null;
+  nombre: string; rfc?: string | null; numero_licencia?: string | null; residencia_fiscal_sat?: string | null;
+  numero_registro_tributario?: string | null; domicilio_snapshot?: CartaPorteAddressSnapshot | null;
+}
+export interface CartaPorteConcept {
+  id: string; posicion: number; descripcion: string; identificador?: string | null;
+  clave_producto_servicio_sat?: string | null; clave_unidad_sat?: string | null; unidad?: string | null;
+  objeto_impuesto_sat?: string | null; cantidad?: string | number | null; valor_unitario?: string | number | null;
+  descuento?: string | number | null; importe?: string | number | null;
+}
+export interface CartaPorteDocument {
+  id: string; viaje_id: string; cfdi_id: string; sat_version_id?: string | null;
+  entrada_salida?: string | null; pais_origen_destino_sat?: string | null; via_entrada_salida_sat?: string | null;
+  unidad_peso_sat?: string | null; polo_origen_sat?: string | null; polo_destino_sat?: string | null;
+  referencia_cliente?: string | null; orden_compra?: string | null; descripcion_carga?: string | null;
+  distancia_total_km?: string | number | null; transporte_internacional?: boolean | null;
+  logistica_inversa?: boolean | null; registro_istmo?: boolean | null;
+  numero_total_mercancias?: number | null; peso_bruto_total?: string | number | null;
+  updated_at?: string; created_at?: string;
+  // scenario metadata is audited by the backend; older responses may omit it.
+  escenario_fiscal?: CartaPorteFiscalScenario | null; mercancias_propias?: boolean | null;
+  cfdi: CartaPorteInvoice;
+  locations: CartaPorteLocation[]; merchandise: CartaPorteMerchandise[];
+  transport: CartaPorteTransport[]; figures: CartaPorteFigure[];
+  trailers?: Array<Record<string, unknown>>; sanitary?: Array<Record<string, unknown>>;
+  parts?: Array<Record<string, unknown>>; regimes?: Array<Record<string, unknown>>;
+  documents?: Array<Record<string, unknown>>; links?: Array<Record<string, unknown>>;
+  allocations?: Array<Record<string, unknown>>; guides?: Array<Record<string, unknown>>;
+  concepts?: CartaPorteConcept[]; taxes?: Array<Record<string, unknown>>; relations?: Array<Record<string, unknown>>;
+  precarga?: { faltantes: string[] };
+  advertencias?: Array<{ category?: string; code?: string; message: string }>;
+}
+
+export type CartaPorteLocationInput = Omit<CartaPorteLocation, 'id' | 'participante_snapshot' | 'domicilio_snapshot'> & { id?: string };
+export type CartaPorteMerchandiseInput = Omit<CartaPorteMerchandise, 'id'> & { id?: string };
+export interface CartaPorteAddressResource extends CartaPorteAddressSnapshot {
+  id: string; nombre: string; participante_id: string; cliente_direccion_id: string | null;
+  zona_horaria?: string | null; activo?: boolean;
+}
+export interface CartaPorteSatEntry { catalogo: string; clave: string; descripcion: string; reglas?: Record<string, unknown> }
+export interface TripCargoItem {
+  id: string; posicion: number; descripcion: string | null; mercancia?: string | null;
+  cantidad: string | number | null; bienes_transp_sat: string | null; clave_unidad_sat: string | null;
+  unidad: string | null; peso_kg: string | number | null; hazmat: boolean | null;
+  clave_material_peligroso_sat: string | null; embalaje_sat: string | null; embalaje: string | null;
+}
+export interface TripCargoResponse { viaje_id: string; updated_at: string; mercancias: TripCargoItem[]; faltantes: string[] }
+
+export type CreateTripCartaPorteInput = CreateTripCartaPorteFiscalInput & { datos_qa?: boolean; cliente_id?: string };
+
+export class LogisticsApiError extends Error {
+  constructor(message: string, readonly code?: string, readonly status?: number) {
+    super(message);
+    this.name = 'LogisticsApiError';
+  }
+}
 
 export type LogisticsCustomerUpdateInput = Partial<Omit<LogisticsCustomerCreateInput, 'direccion'>>;
 export type LogisticsAddressUpdateInput = Partial<Omit<LogisticsAddress, 'id' | 'cliente_id' | 'activo'>>;
@@ -259,7 +371,7 @@ class LogisticsApi {
     if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
     const response = await fetch(`/api/logistica/${path}`, { ...init, headers, cache: 'no-store' });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || `Error de logística (${response.status})`);
+    if (!response.ok) throw new LogisticsApiError(result.error || `Error de logística (${response.status})`, result.code, response.status);
     return result as LogisticsResponse<T>;
   }
 
@@ -277,6 +389,20 @@ class LogisticsApi {
     return this.request<LogisticsCustomerDetail>(`customers/${encodeURIComponent(id)}`);
   }
 
+  getCartaPorteCatalog<T>(resource: string, filters: { q?: string; limit?: number; offset?: number } = {}) {
+    const search = new URLSearchParams(Object.entries(filters).filter(([, value]) => value != null).map(([key, value]) => [key, String(value)]));
+    return this.request<T[]>(`carta-porte/catalogs/${encodeURIComponent(resource)}${search.size ? `?${search}` : ''}`);
+  }
+
+  getCartaPorteCatalogItem<T>(resource: string, id: string) {
+    return this.request<T>(`carta-porte/catalogs/${encodeURIComponent(resource)}/${encodeURIComponent(id)}`);
+  }
+
+  getCartaPorteSatCatalog(catalog: string, versionId: string, q: string) {
+    const search = new URLSearchParams({ version_id: versionId, q, limit: '50', offset: '0' });
+    return this.request<CartaPorteSatEntry[]>(`carta-porte/sat/${encodeURIComponent(catalog)}?${search}`);
+  }
+
   getCatalogs() {
     return this.request<{ servicios: LogisticsServiceType[]; evidencias: Array<{ id: string; nombre: string; codigo?: string }>; costos: unknown[]; extras: unknown[] }>('catalogs');
   }
@@ -291,9 +417,11 @@ class LogisticsApi {
     return this.request<CfdiCatalogSearch>(`cfdi/catalogs/${encodeURIComponent(catalog)}${search.size ? `?${search}` : ''}`);
   }
 
-  getCfdiCatalogKey(catalog: string, key: string, contexto?: Record<string, string | null>) {
+  getCfdiCatalogKey(catalog: string, key: string, contexto?: Record<string, string | null>, options: { vigente?: boolean; fecha?: string } = {}) {
     const search = new URLSearchParams();
     if (contexto) search.set('contexto', JSON.stringify(contexto));
+    if (options.vigente != null) search.set('vigente', String(options.vigente));
+    if (options.fecha) search.set('fecha', options.fecha);
     return this.request<CfdiCatalogRow>(`cfdi/catalogs/${encodeURIComponent(catalog)}/keys/${encodeURIComponent(key)}${search.size ? `?${search}` : ''}`);
   }
 
@@ -358,8 +486,15 @@ class LogisticsApi {
   getTripSession() { return this.request<LogisticsTripSession>('session'); }
   getCartaPorteIssuers() { return this.request<CartaPorteIssuer[]>('carta-porte/catalogs/issuers'); }
   getTripCartaPortes(folio: string) { return this.request<CartaPorteSummary[]>(`trips/${encodeURIComponent(folio)}/carta-porte`); }
-  createTripCartaPorte(folio: string, input: { empresa_emisora_id: string; tipo_comprobante: 'I' | 'T' }) { return this.request<CartaPorteDocument>(`trips/${encodeURIComponent(folio)}/carta-porte`, { method: 'POST', body: JSON.stringify(input) }); }
+  getTripCargo(folio: string) { return this.request<TripCargoResponse>(`trips/${encodeURIComponent(folio)}/cargo`); }
+  createTripCartaPorte(folio: string, input: CreateTripCartaPorteInput) { return this.request<CartaPorteDocument>(`trips/${encodeURIComponent(folio)}/carta-porte`, { method: 'POST', body: JSON.stringify(input) }); }
   getCartaPorte(id: string) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}`); }
+  saveCartaPorteLocations(id: string, expected_revision: number, locations: CartaPorteLocationInput[]) {
+    return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/locations`, { method: 'PUT', body: JSON.stringify({ expected_revision, locations: { upsert: locations, remove: [] } }) });
+  }
+  saveCartaPorteMerchandise(id: string, expected_revision: number, merchandise: CartaPorteMerchandiseInput[]) {
+    return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/merchandise`, { method: 'PUT', body: JSON.stringify({ expected_revision, merchandise: { upsert: merchandise, remove: [] } }) });
+  }
   saveCartaPorteFigures(id: string, expected_revision: number, figures: CartaPorteDocument['figures']) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/figures`, { method: 'PUT', body: JSON.stringify({ expected_revision, figures: { upsert: figures, remove: [] } }) }); }
   saveCartaPorteTransport(id: string, expected_revision: number, unidad_id: string) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/transport`, { method: 'PUT', body: JSON.stringify({ expected_revision, transport: { upsert: [{ unidad_id }], remove: [] } }) }); }
   getOperators(filters: { q?: string; status?: 'all' | 'active' | 'inactive'; limit?: number; offset?: number } = {}) { const search = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])); return this.request<LogisticsOperator[]>(`operators/manage?${search}`); }

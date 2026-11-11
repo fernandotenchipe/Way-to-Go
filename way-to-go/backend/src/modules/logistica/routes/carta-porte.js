@@ -22,7 +22,7 @@ export default function cartaPorteRouter({pool,provider=null,files=null,cfdiCata
       else if(error.code==='23505'){status=409;code='DUPLICATE';message='El registro o la operación ya existe';}
       else if(['23503','23514','23502','22007','22008','22003','22P02'].includes(error.code)){status=422;code='INVALID_DATA';message='Revisa los datos y sus relaciones';}
       if(status===500)console.error('Carta Porte error:',error.code||error.name);
-      res.status(status).json({success:false,error:message,code,...(error.fields?.length?{fields:error.fields}:{})});
+      res.status(status).json({success:false,error:message,code,...(error.fields?.length?{fields:error.fields}:{}),...(error.warnings?.length?{warnings:error.warnings}:{})});
     }
   };
   const read=gate('carta_porte.ver'),edit=gate('carta_porte.editar');

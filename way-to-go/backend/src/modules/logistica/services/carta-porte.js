@@ -5,6 +5,7 @@ import { createFiscalOperations } from './carta-porte-operations.js';
 import { createOperatorService } from './operators.js';
 import { findInvalidTripCargoSatKeys, mapTripCargoToCartaPorte, readTripCargoRows, tripPrefillMissing } from './trip-cargo.js';
 import { createCfdiCatalogProvider } from './cfdi-catalogs.js';
+import { validateFiscalCreation, validateCfdiCatalogKeys } from './carta-porte-fiscal.js';
 
 const editable = new Set(['BORRADOR','RECHAZADO']);
 const json = value => JSON.stringify(value);
@@ -70,6 +71,13 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
     const data={...cp,cfdi:invoices[0]};
     for (const [key,c] of Object.entries(children)) data[key]=(await db.query(`SELECT * FROM tms.${c.table} WHERE ${c.scope}=$1 ORDER BY created_at`,[c.scope==='cfdi_id'?cp.cfdi_id:cp.id])).rows;
     const parseSnapshot=value=>{if(value&&typeof value==='object')return value;if(typeof value==='string'){try{return JSON.parse(value);}catch{}}return {};};
+    const scenarioRow=(await db.query("SELECT datos FROM tms.cp_auditoria WHERE cfdi_id=$1 AND datos ? 'escenario_fiscal' ORDER BY created_at DESC,id DESC LIMIT 1",[cp.cfdi_id])).rows[0];
+    const scenarioData=parseSnapshot(scenarioRow?.datos);
+    const knownScenarios=new Set(['SERVICIO_TRANSPORTE','TRASLADO_BIENES_PROPIOS']);
+    // The scenario is returned only when it was explicitly audited. Never infer
+    // it from the invoice type or transport assignment for legacy documents.
+    data.escenario_fiscal=knownScenarios.has(scenarioData.escenario_fiscal)?scenarioData.escenario_fiscal:null;
+    data.mercancias_propias=data.escenario_fiscal?scenarioData.mercancias_propias===true:null;
     const locations=data.locations||[];
     const location=(type)=>{const row=locations.find(item=>item.tipo===type);if(!row)return null;const address=parseSnapshot(row.domicilio_snapshot);return {...address,ciudad:address.ciudad??address.municipio,fecha_hora:row.fecha_hora};};
     const receiver=parseSnapshot(data.cfdi?.receptor_snapshot);
@@ -192,24 +200,68 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
     } else if (name==='figures' && row.participante_id) Object.assign(row,await participant(db,row.participante_id),{id:row.id});
     return row;
   }
-  async function totals(db, cpId, fId) {
+  async function recalculateInvoiceTotals(db, fId) {
+    const invoice=(await db.query('SELECT tipo_comprobante FROM tms.cfdi WHERE id=$1',[fId])).rows[0];
     const concepts=(await db.query('SELECT * FROM tms.cfdi_conceptos WHERE cfdi_id=$1',[fId])).rows;
-    let subtotal=0n,discount=0n,transfers=0n,withheld=0n;
+    if (invoice?.tipo_comprobante==='T') {
+      const taxes=(await db.query('SELECT id FROM tms.cfdi_impuestos WHERE cfdi_id=$1',[fId])).rows;
+      if (taxes.length) reject(422,'TRANSFER_TAXES_NOT_ALLOWED','El CFDI tipo T no admite impuestos de contraprestación');
+      if (!concepts.length) return;
+      if (concepts.some(c=>c.cantidad==null||c.valor_unitario==null||c.descuento!=null&&decimal(c.descuento)!==0n
+        ||decimal(c.valor_unitario)!==0n||c.importe!=null&&decimal(c.importe)!==0n)) {
+        reject(422,'TRANSFER_CONCEPT_AMOUNT_NOT_ZERO','Los conceptos de traslado deben estar completos y tener importes cero');
+      }
+      const cargo=(await db.query('SELECT bienes_transp_sat FROM tms.cp_mercancias WHERE carta_porte_id=(SELECT id FROM tms.cartas_porte WHERE cfdi_id=$1)',[fId])).rows;
+      const cargoKeys=new Set(cargo.map(row=>row.bienes_transp_sat).filter(Boolean));
+      if (!cargo.length||concepts.some(c=>!cargoKeys.has(c.clave_producto_servicio_sat))||cargoKeys.size!==new Set(concepts.map(c=>c.clave_producto_servicio_sat)).size||[...cargoKeys].some(key=>!concepts.some(c=>c.clave_producto_servicio_sat===key))) {
+        reject(422,'TRANSFER_CONCEPT_MISMATCH','Los conceptos del traslado deben corresponder a las mercancías del complemento Carta Porte');
+      }
+      for (const concept of concepts) await update(db,'cfdi_conceptos',{importe:'0.000000'},'id=$1 AND cfdi_id=$2',[concept.id,fId]);
+      await update(db,'cfdi',{subtotal:'0.000000',total:'0.000000'},'id=$1',[fId]);
+      return;
+    }
+    // Incomplete drafts are common. Do not turn absent inputs into zeroes or
+    // overwrite previously captured totals until every concept is calculable.
+    if (!concepts.length || concepts.some(c=>c.cantidad===null || c.valor_unitario===null)) return;
+    const taxes=(await db.query('SELECT * FROM tms.cfdi_impuestos WHERE cfdi_id=$1',[fId])).rows;
+    const taxesComplete=taxes.every(t=>t.tipo_factor_sat==='Exento'||(t.base!==null&&t.tasa_cuota!==null));
+    let subtotal=0n,discount=0n,hasDiscount=false;
     for (const c of concepts) {
-      if (c.cantidad===null || c.valor_unitario===null) continue;
-      const amount=multiplyDecimal(c.cantidad,c.valor_unitario); const disc=decimal(c.descuento||'0');
+      const amount=multiplyDecimal(c.cantidad,c.valor_unitario);
+      subtotal+=amount;
+      // A missing optional line discount means no discount under the CFDI model;
+      // keep the persisted summary NULL when none was supplied.
+      const disc=c.descuento===null?0n:decimal(c.descuento);
+      if(c.descuento!==null)hasDiscount=true;
+      discount+=disc;
       if (disc>amount) reject(422,'INVALID_DISCOUNT','El descuento supera al importe');
       await update(db,'cfdi_conceptos',{importe:formatDecimal(amount)},'id=$1 AND cfdi_id=$2',[c.id,fId]);
-      subtotal+=amount; discount+=disc;
     }
-    const taxes=(await db.query('SELECT * FROM tms.cfdi_impuestos WHERE cfdi_id=$1',[fId])).rows;
+    const changes={subtotal:formatDecimal(subtotal),descuento:hasDiscount?formatDecimal(discount):null};
+    if(!taxesComplete){changes.impuestos_trasladados=null;changes.impuestos_retenidos=null;changes.total=null;await update(db,'cfdi',changes,'id=$1',[fId]);return;}
+    let transfers=0n,withheld=0n,transfersKnown=false,withheldKnown=false;
+    if(taxes.length){transfersKnown=true;withheldKnown=true;}
+    else if(concepts.every(c=>c.objeto_impuesto_sat==='01')){transfersKnown=true;withheldKnown=true;}
     for (const tax of taxes) {
-      const amount=tax.tipo_factor_sat==='Exento'?null:multiplyDecimal(tax.base,tax.tasa_cuota||'0');
-      await update(db,'cfdi_impuestos',{importe:amount===null?null:formatDecimal(amount)},'id=$1 AND cfdi_id=$2',[tax.id,fId]);
-      if (amount!==null) { if (tax.movimiento==='TRASLADO') transfers+=amount; else withheld+=amount; }
+      const exempt=tax.tipo_factor_sat==='Exento';
+      const amount=exempt?0n:multiplyDecimal(tax.base,tax.tasa_cuota);
+      await update(db,'cfdi_impuestos',{importe:exempt?null:formatDecimal(amount)},'id=$1 AND cfdi_id=$2',[tax.id,fId]);
+      if (tax.movimiento==='TRASLADO') transfers+=amount;
+      else withheld+=amount;
     }
-    if (subtotal-discount+transfers-withheld<0n) reject(422,'INVALID_TOTAL','El total no puede ser negativo');
-    await update(db,'cfdi',{subtotal:formatDecimal(subtotal),descuento:formatDecimal(discount),impuestos_trasladados:formatDecimal(transfers),impuestos_retenidos:formatDecimal(withheld),total:formatDecimal(subtotal-discount+transfers-withheld)},'id=$1',[fId]);
+    if (transfersKnown) changes.impuestos_trasladados=formatDecimal(transfers);
+    if (withheldKnown) changes.impuestos_retenidos=formatDecimal(withheld);
+    if(!taxesComplete||!transfersKnown||!withheldKnown){changes.impuestos_trasladados=null;changes.impuestos_retenidos=null;changes.total=null;}
+    const current=(await db.query('SELECT subtotal,descuento,impuestos_trasladados,impuestos_retenidos FROM tms.cfdi WHERE id=$1',[fId])).rows[0]||{};
+    const known={...current,...changes};
+    if (taxesComplete&&transfersKnown&&withheldKnown&&known.subtotal!==null&&known.subtotal!==undefined&&known.impuestos_trasladados!==null&&known.impuestos_trasladados!==undefined&&known.impuestos_retenidos!==null&&known.impuestos_retenidos!==undefined) {
+      const total=decimal(known.subtotal)-(known.descuento==null?0n:decimal(known.descuento))+decimal(known.impuestos_trasladados)-decimal(known.impuestos_retenidos);
+      if(total<0n)reject(422,'INVALID_TOTAL','El total no puede ser negativo');
+      changes.total=formatDecimal(total);
+    }
+    await update(db,'cfdi',changes,'id=$1',[fId]);
+  }
+  async function recalculateMerchandiseTotals(db, cpId) {
     const m=(await db.query('SELECT count(*)::int AS count, sum(peso_kg) AS weight FROM tms.cp_mercancias WHERE carta_porte_id=$1',[cpId])).rows[0];
     await update(db,'cartas_porte',{numero_total_mercancias:m.count||null,peso_bruto_total:m.weight||null},'id=$1',[cpId]);
   }
@@ -241,6 +293,12 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
         const existing=(await db.query(`SELECT * FROM tms.${c.table} WHERE ${where}`,params)).rows[0];
         const sourceKey={merchandise:'mercancia_id',transport:'unidad_id',trailers:'caja_id'}[name];
         let row=await snapshots(db,name,{...(existing||{}),...parsed},Boolean(sourceKey&&existing&&parsed[sourceKey]&&parsed[sourceKey]!==existing[sourceKey]));
+        if(name==='merchandise'&&(!existing||['bienes_transp_sat','clave_unidad_sat','material_peligroso','clave_material_peligroso_sat','embalaje_sat'].some(key=>Object.hasOwn(parsed,key)))){
+          if(row.clave_material_peligroso_sat&&row.material_peligroso!==true)reject(422,'HAZMAT_MISMATCH','La clave de material peligroso requiere material_peligroso=true');
+          if(row.material_peligroso===true&&(!row.clave_material_peligroso_sat||!row.embalaje_sat))reject(422,'HAZMAT_FIELDS_REQUIRED','El material peligroso requiere clave SAT y embalaje SAT');
+          const invalidKeys=await findInvalidTripCargoSatKeys(db,[row],{catalogProvider:cfdiCatalogProvider});
+          if(invalidKeys.length){const invalid=invalidKeys[0];reject(422,'INVALID_SAT_KEY',`La clave no existe o no está vigente en ${invalid.catalog}`,[{path:`merchandise.${invalid.field}`,code:'INVALID_SAT_KEY',message:`Clave no válida para ${invalid.catalog}`}]);}
+        }
         // Solo columnas conocidas: los valores obtenidos de SELECT no se interpolan como nombres.
         const allowed=[...keysFor(c),'participante_snapshot','domicilio_snapshot'];
         row=Object.fromEntries(Object.entries(row).filter(([k])=>allowed.includes(k)));
@@ -250,7 +308,10 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
         } else await insert(db,c.table,{...row,[c.scope]:scope});
       }
     }
-    await totals(db,cpId,fId);
+    // Recalculate only the derived data owned by the section being edited.
+    // In particular, location edits must never touch CFDI amounts or cargo.
+    if (group==='merchandise') await recalculateMerchandiseTotals(db,cpId);
+    if (group==='invoice-items') await recalculateInvoiceTotals(db,fId);
   }
   function requireProvider() { if (!provider || !files) reject(503,'PAC_NOT_CONFIGURED','Proveedor fiscal y almacenamiento privado pendientes de configurar'); }
   const fiscal=createFiscalOperations({provider,files,transaction,header,aggregate,insert,update,audit,pool});
@@ -314,7 +375,7 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
     async list(folio) { const t=await trip(pool,folio); return (await pool.query('SELECT c.*,f.estado,f.origen,f.revision,f.uuid_fiscal FROM tms.cartas_porte c JOIN tms.cfdi f ON f.id=c.cfdi_id WHERE c.viaje_id=$1 ORDER BY c.created_at DESC',[t.id])).rows; },
     async get(cpId) { return transaction(async db=>{await header(db,cpId);return aggregate(db,cpId);}); },
     async create(folio,body,actor) {
-      const input=fields(body,{empresa_emisora_id:'uuid',tipo_comprobante:'text',cliente_id:'uuid'},['empresa_emisora_id','tipo_comprobante']);
+      const input=fields(body,{empresa_emisora_id:'uuid',tipo_comprobante:'text',cliente_id:'uuid',escenario_fiscal:'text',mercancias_propias:'boolean',datos_qa:'boolean'},['empresa_emisora_id','tipo_comprobante','escenario_fiscal']);
       if (!['I','T'].includes(input.tipo_comprobante)) reject(400,'INVALID_INVOICE_TYPE','Tipo de comprobante inválido');
       return transaction(async db=>{
         const t=await trip(db,folio,true);
@@ -323,8 +384,11 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
         if (open.length) reject(409,'EXISTING_DOCUMENT','Ya existe un documento propio; consulta o sustituye el existente');
         const issuer=await source(db,'empresas_emisoras',input.empresa_emisora_id);
         const customer=await source(db,'clientes',input.cliente_id||t.cliente_id);
+        const fiscalScenario=validateFiscalCreation({tipoComprobante:input.tipo_comprobante,escenarioFiscal:input.escenario_fiscal,mercanciasPropias:input.mercancias_propias,trip:t,issuer,customer});
         const f=await insert(db,'cfdi',{viaje_id:t.id,empresa_emisora_id:issuer.id,cliente_id:customer.id,tipo_comprobante:input.tipo_comprobante,creado_por:actor,
-          emisor_snapshot:json({rfc:issuer.rfc,nombre:issuer.razon_social,regimen_fiscal_sat:issuer.regimen_fiscal_sat,domicilio:issuer.domicilio}),receptor_snapshot:json(fiscalCustomer(customer)),lugar_expedicion_cp:issuer.lugar_expedicion_cp,uso_cfdi_sat:customer.uso_cfdi,forma_pago_sat:customer.forma_pago,metodo_pago_sat:customer.metodo_pago});
+          emisor_snapshot:json({rfc:issuer.rfc,nombre:issuer.razon_social,regimen_fiscal_sat:issuer.regimen_fiscal_sat,domicilio:issuer.domicilio}),receptor_snapshot:json(fiscalCustomer(customer)),lugar_expedicion_cp:issuer.lugar_expedicion_cp,uso_cfdi_sat:customer.uso_cfdi,
+          forma_pago_sat:input.tipo_comprobante==='T'?null:customer.forma_pago,metodo_pago_sat:input.tipo_comprobante==='T'?null:customer.metodo_pago,
+          ...(input.tipo_comprobante==='T'?{total:'0.000000'}:{})});
         const cp=await insert(db,'cartas_porte',{cfdi_id:f.id,viaje_id:t.id});
         let transport=null;
         if (t.unidad_id) {
@@ -332,21 +396,38 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
           await insert(db,'cp_autotransporte',{carta_porte_id:cp.id,...transport});
         }
         const prefill=await tripPrefill(db,t,cp,customer,transport);
-        await audit(db,actor,'cartas_porte',cp.id,'CREAR',f.id,{precarga_faltante:prefill.missing});
+        await audit(db,actor,'cartas_porte',cp.id,'CREAR',f.id,{precarga_faltante:prefill.missing,escenario_fiscal:fiscalScenario.escenario,mercancias_propias:input.mercancias_propias===true,datos_qa:input.datos_qa===true});
         const document=await aggregate(db,cp.id);
         document.precarga.faltantes=[...new Set([...document.precarga.faltantes,...prefill.missing])];
+        document.advertencias=[];
+        if(input.datos_qa===true)document.advertencias.push({category:'QA',code:'SYNTHETIC_DATA',message:'Documento de prueba con datos QA; no utilizar para operación fiscal ni timbrado'});
         return document;
       });
     },
     async patch(cpId,body,actor) {
-      only(body,['expected_revision','header','invoice']); revision(body.expected_revision);
+      only(body,['expected_revision','header','invoice','escenario_fiscal','mercancias_propias','datos_qa']); revision(body.expected_revision);
       const cp=fields(body.header||{},headerFields), invoice=fields(body.invoice||{},invoiceFields);
+      const fiscalMetadata=fields(Object.fromEntries(['escenario_fiscal','mercancias_propias','datos_qa'].filter(k=>Object.hasOwn(body,k)).map(k=>[k,body[k]])),{escenario_fiscal:'text',mercancias_propias:'boolean',datos_qa:'boolean'},Object.hasOwn(body,'escenario_fiscal')?['escenario_fiscal']:[]);
       return transaction(async db=>{
         const f=await header(db,cpId,body.expected_revision,true);
+        if(f.tipo_comprobante==='T'&&invoice.cliente_id){
+          const target=await source(db,'clientes',invoice.cliente_id);
+          const issuerSnapshot=typeof f.emisor_snapshot==='string'?JSON.parse(f.emisor_snapshot):f.emisor_snapshot;
+          if(target.rfc!==issuerSnapshot?.rfc)reject(422,'TRANSFER_RFC_MISMATCH','No se puede asignar al CFDI tipo T un receptor con RFC distinto al emisor');
+        }
+        let auditMetadata={};
+        if(Object.keys(fiscalMetadata).length){
+          const tripRow=(await db.query('SELECT * FROM tms.viajes WHERE id=$1',[f.viaje_id])).rows[0];
+          const issuerSnapshot=typeof f.emisor_snapshot==='string'?JSON.parse(f.emisor_snapshot):f.emisor_snapshot;
+          const receiverSnapshot=invoice.cliente_id?fiscalCustomer(await source(db,'clientes',invoice.cliente_id)):(typeof f.receptor_snapshot==='string'?JSON.parse(f.receptor_snapshot):f.receptor_snapshot);
+          const scenario=validateFiscalCreation({tipoComprobante:f.tipo_comprobante,escenarioFiscal:fiscalMetadata.escenario_fiscal,
+            mercanciasPropias:fiscalMetadata.mercancias_propias,trip:tripRow,issuer:issuerSnapshot,customer:{rfc:receiverSnapshot?.rfc}});
+          auditMetadata={escenario_fiscal:scenario.escenario,mercancias_propias:fiscalMetadata.mercancias_propias===true,datos_qa:fiscalMetadata.datos_qa===true};
+        }
         if (Object.keys(cp).length) await update(db,'cartas_porte',cp,'id=$1',[cpId]);
         if (invoice.cliente_id) invoice.receptor_snapshot=json(fiscalCustomer(await source(db,'clientes',invoice.cliente_id)));
         if (Object.keys(invoice).length) await update(db,'cfdi',{...invoice,estado:'BORRADOR',solicitud_snapshot:null,solicitud_sha256:null},'id=$1',[f.id]);
-        await audit(db,actor,'cartas_porte',cpId,'EDITAR',f.id); return aggregate(db,cpId);
+        await audit(db,actor,'cartas_porte',cpId,Object.keys(auditMetadata).length?'DECLARAR_ESCENARIO_FISCAL':'EDITAR',f.id,auditMetadata); return aggregate(db,cpId);
       });
     },
     async group(cpId,group,body,actor) {
@@ -362,21 +443,28 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
       return transaction(async db=>{
         const f=await header(db,cpId,body.expected_revision,true); const data=await aggregate(db,cpId);
         if(f.estado!=='BORRADOR')reject(409,'DOCUMENT_LOCKED','Reabre el documento antes de validarlo');
-        const tripRow=(await db.query('SELECT unidad_id,operador_id,caja_id FROM tms.viajes WHERE id=$1',[f.viaje_id])).rows[0];
+        const tripRow=(await db.query('SELECT unidad_id,operador_id,caja_id,proveedor_id FROM tms.viajes WHERE id=$1',[f.viaje_id])).rows[0];
         if(tripRow?.unidad_id&&data.transport[0]?.unidad_id!==tripRow.unidad_id)reject(422,'ASSIGNMENT_MISMATCH','La unidad no coincide con la asignación del viaje');
         if(tripRow?.operador_id&&!data.figures.some(fig=>fig.operador_id===tripRow.operador_id))reject(422,'ASSIGNMENT_MISMATCH','El operador no coincide con la asignación del viaje');
         if(tripRow?.caja_id&&!data.trailers.some(trailer=>trailer.caja_id===tripRow.caja_id))reject(422,'ASSIGNMENT_MISMATCH','El remolque no coincide con la asignación del viaje');
-        const {validateCartaPorte}=await import('./carta-porte-validation.js');
-        const errors=validateCartaPorte(data);
-        if (errors.length) reject(422,'CARTA_PORTE_INCOMPLETE','Falta completar información',errors);
+        const {validateCartaPorteDetailed}=await import('./carta-porte-validation.js');
+        const auditData=(await db.query("SELECT datos FROM tms.cp_auditoria WHERE cfdi_id=$1 AND datos ? 'escenario_fiscal' ORDER BY created_at DESC,id DESC LIMIT 1",[f.id])).rows[0]?.datos||{};
+        const metadata=typeof auditData==='string'?JSON.parse(auditData):auditData;
+        const fiscalResult=validateCartaPorteDetailed(data,{scenario:metadata.escenario_fiscal,qaDeclared:metadata.datos_qa===true,
+          mercanciasPropias:metadata.mercancias_propias===true,mediosPropios:Boolean(tripRow?.unidad_id&&!tripRow?.proveedor_id)});
+        let catalogErrors=[];
+        try{catalogErrors=await validateCfdiCatalogKeys(data,cfdiCatalogProvider);}
+        catch{reject(503,'CFDI_CATALOG_UNAVAILABLE','No se pudieron verificar los catálogos locales CFDI');}
+        const errors=[...fiscalResult.errors,...catalogErrors];
+        if (errors.length) reject(422,'CARTA_PORTE_INCOMPLETE','Falta completar información',errors,fiscalResult.warnings);
         requireProvider();
         const version=(await db.query('SELECT * FROM tms.cp_sat_versiones WHERE id=$1',[data.sat_version_id])).rows[0];
         if (!version) reject(503,'SAT_NOT_CONFIGURED','Carga una revisión oficial de catálogos SAT');
         // El adaptador realiza la validación fiscal completa, XSD, catálogos y redondeos.
         const result=await provider.validate(data,{db,version});
-        if (!result?.valid) reject(422,'FISCAL_VALIDATION_FAILED','Documento rechazado por validación fiscal',result?.errors||[]);
+        if (!result?.valid) reject(422,'FISCAL_VALIDATION_FAILED','Documento rechazado por validación fiscal',result?.errors||[],fiscalResult.warnings);
         await update(db,'cfdi',{estado:'VALIDADO',solicitud_snapshot:json(data),solicitud_sha256:hash(json(data))},'id=$1',[f.id]);
-        await audit(db,actor,'cfdi',f.id,'VALIDAR',f.id); return aggregate(db,cpId);
+        await audit(db,actor,'cfdi',f.id,'VALIDAR',f.id); const validated=await aggregate(db,cpId);validated.advertencias=fiscalResult.warnings;return validated;
       });
     },
     async events(cpId) { return transaction(async db=>{const f=await header(db,cpId);return (await db.query('SELECT * FROM tms.cp_auditoria WHERE cfdi_id=$1 ORDER BY created_at,id',[f.id])).rows;}); },

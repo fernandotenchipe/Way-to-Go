@@ -24,6 +24,50 @@ async function invoke(method,path,{body={},params={},permission='carta_porte.ver
   return {res,pool};
 }
 
+function aggregateReadPool(auditRows=[]) {
+  const invoice={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',tipo_comprobante:'T',emisor_snapshot:{rfc:'AAA010101AAA'},receptor_snapshot:{rfc:'AAA010101AAA'}};
+  const cp={id:cpId,cfdi_id:documentId,viaje_id:'55555555-5555-4555-8555-555555555555'};
+  return mockPool(sql=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[invoice]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[cp]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[invoice]};
+    if(sql.includes('FROM tms.cp_auditoria'))return {rows:auditRows};
+    if(sql.includes('ORDER BY created_at'))return {rows:[]};
+    return {rows:[]};
+  });
+}
+
+test('GET Carta Porte devuelve el escenario fiscal auditado, sin inferirlo del CFDI tipo T',async()=>{
+  const pool=aggregateReadPool([{datos:{escenario_fiscal:'TRASLADO_BIENES_PROPIOS',mercancias_propias:true}}]);
+  const data=await createCartaPorteService({pool}).get(cpId);
+  assert.equal(data.cfdi.tipo_comprobante,'T');
+  assert.equal(data.escenario_fiscal,'TRASLADO_BIENES_PROPIOS');
+  assert.equal(data.mercancias_propias,true);
+  assert.ok(pool.calls.some(call=>call.sql.includes("datos ? 'escenario_fiscal'")));
+});
+
+test('GET /carta-porte/:id expone el escenario fiscal auditado en la respuesta HTTP',async()=>{
+  const pool=aggregateReadPool([{datos:{escenario_fiscal:'SERVICIO_TRANSPORTE',mercancias_propias:false}}]);
+  const {res}=await invoke('get','/carta-porte/:id',{params:{id:cpId},pool});
+  assert.equal(res.statusCode,200);
+  assert.equal(res.body.data.escenario_fiscal,'SERVICIO_TRANSPORTE');
+  assert.equal(res.body.data.mercancias_propias,false);
+});
+
+test('GET Carta Porte devuelve escenario null en borradores legados sin auditoría, aunque sean tipo T',async()=>{
+  const data=await createCartaPorteService({pool:aggregateReadPool()}).get(cpId);
+  assert.equal(data.cfdi.tipo_comprobante,'T');
+  assert.equal(data.escenario_fiscal,null);
+  assert.equal(data.mercancias_propias,null);
+});
+
+test('GET Carta Porte devuelve escenario null si el valor auditado no es reconocido',async()=>{
+  const pool=aggregateReadPool([{datos:JSON.stringify({escenario_fiscal:'INFERIDO',mercancias_propias:true})}]);
+  const data=await createCartaPorteService({pool}).get(cpId);
+  assert.equal(data.escenario_fiscal,null);
+  assert.equal(data.mercancias_propias,null);
+});
+
 test('Dinero decimal conserva exactitud y rechaza valores fuera del contrato',()=>{
   assert.equal(formatDecimal(multiplyDecimal('0.1','0.2')),'0.020000');
   assert.equal(formatDecimal(multiplyDecimal('650','17.98')),'11687.000000');
@@ -91,6 +135,172 @@ test('Campos de pertenencia del lote no se aceptan desde el cliente',async()=>{
   const pool=mockPool(()=>({rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]}));
   await assert.rejects(()=>createCartaPorteService({pool}).group(cpId,'merchandise',{expected_revision:'4',merchandise:{upsert:[{carta_porte_id:actor,descripcion:'Ajeno'}]}},actor),e=>e.code==='UNKNOWN_FIELDS');
   assert.ok(pool.calls.some(c=>c.sql==='ROLLBACK'));
+});
+test('Editar ubicaciones conserva importes CFDI y partidas existentes',async()=>{
+  const original={subtotal:'245.000000',descuento:'5.000000',impuestos_trasladados:'38.400000',impuestos_retenidos:'0.000000',total:'278.400000'};
+  const cargo=[{id:actor,posicion:1,descripcion:'Mercancía existente',cantidad:'2.000000',peso_kg:'12.000',bienes_transp_sat:'11121600'}];
+  const loc={id:operationId,carta_porte_id:cpId,posicion:1,tipo:'Origen',identificador_sat:'OR000001',participante_id:null,direccion_id:null,
+    participante_snapshot:{nombre:'Participante anterior'},domicilio_snapshot:{calle:'Domicilio anterior'},fecha_hora:'2026-10-23T15:00:00Z',zona_horaria:'America/Monterrey',distancia_recorrida_km:'12.50'};
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',...original};
+  const cp={id:cpId,cfdi_id:documentId,viaje_id:'55555555-5555-4555-8555-555555555555',numero_total_mercancias:1,peso_bruto_total:'12.000'};
+  const calls=[];
+  const db={async query(sql,params=[]){
+    calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[cp]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
+    if(sql.includes('FROM tms.cp_ubicaciones')&&sql.includes('AND id=$2'))return {rows:[loc]};
+    if(sql.includes('FROM tms.cp_ubicaciones')&&sql.includes('ORDER BY created_at'))return {rows:[loc]};
+    if(sql.includes('FROM tms.cp_mercancias')&&sql.includes('ORDER BY created_at'))return {rows:cargo};
+    if(sql.startsWith('UPDATE tms.cp_ubicaciones'))return {rows:[loc]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    if(sql.startsWith('UPDATE'))return {rows:[{}]};
+    return {rows:[]};
+  },release(){}};
+  const pool={query:db.query,connect:async()=>db};
+  const result=await createCartaPorteService({pool}).group(cpId,'locations',{expected_revision:'7',locations:{upsert:[{
+    id:operationId,posicion:1,tipo:'Origen',identificador_sat:'OR000001',fecha_hora:loc.fecha_hora,zona_horaria:loc.zona_horaria,
+  }],remove:[]}},actor);
+  assert.deepEqual(result.cfdi&&Object.fromEntries(Object.keys(original).map(k=>[k,result.cfdi[k]])),original);
+  assert.deepEqual(result.merchandise,cargo);
+  assert.equal(result.locations[0].id,loc.id);assert.equal(result.locations[0].posicion,loc.posicion);
+  assert.equal(result.locations[0].fecha_hora,loc.fecha_hora);assert.equal(result.locations[0].identificador_sat,loc.identificador_sat);
+  assert.deepEqual(Object.fromEntries(Object.keys(original).map(k=>[k,cfdi[k]])),original);
+  assert.deepEqual(cargo,[{id:actor,posicion:1,descripcion:'Mercancía existente',cantidad:'2.000000',peso_kg:'12.000',bienes_transp_sat:'11121600'}]);
+  assert.ok(!calls.some(c=>/^(UPDATE|SELECT) tms\.(cfdi|cfdi_conceptos|cfdi_impuestos|cp_mercancias)\b/.test(c.sql)));
+  assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO tms.cp_auditoria')));
+  assert.ok(calls.some(c=>c.sql==='COMMIT'));
+});
+test('Editar transporte y figuras no recalcula ni toca importes CFDI',async()=>{
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',subtotal:'245.000000',descuento:null,impuestos_trasladados:null,impuestos_retenidos:null,total:null};
+  const calls=[];
+  const db={async query(sql,params=[]){calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[{id:cpId,cfdi_id:documentId}]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    return {rows:[]};
+  },release(){}};
+  await createCartaPorteService({pool:{query:db.query,connect:async()=>db}}).group(cpId,'transport',{
+    expected_revision:'7',transport:{upsert:[],remove:[]},trailers:{upsert:[],remove:[]},figures:{upsert:[],remove:[]},parts:{upsert:[],remove:[]},
+  },actor);
+  assert.ok(!calls.some(c=>/^(UPDATE|SELECT) tms\.(cfdi|cfdi_conceptos|cfdi_impuestos)\b/.test(c.sql)));
+  assert.deepEqual(Object.fromEntries(['subtotal','descuento','impuestos_trasladados','impuestos_retenidos','total'].map(k=>[k,cfdi[k]])),
+    {subtotal:'245.000000',descuento:null,impuestos_trasladados:null,impuestos_retenidos:null,total:null});
+});
+test('Editar conceptos e impuestos recalcula importes CFDI cuando los datos están completos',async()=>{
+  const concept={id:actor,cfdi_id:documentId,posicion:1,descripcion:'Flete',cantidad:'2.000000',valor_unitario:'100.000000',descuento:'10.000000',importe:'200.000000'};
+  const tax={id:operationId,cfdi_id:documentId,concepto_id:actor,movimiento:'TRASLADO',tipo_factor_sat:'Tasa',base:'190.000000',tasa_cuota:'0.160000',importe:'30.400000'};
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',subtotal:'200.000000',descuento:'10.000000',impuestos_trasladados:'30.400000',impuestos_retenidos:'10.000000',total:'210.400000'};
+  const calls=[];
+  const db={async query(sql,params=[]){
+    calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql.includes('FROM tms.cfdi_conceptos')&&sql.includes('AND id=$2'))return {rows:[concept]};
+    if(sql.includes('FROM tms.cfdi_impuestos')&&sql.includes('AND id=$2'))return {rows:[tax]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[{id:cpId,cfdi_id:documentId}]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
+    if(sql.includes('FROM tms.cfdi_conceptos')&&sql.includes('ORDER BY created_at'))return {rows:[concept]};
+    if(sql.includes('FROM tms.cfdi_impuestos')&&sql.includes('ORDER BY created_at'))return {rows:[tax]};
+    if(sql==='SELECT * FROM tms.cfdi_conceptos WHERE cfdi_id=$1')return {rows:[concept]};
+    if(sql==='SELECT * FROM tms.cfdi_impuestos WHERE cfdi_id=$1')return {rows:[tax]};
+    if(sql.includes('SELECT subtotal,descuento,impuestos_trasladados,impuestos_retenidos'))return {rows:[cfdi]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    if(sql.startsWith('UPDATE'))return {rows:[{}]};
+    return {rows:[]};
+  },release(){}};
+  const pool={query:db.query,connect:async()=>db};
+  const conceptInput={...concept};delete conceptInput.cfdi_id;delete conceptInput.importe;
+  const taxInput={...tax};delete taxInput.cfdi_id;delete taxInput.importe;
+  await createCartaPorteService({pool}).group(cpId,'invoice-items',{expected_revision:'7',concepts:{upsert:[conceptInput],remove:[]},taxes:{upsert:[taxInput],remove:[]}},actor);
+  const cfdiUpdate=calls.find(c=>c.sql.startsWith('UPDATE tms.cfdi SET'));
+  assert.ok(cfdiUpdate);
+  assert.deepEqual(cfdiUpdate.params.slice(1),['200.000000','10.000000','30.400000','0.000000','220.400000']);
+  assert.ok(calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi_conceptos SET importe=')));
+  assert.ok(calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi_impuestos SET importe=')));
+  assert.ok(!calls.some(c=>c.sql.startsWith('UPDATE tms.cartas_porte SET numero_total_mercancias=')));
+});
+test('Editar mercancías recalcula solo número y peso total de carga',async()=>{
+  const item={id:actor,carta_porte_id:cpId,posicion:1,descripcion:'Madera',cantidad:'2.000000',peso_kg:'35.000',bienes_transp_sat:'11121600'};
+  const itemInput={...item};delete itemInput.carta_porte_id;
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',subtotal:'90.000000',descuento:'0.000000',impuestos_trasladados:'14.400000',impuestos_retenidos:'0.000000',total:'104.400000'};
+  const calls=[];
+  const db={async query(sql,params=[]){calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql.includes('WITH requested AS'))return {rows:[{field:'bienes_transp_sat',catalog:'c_ClaveProdServCP',sat_key:'11121600',item_index:0,version_ready:true,catalog_ready:true,key_valid:true,descripcion:'Madera'}]};
+    if(sql.includes('FROM tms.cp_mercancias')&&sql.includes('AND id=$2'))return {rows:[item]};
+    if(sql==='SELECT count(*)::int AS count, sum(peso_kg) AS weight FROM tms.cp_mercancias WHERE carta_porte_id=$1')return {rows:[{count:2,weight:'45.000'}]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[{id:cpId,cfdi_id:documentId}]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
+    if(sql.includes('FROM tms.cp_mercancias')&&sql.includes('ORDER BY created_at'))return {rows:[item]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    if(sql.startsWith('UPDATE'))return {rows:[{}]};
+    return {rows:[]};
+  },release(){}};
+  await createCartaPorteService({pool:{query:db.query,connect:async()=>db}}).group(cpId,'merchandise',{
+    expected_revision:'7',merchandise:{upsert:[itemInput],remove:[]},sanitary:{upsert:[],remove:[]},
+  },actor);
+  const cargoTotals=calls.find(c=>c.sql.startsWith('UPDATE tms.cartas_porte SET numero_total_mercancias='));
+  assert.ok(cargoTotals);assert.deepEqual(cargoTotals.params.slice(1),[2,'45.000']);
+  assert.ok(!calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi')));
+});
+test('PUT de mercancías rechaza claves Carta Porte inválidas antes de escribir',async()=>{
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO'};
+  const calls=[];
+  const db={async query(sql,params=[]){calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql.includes('WITH requested AS'))return {rows:[{field:'bienes_transp_sat',catalog:'c_ClaveProdServCP',sat_key:'NO_EXISTE',item_index:0,version_ready:true,catalog_ready:true,key_valid:false,descripcion:'Clave desconocida'}]};
+    return {rows:[]};
+  },release(){}};
+  const pool={query:db.query,connect:async()=>db};
+  await assert.rejects(()=>createCartaPorteService({pool}).group(cpId,'merchandise',{
+    expected_revision:'7',merchandise:{upsert:[{posicion:1,descripcion:'Carga QA',cantidad:'1.000000',peso_kg:'2.000',bienes_transp_sat:'NO_EXISTE'}],remove:[]},
+  },actor),error=>error.code==='INVALID_SAT_KEY');
+  assert.ok(!calls.some(call=>call.sql.startsWith('INSERT INTO tms.cp_mercancias')||call.sql.startsWith('UPDATE tms.cp_mercancias')));
+  assert.ok(calls.some(call=>call.sql==='ROLLBACK'));
+});
+test('Recalcular un borrador sin conceptos conserva importes NULL',async()=>{
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',subtotal:null,descuento:null,impuestos_trasladados:null,impuestos_retenidos:null,total:null};
+  const calls=[];
+  const db={async query(sql,params=[]){calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[{id:cpId,cfdi_id:documentId}]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
+    if(sql==='SELECT * FROM tms.cfdi_conceptos WHERE cfdi_id=$1'||sql==='SELECT * FROM tms.cfdi_impuestos WHERE cfdi_id=$1')return {rows:[]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    return {rows:[]};
+  },release(){}};
+  await createCartaPorteService({pool:{query:db.query,connect:async()=>db}}).group(cpId,'invoice-items',{
+    expected_revision:'7',concepts:{upsert:[],remove:[]},taxes:{upsert:[],remove:[]},relations:{upsert:[],remove:[]},
+  },actor);
+  assert.deepEqual(Object.fromEntries(['subtotal','descuento','impuestos_trasladados','impuestos_retenidos','total'].map(k=>[k,cfdi[k]])),
+    {subtotal:null,descuento:null,impuestos_trasladados:null,impuestos_retenidos:null,total:null});
+  assert.ok(!calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi SET')));
+});
+
+test('El recálculo del CFDI T fija subtotal y total en cero solo desde conceptos de traslado',async()=>{
+  const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',tipo_comprobante:'T',subtotal:null,total:'0.000000'};
+  const concept={id:actor,cfdi_id:documentId,posicion:1,descripcion:'Madera',clave_producto_servicio_sat:'11121600',clave_unidad_sat:'H87',objeto_impuesto_sat:'01',cantidad:'1.000000',valor_unitario:'0.000000',descuento:null,importe:null};
+  const cargo={bienes_transp_sat:'11121600'};const calls=[];
+  const db={async query(sql,params=[]){calls.push({sql,params});
+    if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql==='SELECT tipo_comprobante FROM tms.cfdi WHERE id=$1')return {rows:[{tipo_comprobante:'T'}]};
+    if(sql==='SELECT * FROM tms.cfdi_conceptos WHERE cfdi_id=$1')return {rows:[concept]};
+    if(sql.includes('SELECT id FROM tms.cfdi_impuestos'))return {rows:[]};
+    if(sql.includes('SELECT bienes_transp_sat FROM tms.cp_mercancias'))return {rows:[cargo]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[{id:cpId,cfdi_id:documentId,viaje_id:actor}]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
+    if(sql.includes('ORDER BY created_at'))return {rows:[]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    if(sql.startsWith('UPDATE'))return {rows:[{}]};
+    return {rows:[]};
+  },release(){}};
+  const pool={query:db.query,connect:async()=>db};
+  const input={...concept};delete input.cfdi_id;delete input.importe;
+  await createCartaPorteService({pool}).group(cpId,'invoice-items',{expected_revision:'7',concepts:{upsert:[input],remove:[]},taxes:{upsert:[],remove:[]}},actor);
+  assert.ok(calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi_conceptos SET importe=')&&c.params.at(-1)==='0.000000'));
+  assert.ok(calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi SET subtotal=')&&c.params.includes('0.000000')));
+  assert.ok(calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi SET subtotal=')&&c.params[0]===documentId&&c.params.includes('0.000000')));
 });
 test('La validación estructural detecta destinos incorrectos y materiales peligrosos incompletos',()=>{
   const errors=validateCartaPorte({cfdi:{},locations:[{id:actor,tipo:'Destino',posicion:1}],merchandise:[{material_peligroso:true}],allocations:[{origen_id:actor,destino_id:actor}]});

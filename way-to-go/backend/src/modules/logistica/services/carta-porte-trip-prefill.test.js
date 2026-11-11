@@ -54,7 +54,7 @@ test('el viaje con documento existente se rechaza antes de insertar otro',async(
     throw new Error(`Consulta inesperada: ${sql}`);
   });
   const service=createCartaPorteService({pool});
-  await assert.rejects(service.create('10',{empresa_emisora_id:uuid(3),tipo_comprobante:'T'},uuid(4)),e=>e.code==='EXISTING_DOCUMENT');
+  await assert.rejects(service.create('10',{empresa_emisora_id:uuid(3),tipo_comprobante:'T',escenario_fiscal:'TRASLADO_BIENES_PROPIOS',mercancias_propias:true},uuid(4)),e=>e.code==='EXISTING_DOCUMENT');
   assert.equal(pool.calls.filter(c=>/^INSERT INTO/i.test(c.sql)).length,0);
 });
 

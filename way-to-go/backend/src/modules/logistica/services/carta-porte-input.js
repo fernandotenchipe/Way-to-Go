@@ -1,8 +1,8 @@
 export class CartaPorteError extends Error {
-  constructor(status, code, message, fields = []) { super(message); this.status = status; this.code = code; this.fields = fields; }
+  constructor(status, code, message, fields = [], warnings = []) { super(message); this.status = status; this.code = code; this.fields = fields; this.warnings = warnings; }
 }
 export const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-export const reject = (status, code, message, fields) => { throw new CartaPorteError(status, code, message, fields); };
+export const reject = (status, code, message, fields, warnings) => { throw new CartaPorteError(status, code, message, fields, warnings); };
 export function object(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) reject(400, 'INVALID_INPUT', 'Envía un objeto válido');
   return value;

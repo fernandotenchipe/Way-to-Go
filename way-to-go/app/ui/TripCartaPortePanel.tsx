@@ -1,13 +1,29 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { logisticsApi, type CartaPorteDocument, type CartaPorteSummary, type LogisticsTrip } from '../services/logistics-api';
+import { logisticsApi, LogisticsApiError, type CartaPorteDocument, type CartaPorteFiscalScenario, type CartaPorteSummary, type LogisticsTrip } from '../services/logistics-api';
+import { buildTripCartaPorteFiscalInput, resolveTripCartaPorteFiscalSelection } from '../services/carta-porte-fiscal';
 import { getDemoOperator } from '../services/logistics-demo-operators';
-import CfdiCatalogSelect from './CfdiCatalogSelect';
+import CartaPorteLocationsEditor from './CartaPorteLocationsEditor';
+import CartaPorteMerchandiseEditor from './CartaPorteMerchandiseEditor';
 
 const button = 'rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
 const storageKey = (folio: string) => `wtg-demo-carta-porte:${folio}`;
 type Issuer = { id: string; nombre: string; razon_social?: string; activo: boolean };
+const display = (value: unknown) => value == null || value === '' ? 'Pendiente' : String(value);
+
+function cartaPorteError(reason: unknown) {
+  if (!(reason instanceof LogisticsApiError)) return reason instanceof Error ? reason.message : 'No se pudo crear el borrador.';
+  const messages: Record<string, string> = {
+    FISCAL_SCENARIO_TYPE_MISMATCH: 'Para facturar un servicio de transporte selecciona el escenario “Servicio de transporte a terceros” y CFDI tipo I.',
+    OWN_GOODS_DECLARATION_REQUIRED: 'El CFDI tipo T requiere declarar expresamente que las mercancías son propias.',
+    TRANSFER_RFC_MISMATCH: 'En el traslado de bienes propios, el RFC del emisor y el receptor deben coincidir.',
+    OWN_MEANS_REQUIRED: 'El tipo T requiere medios propios asignados al viaje. La modalidad del vehículo no confirma que la mercancía sea propia.',
+    EXISTING_DOCUMENT: 'Este viaje ya tiene un documento propio abierto. Consulta el borrador existente antes de intentar crear otro.',
+    INACTIVE_REFERENCE: 'El emisor o cliente seleccionado no existe o está inactivo. Revisa el catálogo y vuelve a consultar.',
+  };
+  return messages[reason.code || ''] || reason.message;
+}
 
 function localDocuments(folio: string): CartaPorteDocument[] {
   try { return JSON.parse(localStorage.getItem(storageKey(folio)) || '[]') as CartaPorteDocument[]; } catch { return []; }
@@ -18,7 +34,8 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
   const [document, setDocument] = useState<CartaPorteDocument | null>(null);
   const [issuers, setIssuers] = useState<Issuer[]>([]);
   const [issuerId, setIssuerId] = useState('');
-  const [invoiceType, setInvoiceType] = useState<'I' | 'T'>('I');
+  const [fiscalScenario, setFiscalScenario] = useState<CartaPorteFiscalScenario | ''>('');
+  const [ownGoodsConfirmed, setOwnGoodsConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -74,21 +91,28 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
     setBusy(true); setError(''); setNotice('');
     try {
       if (!trip.operador_id) throw new Error('Asigna primero un operador al viaje.');
+      const fiscalSelection = resolveTripCartaPorteFiscalSelection(fiscalScenario, ownGoodsConfirmed);
       if (demo) {
         const id = `demo-cp-${crypto.randomUUID()}`;
         const cfdiId = `demo-cfdi-${crypto.randomUUID()}`;
-        const created: CartaPorteDocument = { id, viaje_id: trip.id, cfdi_id: cfdiId, cfdi: { id: cfdiId, estado: 'BORRADOR', origen: 'PROPIO', revision: 1, tipo_comprobante: invoiceType }, transport: trip.unidad_id ? [{ unidad_id: trip.unidad_id }] : [], figures: [] };
+        const invoiceType = fiscalSelection.tipo_comprobante;
+        const created: CartaPorteDocument = {
+          id, viaje_id: trip.id, cfdi_id: cfdiId, escenario_fiscal: fiscalSelection.escenario_fiscal,
+          mercancias_propias: fiscalSelection.mercancias_propias === true,
+          cfdi: { id: cfdiId, estado: 'BORRADOR', origen: 'PROPIO', revision: 1, tipo_comprobante: invoiceType, uuid_fiscal: null },
+          locations: [], merchandise: [], transport: trip.unidad_id ? [{ unidad_id: trip.unidad_id }] : [], figures: [],
+          concepts: [], taxes: [], precarga: { faltantes: ['Ubicaciones', 'Mercancías'] }, advertencias: [],
+        };
         const rows = [created, ...localDocuments(trip.folio)];
         localStorage.setItem(storageKey(trip.folio), JSON.stringify(rows));
         await saveFigure(created);
         setDocuments(rows.map(row => ({ id: row.id, cfdi_id: row.cfdi_id, estado: row.cfdi.estado, origen: row.cfdi.origen, revision: row.cfdi.revision, uuid_fiscal: null, created_at: new Date().toISOString() })));
       } else {
-        if (!issuerId) throw new Error('Selecciona una empresa emisora activa.');
-        const created = await logisticsApi.createTripCartaPorte(trip.folio, { empresa_emisora_id: issuerId, tipo_comprobante: invoiceType });
+        const created = await logisticsApi.createTripCartaPorte(trip.folio, buildTripCartaPorteFiscalInput(issuerId, fiscalScenario, ownGoodsConfirmed));
         await saveFigure(created.data);
         await load();
       }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo crear el borrador.'); }
+    } catch (reason) { setError(cartaPorteError(reason)); }
     finally { setBusy(false); }
   }
 
@@ -124,6 +148,19 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
   const alreadyLinked = Boolean(figure && figure.operador_id === trip.operador_id);
   const transport = document?.transport?.[0];
   const unitLinked = Boolean(transport && transport.unidad_id === trip.unidad_id);
+  const invoice = document?.cfdi;
+  const issuer = invoice?.emisor_snapshot;
+  const receiver = invoice?.receptor_snapshot;
+  const scenarioLabel = document?.escenario_fiscal === 'SERVICIO_TRANSPORTE' ? 'Servicio de transporte a terceros'
+    : document?.escenario_fiscal === 'TRASLADO_BIENES_PROPIOS' ? 'Traslado de bienes propios'
+    : 'El backend no incluyó el escenario fiscal en la respuesta';
+  const invoiceType = fiscalScenario === 'SERVICIO_TRANSPORTE' ? 'I' : fiscalScenario === 'TRASLADO_BIENES_PROPIOS' ? 'T' : '—';
+  function acceptDocumentUpdate(updated: CartaPorteDocument) {
+    setDocument(updated);
+    setDocuments(rows => rows.map(row => row.id === updated.id ? {
+      ...row, estado: updated.cfdi.estado, revision: updated.cfdi.revision, uuid_fiscal: updated.cfdi.uuid_fiscal,
+    } : row));
+  }
   return <section className="rounded-xl border border-slate-200 bg-white p-5">
     <h2 className="font-bold text-[#0b1f3b]">Carta Porte del viaje</h2>
     <p className="mt-2 text-sm text-slate-600">La Carta Porte se prepara dentro de este viaje. La unidad y el operador asignados aportan sus datos reutilizables al borrador. Al completar el traslado se podrá validar y timbrar desde el flujo del viaje.</p>
@@ -132,11 +169,37 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
     {!trip.operador_id && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Asigna un operador en la pestaña Asignación antes de crear la Carta Porte.</p>}
     {!trip.unidad_id && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">La unidad se puede asignar después. Hazlo en Asignación antes de completar la Carta Porte.</p>}
     {loading ? <p role="status" className="mt-4 text-sm text-slate-500">Consultando documentos…</p> : <>
-      {documents.length > 0 && <div className="mt-4 rounded-lg border border-slate-200 p-4"><p className="text-sm font-semibold">Borrador más reciente · {document?.cfdi.estado || documents[0].estado}</p><p className="mt-1 text-xs text-slate-500">Revisión {document?.cfdi.revision ?? documents[0].revision} · {document?.cfdi.tipo_comprobante === 'T' ? 'Traslado' : 'Ingreso'}</p>{figure ? <p className="mt-3 text-sm">Figura 01: <strong>{figure.nombre}</strong>{alreadyLinked ? ' · vinculada al operador asignado' : ' · requiere sincronización con la asignación actual'}</p> : <p className="mt-3 text-sm text-amber-800">Aún no tiene figura de operador.</p>}{!alreadyLinked && trip.operador_id && <button type="button" className={`${button} mt-4`} disabled={busy} onClick={() => void syncOperator()}>{busy ? 'Guardando…' : 'Vincular operador asignado'}</button>}</div>}
-      {documents.length > 0 && trip.unidad_id && <div className="mt-3 rounded-lg border border-slate-200 p-4 text-sm"><p>Unidad asignada: <strong>{trip.unidad || trip.unidad_id}</strong>{unitLinked ? ' · vinculada al borrador' : ' · pendiente de vincular'}</p>{transport?.placas && <p className="mt-1 text-xs text-slate-500">Placas guardadas en el borrador: {transport.placas}</p>}{!unitLinked && ['BORRADOR', 'RECHAZADO'].includes(document?.cfdi.estado || '') && <button type="button" className={`${button} mt-3`} disabled={busy} onClick={() => void syncUnit()}>{busy ? 'Guardando…' : 'Vincular unidad asignada'}</button>}</div>}
+      {documents.length > 0 && <div className="mt-4 space-y-4">
+        <div className="rounded-lg border border-slate-200 p-4">
+          <p className="text-sm font-semibold">Borrador más reciente · {invoice?.estado || documents[0].estado}</p>
+          <p className="mt-1 text-xs text-slate-500">CFDI tipo {invoice?.tipo_comprobante || '—'} · {scenarioLabel} · Revisión {invoice?.revision ?? documents[0].revision}</p>
+          {!document?.escenario_fiscal && <p className="mt-2 text-xs text-amber-800">El backend no devuelve el escenario fiscal auditado para este borrador; no se infiere a partir del tipo ni de la unidad.</p>}
+          <p className="mt-2 text-xs text-slate-600">UUID fiscal: {display(invoice?.uuid_fiscal)} · Emisor: {display(issuer?.nombre)} ({display(issuer?.rfc)}) · Receptor: {display(receiver?.nombre)} ({display(receiver?.rfc)})</p>
+          {figure ? <p className="mt-3 text-sm">Figura 01: <strong>{figure.nombre}</strong>{alreadyLinked ? ' · vinculada al operador asignado' : ' · requiere sincronización con la asignación actual'}</p> : <p className="mt-3 text-sm text-amber-800">Aún no tiene figura de operador.</p>}
+          {!alreadyLinked && trip.operador_id && ['BORRADOR', 'RECHAZADO'].includes(invoice?.estado || '') && <button type="button" className={`${button} mt-4`} disabled={busy} onClick={() => void syncOperator()}>{busy ? 'Guardando…' : 'Vincular operador asignado'}</button>}
+        </div>
+        {document && <CartaPorteLocationsEditor trip={trip} document={document} onSaved={acceptDocumentUpdate} />}
+        {document && <CartaPorteMerchandiseEditor trip={trip} document={document} onSaved={acceptDocumentUpdate} />}
+        <div className="rounded-lg border border-slate-200 p-4 text-sm">
+          <h3 className="font-semibold">Transporte y operador</h3>
+          <p className="mt-2">Unidad del viaje: <strong>{trip.unidad || 'Sin asignar'}</strong>{unitLinked ? ' · vinculada al borrador' : document?.transport?.length ? ' · el borrador tiene otra referencia' : ' · pendiente de vincular'}</p>
+          {transport && <p className="text-xs text-slate-500">Placas {display(transport.placas)} · Configuración {display(transport.configuracion_vehicular_sat)} · Permiso {display(transport.permiso_sict_sat)} {display(transport.numero_permiso_sict)}</p>}
+          <p className="mt-1">Operador del viaje: <strong>{trip.operador || 'Sin asignar'}</strong>{alreadyLinked ? ' · figura 01 vinculada' : figure ? ' · la figura 01 requiere sincronización' : ' · figura 01 pendiente'}</p>
+          {documents.length > 0 && trip.unidad_id && !unitLinked && ['BORRADOR', 'RECHAZADO'].includes(invoice?.estado || '') && <button type="button" className={`${button} mt-3`} disabled={busy} onClick={() => void syncUnit()}>{busy ? 'Guardando…' : 'Vincular unidad asignada'}</button>}
+        </div>
+        {!!document?.precarga?.faltantes?.length && <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900"><strong>Datos pendientes:</strong> {document.precarga.faltantes.join(' · ')}</div>}
+        {!!document?.advertencias?.length && document.advertencias.map((warning, index) => <div key={`${warning.code || 'warning'}-${index}`} className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">{warning.message}</div>)}
+      </div>}
       {!documents.length && <p className="mt-4 text-sm text-slate-500">Aún no hay una Carta Porte para este viaje.</p>}
-      {demo ? <p className="mt-4 text-xs text-amber-800">Modo demostración: el borrador, el operador y la referencia de la unidad se guardan solo en este navegador. Los datos del vehículo se copiarán al usar el servicio real.</p> : <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm">Empresa emisora<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={issuerId} onChange={event => setIssuerId(event.target.value)}><option value="">Seleccionar</option>{issuers.map(row => <option key={row.id} value={row.id}>{row.razon_social || row.nombre}</option>)}</select></label><CfdiCatalogSelect catalog="c_TipoDeComprobante" name="tipo_comprobante" label="Tipo de comprobante" defaultValue="I" allowedKeys={['I', 'T']} onValueChange={(value) => { if (value === 'I' || value === 'T') setInvoiceType(value); }}/></div>}
-      {!documents.length && <button type="button" className={`${button} mt-4`} disabled={busy || !trip.operador_id || (!demo && (!issuerId || !issuers.length))} onClick={() => void createDraft()}>{busy ? 'Creando borrador…' : 'Crear borrador de Carta Porte'}</button>}
+      {!documents.length && <>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {!demo && <label className="text-sm">Empresa emisora<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={issuerId} onChange={event => setIssuerId(event.target.value)}><option value="">Seleccionar</option>{issuers.map(row => <option key={row.id} value={row.id}>{row.razon_social || row.nombre}</option>)}</select></label>}
+          <label className="text-sm">Escenario fiscal<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={fiscalScenario} onChange={event => { const value = event.target.value as CartaPorteFiscalScenario | ''; setFiscalScenario(value); if (value !== 'TRASLADO_BIENES_PROPIOS') setOwnGoodsConfirmed(false); }}><option value="">Selecciona explícitamente</option><option value="SERVICIO_TRANSPORTE">Servicio de transporte a terceros · CFDI tipo I</option><option value="TRASLADO_BIENES_PROPIOS">Traslado de bienes propios · CFDI tipo T</option></select><span className="mt-1 block text-xs text-slate-500">El tipo de comprobante se determina por este escenario, no por la modalidad de la unidad.</span></label>
+          {fiscalScenario === 'TRASLADO_BIENES_PROPIOS' && <label className="sm:col-span-2 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><input type="checkbox" className="mt-1" checked={ownGoodsConfirmed} onChange={event => setOwnGoodsConfirmed(event.target.checked)} /><span>Confirmo expresamente que las mercancías transportadas son propiedad del emisor. El tipo T requiere además que emisor y receptor tengan el mismo RFC.</span></label>}
+        </div>
+        {demo && <p className="mt-4 text-xs text-amber-800">Modo demostración: el borrador, el operador y la referencia de unidad se guardan solo en este navegador.</p>}
+        <button type="button" className={`${button} mt-4`} disabled={busy || !trip.operador_id || !fiscalScenario || (fiscalScenario === 'TRASLADO_BIENES_PROPIOS' && !ownGoodsConfirmed) || (!demo && (!issuerId || !issuers.length))} onClick={() => void createDraft()}>{busy ? 'Creando borrador…' : `Crear borrador${invoiceType === '—' ? '' : ` · CFDI tipo ${invoiceType}`}`}</button>
+      </>}
       {documents.length > 1 && <p className="mt-3 text-xs text-slate-500">Este viaje tiene {documents.length} documentos de Carta Porte.</p>}
     </>}
   </section>;
