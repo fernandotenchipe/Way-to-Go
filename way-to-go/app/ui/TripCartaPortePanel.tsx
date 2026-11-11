@@ -7,6 +7,7 @@ import { getDemoOperator } from '../services/logistics-demo-operators';
 import CartaPorteLocationsEditor from './CartaPorteLocationsEditor';
 import CartaPorteMerchandiseEditor from './CartaPorteMerchandiseEditor';
 import CartaPorteFiscalEditor from './CartaPorteFiscalEditor';
+import CartaPortePreview from './CartaPortePreview';
 
 const button = 'rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
 const storageKey = (folio: string) => `wtg-demo-carta-porte:${folio}`;
@@ -41,6 +42,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -172,7 +174,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
     {loading ? <p role="status" className="mt-4 text-sm text-slate-500">Consultando documentos…</p> : <>
       {documents.length > 0 && <div className="mt-4 space-y-4">
         <div className="rounded-lg border border-slate-200 p-4">
-          <p className="text-sm font-semibold">Borrador más reciente · {invoice?.estado || documents[0].estado}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Documento más reciente · {invoice?.estado || documents[0].estado}</p>{document && invoice?.estado === 'BORRADOR' && !invoice.uuid_fiscal && <button type="button" className={button} onClick={() => setPreviewOpen(true)}>Vista previa</button>}</div>
           <p className="mt-1 text-xs text-slate-500">CFDI tipo {invoice?.tipo_comprobante || '—'} · {scenarioLabel} · Revisión {invoice?.revision ?? documents[0].revision}</p>
           {!document?.escenario_fiscal && <p className="mt-2 text-xs text-amber-800">El backend no devuelve el escenario fiscal auditado para este borrador; no se infiere a partir del tipo ni de la unidad.</p>}
           <p className="mt-2 text-xs text-slate-600">UUID fiscal: {display(invoice?.uuid_fiscal)} · Emisor: {display(issuer?.nombre)} ({display(issuer?.rfc)}) · Receptor: {display(receiver?.nombre)} ({display(receiver?.rfc)})</p>
@@ -204,5 +206,6 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
       </>}
       {documents.length > 1 && <p className="mt-3 text-xs text-slate-500">Este viaje tiene {documents.length} documentos de Carta Porte.</p>}
     </>}
+    {previewOpen && document && <CartaPortePreview document={document} onClose={() => setPreviewOpen(false)}/>}
   </section>;
 }
