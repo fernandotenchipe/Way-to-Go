@@ -5,9 +5,9 @@ import { updateTripCustomer, TripCustomerError } from '../services/trip-customer
 import { scheduleKeys, validateTripSchedule, reserveTripResources } from '../services/trip-schedule.js';
 import { createTripCargoService } from '../services/trip-cargo.js';
 
-export default function tripRecordRouter({ pool, wrap, fail, isUuid }) {
+export default function tripRecordRouter({ pool, wrap, fail, isUuid, cfdiCatalogProvider=null }) {
   const router = express.Router();
-  const cargoService=createTripCargoService({pool});
+  const cargoService=createTripCargoService({pool,cfdiCatalogProvider});
   const cargoRoute=action=>async(req,res,next)=>{
     try { const data=await action(req,res);if(!res.headersSent)res.json({success:true,data}); }
     catch(error) {

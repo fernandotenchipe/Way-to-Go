@@ -20,6 +20,7 @@ import { requireCostRead, requireCreateTrip, requireExtraApproval, requireFinanc
 import { validateAddresses, insertCustomerAddresses } from '../services/customer-addresses.js';
 
 const router = express.Router();
+const cfdiCatalogProvider = createCfdiCatalogProvider({pool});
 const routeDir = path.dirname(fileURLToPath(import.meta.url));
 export const LOGISTICS_UPLOAD_DIR = path.resolve(routeDir, '../../../../uploads/logistica');
 mkdirSync(LOGISTICS_UPLOAD_DIR, { recursive: true });
@@ -69,11 +70,11 @@ const upload = multer({
 router.get('/health', (_req, res) => res.json({ success: true, module: 'logistica', database_schema: 'tms', status: 'ready' }));
 router.use(requireLogisticsUser);
 router.use(operatorsRouter({ pool }));
-router.use(cfdiCatalogRouter({ provider: createCfdiCatalogProvider({ pool }) }));
+router.use(cfdiCatalogRouter({ provider: cfdiCatalogProvider }));
 router.use(sepomexRouter({ pool }));
-router.use(cartaPorteRouter({ pool, files: createCartaPorteStorage({ pool }) }));
+router.use(cartaPorteRouter({ pool, files: createCartaPorteStorage({ pool }), cfdiCatalogProvider }));
 const requireActor = (req, res, next) => isUuid(req.user.id) ? next() : fail(res, 403, 'Inicia sesión con un usuario TMS válido para guardar cambios');
-router.use(tripRecordRouter({ pool, wrap, fail, isUuid }));
+router.use(tripRecordRouter({ pool, wrap, fail, isUuid, cfdiCatalogProvider }));
 router.use(fleetRouter({ pool, wrap, fail }));
 router.use(fleetBoxesRouter({ pool }));
 

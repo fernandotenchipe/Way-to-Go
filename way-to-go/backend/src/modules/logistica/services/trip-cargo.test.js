@@ -73,10 +73,12 @@ test('reporta campos pendientes por renglón y condiciona embalaje a material pe
   assert.ok(missing.includes('mercancias[1].clave_unidad_sat'));
 });
 
-test('valida clave SAT vigente en el catálogo y versión Carta Porte 3.1 indicada',async()=>{
+test('valida bienes transportados en Carta Porte 3.1 y rechaza el marcador sin catálogo',async()=>{
   let params;
-  await validateTripCargoSatKey({query:async(_sql,values)=>{params=values;return {rows:[{version_ready:true,catalog_ready:true,key_valid:true}]};}},'bienes_transp_sat','01010101');
-  assert.deepEqual(params,[CARTA_PORTE_31_CATALOG_VERSION,['bienes_transp_sat'],['c_ClaveProdServCP'],['01010101'],[0]]);
+  const db={query:async(_sql,values)=>{params=values;return {rows:[{version_ready:true,catalog_ready:true,key_valid:true,descripcion:'Muebles'}]};}};
+  await validateTripCargoSatKey(db,'bienes_transp_sat','10101500');
+  assert.deepEqual(params,[CARTA_PORTE_31_CATALOG_VERSION,['bienes_transp_sat'],['c_ClaveProdServCP'],['10101500'],[0]]);
+  await assert.rejects(validateTripCargoSatKey({query:async()=>({rows:[{field:'bienes_transp_sat',catalog:'c_ClaveProdServCP',version_ready:true,catalog_ready:true,key_valid:true,descripcion:'  No existe en el catálogo  '}]})},'bienes_transp_sat','01010101'),error=>error.code==='INVALID_SAT_KEY'&&error.status===422);
 });
 
 test('rechaza una clave SAT inexistente sin asignar sustitutos',async()=>{
@@ -109,7 +111,7 @@ function memoryPool({validKeys=['31211500','11121600','H87','1263','1A1'],cargo=
       if(text.startsWith('SELECT id,folio,updated_at,estado_operativo FROM tms.viajes'))return {rows:[{...state.journey}]};
       if(text.startsWith('SELECT viaje_id FROM tms.viaje_eventos WHERE idempotency_key'))return {rows:state.events.has(params[0])?[{viaje_id:state.events.get(params[0])}]:[]};
       if(text.startsWith('SELECT * FROM tms.viaje_carga_mercancias WHERE viaje_id'))return {rows:structuredClone(state.cargo)};
-      if(text.startsWith('WITH requested AS'))return {rows:params[1].map((field,index)=>({field,catalog:params[2][index],sat_key:params[3][index],item_index:params[4][index],version_ready:true,catalog_ready:true,key_valid:validKeys.includes(params[3][index])}))};
+      if(text.startsWith('WITH requested AS'))return {rows:params[1].map((field,index)=>({field,catalog:params[2][index],sat_key:params[3][index],item_index:params[4][index],version_ready:true,catalog_ready:true,key_valid:validKeys.includes(params[3][index]),descripcion:'Clave oficial'}))};
       if(text.startsWith('INSERT INTO tms.viaje_carga_mercancias')) {
         const columns=text.match(/\(viaje_id,posicion,([^)]*)\)/)[1].split(',');
         const row={viaje_id:params[0],posicion:params[1],id:uuid(state.nextId++),created_at:now};

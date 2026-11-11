@@ -4,9 +4,9 @@ import { createCartaPorteService } from '../services/carta-porte.js';
 import { groups, catalogs } from '../services/carta-porte-config.js';
 import { uuid, only, revision, reject } from '../services/carta-porte-input.js';
 
-export default function cartaPorteRouter({pool,provider=null,files=null}) {
+export default function cartaPorteRouter({pool,provider=null,files=null,cfdiCatalogProvider=null}) {
   const router=express.Router();
-  const service=createCartaPorteService({pool,provider,files});
+  const service=createCartaPorteService({pool,provider,files,cfdiCatalogProvider});
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024,files:1}}).single('file');
   const gate=permission=>(req,res,next)=>{
     if(!uuid(req.user?.id))return res.status(403).json({success:false,code:'REAL_ACTOR_REQUIRED',error:'Inicia sesión con un usuario TMS válido'});

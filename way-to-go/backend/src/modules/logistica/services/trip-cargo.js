@@ -9,6 +9,7 @@ const satFields = {
   clave_material_peligroso_sat: 'c_MaterialPeligroso',
   embalaje_sat: 'c_TipoEmbalaje',
 };
+const cartaPorteSatFields = Object.fromEntries(Object.entries(satFields).filter(([field])=>field!=='clave_unidad_sat'));
 const itemFields = {
   descripcion:'text', mercancia:'text', cantidad:'decimal', bienes_transp_sat:'text',
   clave_unidad_sat:'text', unidad:'text', peso_kg:'decimal', hazmat:'boolean',
@@ -85,6 +86,8 @@ export function tripPrefillMissing({customer,origin,destination,transport,operat
 }
 
 export async function findInvalidTripCargoSatKeys(db,items,{catalogProvider=createCfdiCatalogProvider({pool:db})}={}) {
+const isCatalogPlaceholder = value =>
+  String(value ?? '').trim().replace(/\s+/g,' ').toLocaleLowerCase('es-MX') === 'no existe en el catálogo';
   const requested=[];
   for(const [index,item] of items.entries())for(const [field,catalog] of Object.entries(satFields))
     if(item[field])requested.push({index,field,catalog,key:item[field]});
@@ -107,6 +110,7 @@ export async function findInvalidTripCargoSatKeys(db,items,{catalogProvider=crea
     SELECT r.field,r.catalog,r.sat_key,r.item_index,
       EXISTS(SELECT 1 FROM version) AS version_ready,
       EXISTS(SELECT 1 FROM tms.cp_sat_claves c JOIN version v ON v.id=c.version_id WHERE c.catalogo=r.catalog) AS catalog_ready,
+      (SELECT c.descripcion FROM tms.cp_sat_claves c JOIN version v ON v.id=c.version_id WHERE c.catalogo=r.catalog AND c.clave=r.sat_key ORDER BY c.clave_contexto LIMIT 1) AS descripcion,
       EXISTS(SELECT 1 FROM tms.cp_sat_claves c JOIN version v ON v.id=c.version_id
         WHERE c.catalogo=r.catalog AND c.clave=r.sat_key
           AND (c.vigente_desde IS NULL OR c.vigente_desde<=CURRENT_DATE)
@@ -117,7 +121,9 @@ export async function findInvalidTripCargoSatKeys(db,items,{catalogProvider=crea
   ]);
   const unavailable=rows.find(row=>!row.version_ready||!row.catalog_ready);
   if(unavailable)reject(503,'SAT_CATALOG_UNAVAILABLE',`No está disponible ${unavailable.catalog} en la versión Carta Porte 3.1 configurada`);
-  invalid.push(...rows.filter(row=>!row.key_valid).map(row=>({index:row.item_index,field:row.field,catalog:row.catalog,key:row.sat_key})));
+  invalid.push(...rows.filter(row=>!row.key_valid
+    ||(row.catalog==='c_ClaveProdServCP'&&isCatalogPlaceholder(row.descripcion)))
+    .map(row=>({index:row.item_index,field:row.field,catalog:row.catalog,key:row.sat_key})));
   return invalid;
 }
 
