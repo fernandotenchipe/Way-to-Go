@@ -68,6 +68,29 @@ test('GET Carta Porte devuelve escenario null si el valor auditado no es reconoc
   assert.equal(data.mercancias_propias,null);
 });
 
+test('validación dry_run devuelve errores estructurados sin cambiar CFDI ni consultar proveedor',async()=>{
+  const invoice={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',tipo_comprobante:'T'};
+  const cp={id:cpId,cfdi_id:documentId,viaje_id:'55555555-5555-4555-8555-555555555555',sat_version_id:null};
+  const pool=mockPool(sql=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[invoice]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[cp]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[invoice]};
+    if(sql.includes('FROM tms.cp_auditoria'))return {rows:[]};
+    if(sql.startsWith('SELECT unidad_id,operador_id,caja_id,proveedor_id'))return {rows:[]};
+    if(sql.startsWith('SELECT * FROM tms.'))return {rows:[]};
+    return {rows:[]};
+  });
+  let providerCalls=0;
+  const result=await createCartaPorteService({pool,provider:{validate:async()=>{providerCalls++;return {valid:true};}},cfdiCatalogProvider:{listCatalogs:async()=>[],getByKey:async()=>null}})
+    .validate(cpId,{expected_revision:7,dry_run:true},actor);
+  assert.equal(result.valid,false);
+  assert.equal(result.mode,'DRY_RUN');
+  assert.equal(result.provider_checked,false);
+  assert.ok(result.structural_errors.length>0);
+  assert.equal(providerCalls,0);
+  assert.equal(pool.calls.some(call=>/^\s*(UPDATE|INSERT|DELETE)\b/i.test(call.sql)),false);
+});
+
 test('Dinero decimal conserva exactitud y rechaza valores fuera del contrato',()=>{
   assert.equal(formatDecimal(multiplyDecimal('0.1','0.2')),'0.020000');
   assert.equal(formatDecimal(multiplyDecimal('650','17.98')),'11687.000000');

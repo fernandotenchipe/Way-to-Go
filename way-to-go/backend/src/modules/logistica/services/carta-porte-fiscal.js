@@ -165,7 +165,7 @@ export async function validateCfdiCatalogKeys(data, catalogProvider) {
   ]) await check(catalog,key,path);
   for(const [side,snapshot] of [['emisor',f.emisor_snapshot],['receptor',f.receptor_snapshot]]) await check('c_RegimenFiscal',snapshot?.regimen_fiscal_sat,`invoice.${side}_snapshot.regimen_fiscal_sat`);
   for(const [i,concept] of (data.concepts||[]).entries())for(const [field,catalog,key] of [
-    ['clave_producto_servicio_sat','c_ClaveProdServ',concept.clave_producto_servicio_sat],
+    ['clave_producto_servicio_sat',f.tipo_comprobante==='T'?'c_ClaveProdServCP':'c_ClaveProdServ',concept.clave_producto_servicio_sat],
     ['clave_unidad_sat','c_ClaveUnidad',concept.clave_unidad_sat],['objeto_impuesto_sat','c_ObjetoImp',concept.objeto_impuesto_sat],
   ]) await check(catalog,key,`concepts[${i}].${field}`);
   for(const [i,tax] of (data.taxes||[]).entries())for(const [field,catalog,key] of [

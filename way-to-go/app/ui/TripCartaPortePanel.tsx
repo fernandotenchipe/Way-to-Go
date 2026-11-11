@@ -6,6 +6,7 @@ import { buildTripCartaPorteFiscalInput, resolveTripCartaPorteFiscalSelection } 
 import { getDemoOperator } from '../services/logistics-demo-operators';
 import CartaPorteLocationsEditor from './CartaPorteLocationsEditor';
 import CartaPorteMerchandiseEditor from './CartaPorteMerchandiseEditor';
+import CartaPorteFiscalEditor from './CartaPorteFiscalEditor';
 
 const button = 'rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
 const storageKey = (folio: string) => `wtg-demo-carta-porte:${folio}`;
@@ -180,6 +181,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
         </div>
         {document && <CartaPorteLocationsEditor trip={trip} document={document} onSaved={acceptDocumentUpdate} />}
         {document && <CartaPorteMerchandiseEditor trip={trip} document={document} onSaved={acceptDocumentUpdate} />}
+        {document && <CartaPorteFiscalEditor key={`${document.id}-${document.cfdi.revision}`} document={document} onSaved={acceptDocumentUpdate} readOnly={demo} />}
         <div className="rounded-lg border border-slate-200 p-4 text-sm">
           <h3 className="font-semibold">Transporte y operador</h3>
           <p className="mt-2">Unidad del viaje: <strong>{trip.unidad || 'Sin asignar'}</strong>{unitLinked ? ' · vinculada al borrador' : document?.transport?.length ? ' · el borrador tiene otra referencia' : ' · pendiente de vincular'}</p>

@@ -85,6 +85,17 @@ test('Se validan las claves de concepto CFDI contra los catálogos vigentes',asy
   assert.equal(errors[0].path,'concepts[0].clave_producto_servicio_sat');
 });
 
+test('El concepto de CFDI tipo T se valida con c_ClaveProdServCP',async()=>{
+  const calls=[];
+  const catalogs=['c_UsoCFDI','c_Exportacion','c_Moneda','c_RegimenFiscal','c_ClaveProdServCP','c_ClaveUnidad','c_ObjetoImp'];
+  const provider={listCatalogs:async()=>catalogs.map(catalogo=>({catalogo})),getByKey:async(catalog,key)=>{calls.push([catalog,key]);return {clave:key};}};
+  const data={cfdi:{tipo_comprobante:'T',fecha_expedicion:'2026-11-11T10:00:00Z',uso_cfdi_sat:'S01',exportacion_sat:'01',moneda:'MXN',
+    emisor_snapshot:{regimen_fiscal_sat:'601'},receptor_snapshot:{regimen_fiscal_sat:'601'}},
+    concepts:[{clave_producto_servicio_sat:'10101500',clave_unidad_sat:'H87',objeto_impuesto_sat:'01'}],taxes:[]};
+  assert.deepEqual(await validateCfdiCatalogKeys(data,provider),[]);
+  assert.ok(calls.some(([catalog,key])=>catalog==='c_ClaveProdServCP'&&key==='10101500'));
+});
+
 test('Los datos QA generan advertencia diferenciada de errores fiscales',()=>{
   const result=validateFiscalModel(ownTransfer(),{scenario:fiscalScenarios.OWN_GOODS,mercanciasPropias:true,mediosPropios:true,qaDeclared:true});
   assert.deepEqual(result.errors,[]);

@@ -53,7 +53,11 @@ export default function cartaPorteRouter({pool,provider=null,files=null,cfdiCata
   router.patch('/carta-porte/:id',edit,route(req=>service.patch(req.params.id,req.body,req.user.id)));
   for(const group of Object.keys(groups))router.put(`/carta-porte/:id/${group}`,edit,route(req=>service.group(req.params.id,group,req.body,req.user.id)));
   router.post('/carta-porte/:id/reopen',edit,route(req=>service.reopen(req.params.id,req.body,req.user.id)));
-  router.post('/carta-porte/:id/validate',gate('carta_porte.validar'),route(req=>service.validate(req.params.id,req.body,req.user.id)));
+  router.post('/carta-porte/:id/validate',gate('carta_porte.validar'),route(req=>{
+    only(req.body,['expected_revision','dry_run']);revision(req.body.expected_revision);
+    if(req.body.dry_run!==undefined&&typeof req.body.dry_run!=='boolean')reject(400,'INVALID_DRY_RUN','dry_run debe ser booleano');
+    return service.validate(req.params.id,req.body,req.user.id);
+  }));
   router.get('/carta-porte/:id/events',read,route(req=>service.events(req.params.id)));
   router.get('/carta-porte/:id/operations/:operationId',read,route(req=>service.operation(req.params.id,req.params.operationId)));
   router.get('/carta-porte/:id/files/:kind',read,route(async(req,res)=>{

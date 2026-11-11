@@ -313,6 +313,24 @@ export interface CartaPorteConcept {
   objeto_impuesto_sat?: string | null; cantidad?: string | number | null; valor_unitario?: string | number | null;
   descuento?: string | number | null; importe?: string | number | null;
 }
+export interface CartaPorteTax {
+  id: string; concepto_id: string; movimiento: 'TRASLADO' | 'RETENCION'; impuesto_sat: string;
+  tipo_factor_sat: 'Tasa' | 'Cuota' | 'Exento'; base: string | number; tasa_cuota?: string | number | null; importe?: string | number | null;
+}
+export interface CartaPorteValidationIssue { category?: string; path?: string; code?: string; message: string }
+export interface CartaPorteValidationResult {
+  valid: boolean; mode?: 'DRY_RUN'; provider_checked?: boolean; errors: CartaPorteValidationIssue[];
+  structural_errors: CartaPorteValidationIssue[]; fiscal_errors: CartaPorteValidationIssue[];
+  warnings: CartaPorteValidationIssue[]; pending_fields: string[]; revision: number; estado: string;
+}
+export interface CartaPorteConceptInput {
+  id: string; posicion: number; descripcion: string; identificador?: string | null; clave_producto_servicio_sat: string;
+  clave_unidad_sat: string; unidad?: string | null; objeto_impuesto_sat: string; cantidad: string; valor_unitario: string; descuento?: string | null;
+}
+export interface CartaPorteTaxInput {
+  id: string; concepto_id: string; movimiento: 'TRASLADO' | 'RETENCION'; impuesto_sat: string;
+  tipo_factor_sat: 'Tasa' | 'Cuota' | 'Exento'; base: string; tasa_cuota?: string | null;
+}
 export interface CartaPorteDocument {
   id: string; viaje_id: string; cfdi_id: string; sat_version_id?: string | null;
   entrada_salida?: string | null; pais_origen_destino_sat?: string | null; via_entrada_salida_sat?: string | null;
@@ -331,7 +349,7 @@ export interface CartaPorteDocument {
   parts?: Array<Record<string, unknown>>; regimes?: Array<Record<string, unknown>>;
   documents?: Array<Record<string, unknown>>; links?: Array<Record<string, unknown>>;
   allocations?: Array<Record<string, unknown>>; guides?: Array<Record<string, unknown>>;
-  concepts?: CartaPorteConcept[]; taxes?: Array<Record<string, unknown>>; relations?: Array<Record<string, unknown>>;
+  concepts?: CartaPorteConcept[]; taxes?: CartaPorteTax[]; relations?: Array<Record<string, unknown>>;
   precarga?: { faltantes: string[] };
   advertencias?: Array<{ category?: string; code?: string; message: string }>;
 }
@@ -354,7 +372,7 @@ export interface TripCargoResponse { viaje_id: string; updated_at: string; merca
 export type CreateTripCartaPorteInput = CreateTripCartaPorteFiscalInput & { datos_qa?: boolean; cliente_id?: string };
 
 export class LogisticsApiError extends Error {
-  constructor(message: string, readonly code?: string, readonly status?: number) {
+  constructor(message: string, readonly code?: string, readonly status?: number, readonly fields: CartaPorteValidationIssue[] = [], readonly warnings: CartaPorteValidationIssue[] = []) {
     super(message);
     this.name = 'LogisticsApiError';
   }
@@ -371,7 +389,7 @@ class LogisticsApi {
     if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
     const response = await fetch(`/api/logistica/${path}`, { ...init, headers, cache: 'no-store' });
     const result = await response.json();
-    if (!response.ok) throw new LogisticsApiError(result.error || `Error de logística (${response.status})`, result.code, response.status);
+    if (!response.ok) throw new LogisticsApiError(result.error || `Error de logística (${response.status})`, result.code, response.status, result.fields || [], result.warnings || []);
     return result as LogisticsResponse<T>;
   }
 
@@ -489,6 +507,17 @@ class LogisticsApi {
   getTripCargo(folio: string) { return this.request<TripCargoResponse>(`trips/${encodeURIComponent(folio)}/cargo`); }
   createTripCartaPorte(folio: string, input: CreateTripCartaPorteInput) { return this.request<CartaPorteDocument>(`trips/${encodeURIComponent(folio)}/carta-porte`, { method: 'POST', body: JSON.stringify(input) }); }
   getCartaPorte(id: string) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}`); }
+  patchCartaPorte(id: string, expected_revision: number, update: { header?: Partial<Pick<CartaPorteDocument, 'transporte_internacional'>>; invoice?: Partial<Pick<CartaPorteInvoice, 'fecha_expedicion' | 'moneda' | 'exportacion_sat' | 'uso_cfdi_sat' | 'forma_pago_sat' | 'metodo_pago_sat'>> }) {
+    return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ expected_revision, ...update }) });
+  }
+  saveCartaPorteInvoiceItems(id: string, expected_revision: number, concepts: { upsert: CartaPorteConceptInput[]; remove: string[] }, taxes: { upsert: CartaPorteTaxInput[]; remove: string[] }) {
+    return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/invoice-items`, { method: 'PUT', body: JSON.stringify({ expected_revision,
+      concepts: { upsert: concepts.upsert, remove: concepts.remove.map(id => ({ id })) },
+      taxes: { upsert: taxes.upsert, remove: taxes.remove.map(id => ({ id })) } }) });
+  }
+  validateCartaPorte(id: string, expected_revision: number) {
+    return this.request<CartaPorteValidationResult>(`carta-porte/${encodeURIComponent(id)}/validate`, { method: 'POST', body: JSON.stringify({ expected_revision, dry_run: true }) });
+  }
   saveCartaPorteLocations(id: string, expected_revision: number, locations: CartaPorteLocationInput[]) {
     return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/locations`, { method: 'PUT', body: JSON.stringify({ expected_revision, locations: { upsert: locations, remove: [] } }) });
   }

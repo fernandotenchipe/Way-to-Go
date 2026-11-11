@@ -439,14 +439,22 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
       return transaction(async db=>{const f=await header(db,cpId,body.expected_revision);if(!['VALIDADO','RECHAZADO'].includes(f.estado)||f.origen!=='PROPIO')reject(409,'DOCUMENT_LOCKED','No se puede reabrir');await update(db,'cfdi',{estado:'BORRADOR'},'id=$1',[f.id]);await audit(db,actor,'cfdi',f.id,'REABRIR',f.id);return aggregate(db,cpId);});
     },
     async validate(cpId,body,actor) {
-      only(body,['expected_revision']); revision(body.expected_revision);
+      only(body,['expected_revision','dry_run']); revision(body.expected_revision);
+      if(body.dry_run!==undefined&&typeof body.dry_run!=='boolean')reject(400,'INVALID_DRY_RUN','dry_run debe ser booleano');
+      const dryRun=body.dry_run===true;
       return transaction(async db=>{
         const f=await header(db,cpId,body.expected_revision,true); const data=await aggregate(db,cpId);
         if(f.estado!=='BORRADOR')reject(409,'DOCUMENT_LOCKED','Reabre el documento antes de validarlo');
         const tripRow=(await db.query('SELECT unidad_id,operador_id,caja_id,proveedor_id FROM tms.viajes WHERE id=$1',[f.viaje_id])).rows[0];
-        if(tripRow?.unidad_id&&data.transport[0]?.unidad_id!==tripRow.unidad_id)reject(422,'ASSIGNMENT_MISMATCH','La unidad no coincide con la asignación del viaje');
-        if(tripRow?.operador_id&&!data.figures.some(fig=>fig.operador_id===tripRow.operador_id))reject(422,'ASSIGNMENT_MISMATCH','El operador no coincide con la asignación del viaje');
-        if(tripRow?.caja_id&&!data.trailers.some(trailer=>trailer.caja_id===tripRow.caja_id))reject(422,'ASSIGNMENT_MISMATCH','El remolque no coincide con la asignación del viaje');
+        const assignmentErrors=[];
+        const checkAssignment=(condition,path,message)=>{
+          if(!condition)return;
+          if(!dryRun)reject(422,'ASSIGNMENT_MISMATCH',message);
+          assignmentErrors.push({category:'ESTRUCTURA',path,code:'ASSIGNMENT_MISMATCH',message});
+        };
+        checkAssignment(tripRow?.unidad_id&&data.transport[0]?.unidad_id!==tripRow.unidad_id,'transport','La unidad no coincide con la asignación del viaje');
+        checkAssignment(tripRow?.operador_id&&!data.figures.some(fig=>fig.operador_id===tripRow.operador_id),'figures','El operador no coincide con la asignación del viaje');
+        checkAssignment(tripRow?.caja_id&&!data.trailers.some(trailer=>trailer.caja_id===tripRow.caja_id),'trailers','El remolque no coincide con la asignación del viaje');
         const {validateCartaPorteDetailed}=await import('./carta-porte-validation.js');
         const auditData=(await db.query("SELECT datos FROM tms.cp_auditoria WHERE cfdi_id=$1 AND datos ? 'escenario_fiscal' ORDER BY created_at DESC,id DESC LIMIT 1",[f.id])).rows[0]?.datos||{};
         const metadata=typeof auditData==='string'?JSON.parse(auditData):auditData;
@@ -455,7 +463,13 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
         let catalogErrors=[];
         try{catalogErrors=await validateCfdiCatalogKeys(data,cfdiCatalogProvider);}
         catch{reject(503,'CFDI_CATALOG_UNAVAILABLE','No se pudieron verificar los catálogos locales CFDI');}
-        const errors=[...fiscalResult.errors,...catalogErrors];
+        const errors=[...assignmentErrors,...fiscalResult.errors,...catalogErrors];
+        if(dryRun){
+          return {valid:errors.length===0,mode:'DRY_RUN',provider_checked:false,errors,
+            structural_errors:errors.filter(error=>error.category==='ESTRUCTURA'),
+            fiscal_errors:errors.filter(error=>error.category==='FISCAL'),warnings:fiscalResult.warnings,
+            pending_fields:[...(data.precarga?.faltantes||[])],revision:Number(f.revision),estado:f.estado};
+        }
         if (errors.length) reject(422,'CARTA_PORTE_INCOMPLETE','Falta completar información',errors,fiscalResult.warnings);
         requireProvider();
         const version=(await db.query('SELECT * FROM tms.cp_sat_versiones WHERE id=$1',[data.sat_version_id])).rows[0];
