@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error Node executes this TypeScript test directly.
-import { buildCartaPorteMerchandiseMutation, findUnmatchedTripCargo } from '../../../app/services/carta-porte-sync.ts';
+import { buildCartaPorteLocationsMutation, buildCartaPorteMerchandiseMutation, findUnmatchedTripCargo } from '../../../app/services/carta-porte-sync.ts';
 
 const cargo = (id: string, overrides: Record<string, unknown> = {}) => ({
   id, posicion: 1, descripcion: 'Caja de piezas', mercancia: 'Caja de piezas', cantidad: '2.000000',
@@ -28,5 +28,12 @@ test('la mutación conserva partidas SAT repetidas y expresa eliminaciones por i
   assert.deepEqual(buildCartaPorteMerchandiseMutation(repeated, ['cp-3']), {
     upsert: repeated,
     remove: [{ id: 'cp-3' }],
+  });
+});
+
+test('la mutación de ubicaciones conserva el orden enviado y expresa eliminaciones sin reemplazar ids', () => {
+  const route = [{ id: 'origin-id', posicion: 1, tipo: 'Origen' }, { id: 'stop-id', posicion: 2, tipo: 'Destino' }];
+  assert.deepEqual(buildCartaPorteLocationsMutation(route, ['removed-stop-id']), {
+    upsert: route, remove: [{ id: 'removed-stop-id' }],
   });
 });

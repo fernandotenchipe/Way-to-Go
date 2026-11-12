@@ -1,5 +1,9 @@
 import type { CartaPorteMerchandise, TripCargoItem } from './logistics-api';
 
+export function buildCartaPorteLocationsMutation<T>(upsert: T[], remove: string[] = []) {
+  return { upsert, remove: remove.map(id => ({ id })) };
+}
+
 export function buildCartaPorteMerchandiseMutation<T>(upsert: T[], remove: string[] = []) {
   return { upsert, remove: remove.map(id => ({ id })) };
 }

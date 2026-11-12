@@ -17,16 +17,26 @@ test('la validación detecta RFC malformados y acepta RFC de 12 y 13 caracteres'
   const invalid={...base,cfdi:{...base.cfdi,emisor_snapshot:{rfc:'RFC-INCORRECTO'}}};
   assert.ok(validateCartaPorte(invalid).some(issue=>issue.path==='invoice.emisor_snapshot.rfc'&&issue.code==='RFC_FORMAT_INVALID'));
 });
-test('la validación acepta recorridos con múltiples orígenes y destinos en orden temporal',()=>{
-  const locations=[
-    {id:'o1',posicion:1,tipo:'Origen',fecha_hora:'2026-11-01T08:00:00Z'},
-    {id:'d1',posicion:2,tipo:'Destino',fecha_hora:'2026-11-01T10:00:00Z'},
-    {id:'o2',posicion:3,tipo:'Origen',fecha_hora:'2026-11-01T11:00:00Z'},
-    {id:'d2',posicion:4,tipo:'Destino',fecha_hora:'2026-11-01T12:00:00Z'},
+test('la validación admite los cuatro patrones de múltiples orígenes y destinos',()=>{
+  const patterns=[
+    ['Origen','Destino'],
+    ['Origen','Destino','Destino','Destino'],
+    ['Origen','Origen','Origen','Destino'],
+    ['Origen','Destino','Origen','Destino'],
   ];
-  const issues=validateCartaPorteDetailed({locations,merchandise:[],transport:[],figures:[],concepts:[],cfdi:{}}).errors;
-  assert.ok(!issues.some(issue=>issue.code==='ORIGIN_DESTINATION_REQUIRED'));
-  assert.ok(!issues.some(issue=>issue.code==='TIME_ORDER'));
+  for(const types of patterns){
+    const locations=types.map((tipo,index)=>({id:`stop-${index}`,posicion:index+1,tipo,fecha_hora:`2026-11-01T${String(8+index).padStart(2,'0')}:00:00Z`}));
+    const issues=validateCartaPorteDetailed({locations,merchandise:[],transport:[],figures:[],concepts:[],cfdi:{}}).errors;
+    assert.ok(!issues.some(issue=>issue.code==='ORIGIN_DESTINATION_REQUIRED'),types.join(','));
+    assert.ok(!issues.some(issue=>issue.code==='TIME_ORDER'),types.join(','));
+  }
+});
+test('la validación reporta secuencias de ubicaciones con fechas invertidas',()=>{
+  const errors=validateCartaPorteDetailed({locations:[
+    {posicion:1,tipo:'Origen',fecha_hora:'2026-11-01T12:00:00Z'},
+    {posicion:2,tipo:'Destino',fecha_hora:'2026-11-01T08:00:00Z'},
+  ],merchandise:[],transport:[],figures:[],concepts:[],cfdi:{}}).errors;
+  assert.ok(errors.some(issue=>issue.code==='TIME_ORDER'));
 });
 const operationId='44444444-4444-4444-8444-444444444444';
 function mockPool(handler=()=>({rows:[]})) {
@@ -288,14 +298,18 @@ test('La API directa permite cambios de Carta Porte en estado RECHAZADO',async()
 test('Si falla la auditoría de un guardado de detalles, la transacción revierte el cambio parcial',async()=>{
   const pool=mockPool(sql=>{
     if(sql.startsWith('SELECT f.*'))return {rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]};
+    if(sql.startsWith('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones'))return {rows:[]};
+    if(sql.startsWith('SELECT 1 FROM tms.cp_cantidades_transportadas'))return {rows:[]};
     if(sql.startsWith('SELECT * FROM tms.cp_ubicaciones'))return {rows:[]};
     if(sql.startsWith('INSERT INTO tms.cp_ubicaciones'))return {rows:[{id:operationId}]};
     if(sql.startsWith('INSERT INTO tms.cp_auditoria'))throw new Error('audit unavailable');
     return {rows:[]};
   });
-  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[{
-    id:operationId,tipo:'Origen',posicion:1,identificador_sat:'OR000001',
-  }],remove:[]}},permission:'carta_porte.editar',pool});
+  const destinationId='55555555-5555-4555-8555-555555555555';
+  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[
+    {id:operationId,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},
+    {id:destinationId,tipo:'Destino',posicion:2,identificador_sat:'DE000001'},
+  ],remove:[]}},permission:'carta_porte.editar',pool});
   assert.equal(res.statusCode,500);
   assert.ok(pool.calls.some(call=>call.sql.startsWith('INSERT INTO tms.cp_ubicaciones')));
   assert.ok(pool.calls.some(call=>call.sql==='ROLLBACK'));
@@ -317,6 +331,8 @@ test('Editar ubicaciones conserva importes CFDI y partidas existentes',async()=>
   const db={async query(sql,params=[]){
     calls.push({sql,params});
     if(sql.startsWith('SELECT f.*'))return {rows:[cfdi]};
+    if(sql.startsWith('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones'))return {rows:[loc,{...loc,id:'destination-id',posicion:2,tipo:'Destino',identificador_sat:'DE000001',fecha_hora:'2026-10-23T16:00:00Z'}]};
+    if(sql.startsWith('SELECT 1 FROM tms.cp_cantidades_transportadas'))return {rows:[]};
     if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[cp]};
     if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[cfdi]};
     if(sql.includes('FROM tms.cp_ubicaciones')&&sql.includes('AND id=$2'))return {rows:[loc]};
@@ -340,6 +356,96 @@ test('Editar ubicaciones conserva importes CFDI y partidas existentes',async()=>
   assert.ok(!calls.some(c=>/^(UPDATE|SELECT) tms\.(cfdi|cfdi_conceptos|cfdi_impuestos|cp_mercancias)\b/.test(c.sql)));
   assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO tms.cp_auditoria')));
   assert.ok(calls.some(c=>c.sql==='COMMIT'));
+});
+test('la API no permite quitar el último origen o destino',async()=>{
+  const originId='55555555-5555-4555-8555-555555555555';
+  const destinationId='66666666-6666-4666-8666-666666666666';
+  const pool=mockPool(sql=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]};
+    if(sql.startsWith('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones'))return {rows:[
+      {id:originId,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},
+      {id:destinationId,tipo:'Destino',posicion:2,identificador_sat:'DE000001'},
+    ]};
+    return {rows:[]};
+  });
+  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[],remove:[{id:originId}]}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,422);assert.equal(res.body.code,'ORIGIN_DESTINATION_REQUIRED');
+  assert.ok(!pool.calls.some(call=>call.sql.startsWith('DELETE FROM tms.cp_ubicaciones')));
+  assert.ok(pool.calls.some(call=>call.sql==='ROLLBACK'));
+});
+test('la API rechaza distancias con precisión que la columna numeric(16,2) redondearía',async()=>{
+  const pool=mockPool(sql=>sql.startsWith('SELECT f.*')?{rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]}:{rows:[]});
+  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[
+    {tipo:'Origen',posicion:1,identificador_sat:'OR000001',distancia_recorrida_km:'1.234'},
+    {tipo:'Destino',posicion:2,identificador_sat:'DE000001'},
+  ],remove:[]}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,422);assert.equal(res.body.code,'INVALID_DISTANCE');
+  assert.ok(!pool.calls.some(call=>call.sql.startsWith('INSERT INTO tms.cp_ubicaciones')));
+});
+test('la API impide quitar ubicaciones usadas por una distribución de mercancías',async()=>{
+  const firstOrigin='55555555-5555-4555-8555-555555555555';
+  const secondOrigin='66666666-6666-4666-8666-666666666666';
+  const destinationId='77777777-7777-4777-8777-777777777777';
+  const pool=mockPool(sql=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]};
+    if(sql.startsWith('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones'))return {rows:[
+      {id:firstOrigin,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},
+      {id:secondOrigin,tipo:'Origen',posicion:2,identificador_sat:'OR000002'},
+      {id:destinationId,tipo:'Destino',posicion:3,identificador_sat:'DE000001'},
+    ]};
+    if(sql.startsWith('SELECT 1 FROM tms.cp_cantidades_transportadas'))return {rows:[{ '?column?':1 }]};
+    return {rows:[]};
+  });
+  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[
+    {id:secondOrigin,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},
+    {id:destinationId,tipo:'Destino',posicion:2,identificador_sat:'DE000001'},
+  ],remove:[{id:firstOrigin}]}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,409);assert.equal(res.body.code,'LOCATION_IN_USE');
+  assert.ok(!pool.calls.some(call=>call.sql.startsWith('DELETE FROM tms.cp_ubicaciones')));
+});
+test('reordenar ubicaciones evita colisiones temporales de posición e identificador SAT',async()=>{
+  const a='55555555-5555-4555-8555-555555555555',b='66666666-6666-4666-8666-666666666666',d='77777777-7777-4777-8777-777777777777';
+  const rows=[
+    {id:a,carta_porte_id:cpId,posicion:1,tipo:'Origen',identificador_sat:'OR000001',fecha_hora:'2026-11-01T08:00:00Z'},
+    {id:b,carta_porte_id:cpId,posicion:2,tipo:'Origen',identificador_sat:'OR000002',fecha_hora:'2026-11-01T09:00:00Z'},
+    {id:d,carta_porte_id:cpId,posicion:3,tipo:'Destino',identificador_sat:'DE000001',fecha_hora:'2026-11-01T10:00:00Z'},
+  ];
+  const calls=[];
+  const db={async query(sql,params=[]){
+    calls.push({sql,params});
+    if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return {rows:[]};
+    if(sql.startsWith('SELECT f.*'))return {rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]};
+    if(sql.startsWith('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones'))return {rows:rows.map(row=>({...row}))};
+    if(sql.startsWith('SELECT 1 FROM tms.cp_cantidades_transportadas'))return {rows:[]};
+    if(sql.startsWith('SELECT * FROM tms.cp_ubicaciones WHERE carta_porte_id=$1 AND id=$2'))return {rows:rows.filter(row=>row.id===params[1]).map(row=>({...row}))};
+    if(sql.startsWith('UPDATE tms.cp_ubicaciones SET posicion=$3,identificador_sat=$4')){
+      const row=rows.find(item=>item.id===params[1]);row.posicion=params[2];row.identificador_sat=params[3];return {rows:[{...row}]};
+    }
+    if(sql.startsWith('UPDATE tms.cp_ubicaciones SET')){
+      const row=rows.find(item=>item.id===params[1]);
+      const assignments=[...sql.matchAll(/([a-z_]+)=\$(\d+)/g)];
+      assignments.forEach(([,field,n])=>{if(field!=='carta_porte_id'&&field!=='id')row[field]=params[Number(n)-1];});
+      const positions=rows.map(item=>item.posicion),identifiers=rows.map(item=>item.identificador_sat);
+      assert.equal(new Set(positions).size,rows.length);assert.equal(new Set(identifiers).size,rows.length);
+      return {rows:[{...row}]};
+    }
+    if(sql==='SELECT revision FROM tms.cfdi WHERE id=$1')return {rows:[{revision:5}]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))return {rows:[{}]};
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[{id:cpId,cfdi_id:documentId}]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[{id:documentId,revision:'5',estado:'BORRADOR'}]};
+    if(sql.includes('FROM tms.cp_ubicaciones')&&sql.includes('ORDER BY created_at'))return {rows:rows.map(row=>({...row}))};
+    if(sql.includes('ORDER BY created_at'))return {rows:[]};
+    return {rows:[]};
+  },release(){}};
+  await createCartaPorteService({pool:{query:db.query,connect:async()=>db}}).group(cpId,'locations',{expected_revision:'4',locations:{upsert:[
+    {id:b,tipo:'Origen',posicion:1,identificador_sat:'OR000001',fecha_hora:'2026-11-01T08:00:00Z'},
+    {id:a,tipo:'Origen',posicion:2,identificador_sat:'OR000002',fecha_hora:'2026-11-01T09:00:00Z'},
+    {id:d,tipo:'Destino',posicion:3,identificador_sat:'DE000001',fecha_hora:'2026-11-01T10:00:00Z'},
+  ],remove:[]}},actor);
+  assert.deepEqual(rows.sort((x,y)=>x.posicion-y.posicion).map(row=>[row.id,row.posicion,row.identificador_sat]),[
+    [b,1,'OR000001'],[a,2,'OR000002'],[d,3,'DE000001'],
+  ]);
+  assert.equal(calls.filter(call=>call.sql.startsWith('UPDATE tms.cp_ubicaciones SET posicion=$3,identificador_sat=$4')).length,3);
 });
 test('Editar transporte y figuras no recalcula ni toca importes CFDI',async()=>{
   const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',subtotal:'245.000000',descuento:null,impuestos_trasladados:null,impuestos_retenidos:null,total:null};

@@ -284,6 +284,7 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
         const parsed=fields(entry,{...c.fields,...Object.fromEntries(c.keys.map(k=>[k,c.fields[k]||'uuid']))});
         if(c.keys.includes('id')&&!parsed.id)parsed.id=randomUUID();
         for(const key of c.keys)if(parsed[key]===undefined)reject(400,'MISSING_KEY',`Falta ${key}`);
+        if(name==='locations'&&parsed.distancia_recorrida_km!=null&&!/^\d{1,14}(\.\d{1,2})?$/.test(parsed.distancia_recorrida_km))reject(422,'INVALID_DISTANCE','La distancia admite hasta dos decimales y no puede ser negativa');
         return parsed;
       });
       const identity=row=>JSON.stringify(c.keys.map(k=>row[k]));
@@ -291,6 +292,39 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
       if(new Set(updateKeys).size!==updateKeys.length||new Set(removeKeys).size!==removeKeys.length)reject(400,'DUPLICATE_ROW_KEY','No repitas la misma fila en el lote');
       if(updateKeys.some(key=>removeKeys.includes(key)))reject(400,'CONFLICTING_ROW_ACTION','No actualices y elimines la misma fila');
       prepared[name]={upsert:updates,remove:removals};
+    }
+    if(group==='locations'&&prepared.locations){
+      const current=(await db.query('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones WHERE carta_porte_id=$1 ORDER BY posicion,id FOR UPDATE',[cpId])).rows;
+      const removed=new Set(prepared.locations.remove.map(row=>row.id));
+      const updates=new Map(prepared.locations.upsert.map(row=>[row.id,row]));
+      const finalRows=[...current.filter(row=>!removed.has(row.id)&&!updates.has(row.id)),...current.filter(row=>!removed.has(row.id)&&updates.has(row.id)).map(row=>({...row,...updates.get(row.id)})),...prepared.locations.upsert.filter(row=>!current.some(existing=>existing.id===row.id))];
+      if(!finalRows.some(row=>row.tipo==='Origen')||!finalRows.some(row=>row.tipo==='Destino'))reject(422,'ORIGIN_DESTINATION_REQUIRED','Conserva al menos un origen y un destino');
+      const positions=finalRows.map(row=>Number(row.posicion));
+      if(positions.some(position=>!Number.isInteger(position)||position<1)||new Set(positions).size!==positions.length||positions.length!==Math.max(0,...positions))reject(422,'INVALID_LOCATION_ORDER','Las posiciones deben ser únicas y consecutivas desde 1');
+      const ordered=[...finalRows].sort((a,b)=>Number(a.posicion)-Number(b.posicion));
+      let previousTime=null;
+      for(const row of ordered){
+        if(row.fecha_hora){const time=Date.parse(row.fecha_hora);if(!Number.isFinite(time))reject(422,'INVALID_LOCATION_DATE','La fecha de la ubicación no es válida');if(previousTime!==null&&time<previousTime)reject(422,'LOCATION_TIME_ORDER','Las fechas deben seguir el orden del recorrido');previousTime=time;}
+      }
+      const removedIds=[...removed];
+      if(removedIds.length){
+        const referenced=(await db.query('SELECT 1 FROM tms.cp_cantidades_transportadas WHERE carta_porte_id=$1 AND (origen_id=ANY($2::uuid[]) OR destino_id=ANY($2::uuid[])) LIMIT 1',[cpId,removedIds])).rows[0];
+        if(referenced)reject(409,'LOCATION_IN_USE','La ubicación está vinculada a cantidades transportadas; actualiza esas relaciones antes de quitarla');
+      }
+      const existingUpdated=prepared.locations.upsert.filter(row=>current.some(existing=>existing.id===row.id));
+      if(existingUpdated.length){
+        const offset=Math.max(...positions,...current.map(row=>Number(row.posicion)),0)+existingUpdated.length+1;
+        const usedIdentifiers=new Set(current.map(row=>row.identificador_sat));
+        let temporaryNumber=999999;
+        for(const [index,row] of existingUpdated.entries()){
+          const existing=current.find(item=>item.id===row.id);
+          const prefix=existing.tipo==='Origen'?'OR':'DE';
+          let temporaryIdentifier;
+          do { temporaryIdentifier=`${prefix}${String(temporaryNumber--).padStart(6,'0')}`; } while(usedIdentifiers.has(temporaryIdentifier));
+          usedIdentifiers.add(temporaryIdentifier);
+          await db.query('UPDATE tms.cp_ubicaciones SET posicion=$3,identificador_sat=$4 WHERE carta_porte_id=$1 AND id=$2',[cpId,row.id,offset+index,temporaryIdentifier]);
+        }
+      }
     }
     // Borrar dependencias en orden inverso; insertar padres antes que sus relaciones.
     for (const name of [...names].reverse()) {
