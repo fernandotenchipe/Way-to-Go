@@ -72,7 +72,9 @@ export default function CartaPorteLocationsEditor({
   async function save() {
     setBusy(true); setError(''); setNotice('');
     try {
+      if (!editable(document)) throw new LogisticsApiError('El estado actual del documento no permite editar ubicaciones.', 'DOCUMENT_LOCKED', 409);
       const fresh = await logisticsApi.getCartaPorte(document.id);
+      if (!editable(fresh.data)) throw new LogisticsApiError('El estado actual del documento no permite editar ubicaciones.', 'DOCUMENT_LOCKED', 409);
       if (editRevision !== fresh.data.cfdi.revision) {
         onSaved(fresh.data);
         setEditRevision(fresh.data.cfdi.revision);
@@ -106,10 +108,10 @@ export default function CartaPorteLocationsEditor({
   return <section className="rounded-lg border border-slate-200 p-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">Ubicaciones</h3>{!editing && canEdit && <button type="button" className={button} disabled={busy || !document.locations.length} onClick={() => void beginEdit()}>{busy ? 'Cargando domicilios…' : 'Editar ubicaciones'}</button>}</div>
     {!document.locations.length && <p className="mt-2 text-sm text-amber-800">Este borrador no tiene ubicaciones existentes para editar.</p>}
-    {!editing && document.locations.length > 0 && <div className="mt-3 space-y-3">{document.locations.slice().sort((a,b)=>a.posicion-b.posicion).map(location => <article key={location.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-medium">{location.tipo} · {location.identificador_sat} · posición {location.posicion}</p><p className="text-slate-600">{location.participante_snapshot?.nombre || 'Participante pendiente'} · {snapshotText(location.domicilio_snapshot)}</p><p className="text-xs text-slate-500">Fecha {location.fecha_hora || 'pendiente'} · zona {location.zona_horaria || 'pendiente'} · distancia {location.distancia_recorrida_km ?? 'pendiente'} km</p></article>)}</div>}
+    {(!editing || !canEdit) && document.locations.length > 0 && <div className="mt-3 space-y-3">{document.locations.slice().sort((a,b)=>a.posicion-b.posicion).map(location => <article key={location.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-medium">{location.tipo} · {location.identificador_sat} · posición {location.posicion}</p><p className="text-slate-600">{location.participante_snapshot?.nombre || 'Participante pendiente'} · {snapshotText(location.domicilio_snapshot)}</p><p className="text-xs text-slate-500">Fecha {location.fecha_hora || 'pendiente'} · zona {location.zona_horaria || 'pendiente'} · distancia {location.distancia_recorrida_km ?? 'pendiente'} km</p></article>)}</div>}
     {!!error && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     {!!notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
-    {editing && <div className="mt-3 space-y-4">{document.locations.slice().sort((a,b)=>a.posicion-b.posicion).map(location => {
+    {editing && canEdit && <div className="mt-3 space-y-4">{document.locations.slice().sort((a,b)=>a.posicion-b.posicion).map(location => {
       const selectedId = selected[location.id] || location.direccion_id || '';
       const selectedCpAddress = options.find(option => option.id === selectedId);
       const customerAddress = addresses.find(address => address.id === selectedCpAddress?.cliente_direccion_id);

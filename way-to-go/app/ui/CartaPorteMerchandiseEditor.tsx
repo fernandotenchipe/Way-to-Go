@@ -92,7 +92,9 @@ export default function CartaPorteMerchandiseEditor({
   async function save() {
     setBusy(true); setError(''); setNotice('');
     try {
+      if (!editable(document)) throw new LogisticsApiError('El estado actual del documento no permite editar mercancías.', 'DOCUMENT_LOCKED', 409);
       const fresh = await logisticsApi.getCartaPorte(document.id);
+      if (!editable(fresh.data)) throw new LogisticsApiError('El estado actual del documento no permite editar mercancías.', 'DOCUMENT_LOCKED', 409);
       if (editRevision !== fresh.data.cfdi.revision) {
         onSaved(fresh.data); setEditRevision(fresh.data.cfdi.revision); setDrafts(fresh.data.merchandise.map(row => ({ ...row })));
         throw new Error('El borrador cambió mientras editabas. Recargué su revisión; revisa los datos y vuelve a guardar.');
@@ -147,8 +149,10 @@ export default function CartaPorteMerchandiseEditor({
   async function addTripCargo() {
     setBusy(true); setError(''); setNotice('');
     try {
+      if (!editable(document)) throw new LogisticsApiError('El estado actual del documento no permite sincronizar mercancías.', 'DOCUMENT_LOCKED', 409);
       if (!syncCandidates.length) return;
       const [fresh, currentCargo] = await Promise.all([logisticsApi.getCartaPorte(document.id), logisticsApi.getTripCargo(trip.folio)]);
+      if (!editable(fresh.data)) throw new LogisticsApiError('El estado actual del documento no permite sincronizar mercancías.', 'DOCUMENT_LOCKED', 409);
       if (syncRevision !== fresh.data.cfdi.revision) {
         onSaved(fresh.data); setSyncCandidates([]);
         throw new Error('El borrador cambió desde la revisión de sincronización. Se recargó; vuelve a revisar antes de agregar.');
@@ -193,7 +197,7 @@ export default function CartaPorteMerchandiseEditor({
     {!!error && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     {!!notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
 
-    {editing ? <div className="mt-4 space-y-4">{drafts.map((row, index) => <article key={row.id} className="rounded-lg bg-slate-50 p-4">
+    {editing && canEdit ? <div className="mt-4 space-y-4">{drafts.map((row, index) => <article key={row.id} className="rounded-lg bg-slate-50 p-4">
       <p className="text-sm font-semibold">Mercancía {row.posicion || index + 1}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="text-xs">Descripción<input className={inputClass} value={row.descripcion} onChange={event => change(row.id, 'descripcion', event.target.value)} /></label>

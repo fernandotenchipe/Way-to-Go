@@ -234,6 +234,62 @@ test('Un documento timbrado no admite edición de cabecera',async()=>{
   const pool=mockPool(()=>({rows:[{id:documentId,revision:'4',estado:'TIMBRADO',origen:'PROPIO'}]}));
   await assert.rejects(()=>createCartaPorteService({pool}).patch(cpId,{expected_revision:'4',header:{orden_compra:'OC-1'}},actor),e=>e.code==='DOCUMENT_LOCKED');
 });
+test('La API directa devuelve 409 y no escribe para documentos TIMBRADO o CANCELADO en todas las rutas de edición',async()=>{
+  const mutatingRoutes=[
+    ['patch','/carta-porte/:id',{header:{orden_compra:'OC-2'}}],
+    ...['locations','merchandise','transport','customs','allocations','invoice-items'].map(group=>['put',`/carta-porte/:id/${group}`,{}]),
+    ['post','/carta-porte/:id/refresh-snapshots',{}],
+  ];
+  for(const state of ['TIMBRADO','CANCELADO'])for(const [method,path,changes] of mutatingRoutes){
+    const pool=mockPool(sql=>sql.startsWith('SELECT f.*')?{rows:[{id:documentId,revision:'8',estado:state,origen:'PROPIO'}]}:{rows:[]});
+    const body={expected_revision:'8',...changes};
+    const {res}=await invoke(method,path,{params:{id:cpId},body,permission:'carta_porte.editar',pool});
+    assert.equal(res.statusCode,409,`${state} ${method.toUpperCase()} ${path}`);
+    assert.equal(res.body.code,'DOCUMENT_LOCKED');
+    assert.ok(pool.calls.some(call=>call.sql==='ROLLBACK'));
+    assert.ok(!pool.calls.some(call=>/^\s*(UPDATE|INSERT|DELETE)\s/i.test(call.sql)),`${state} ${path} no debe escribir`);
+  }
+});
+test('La API directa permite cambios de Carta Porte en estado RECHAZADO',async()=>{
+  const cp={id:cpId,cfdi_id:documentId,viaje_id:'55555555-5555-4555-8555-555555555555'};
+  const invoice={id:documentId,revision:'4',estado:'RECHAZADO',origen:'PROPIO',tipo_comprobante:'I'};
+  let currentRevision=4;let auditData=null;
+  const pool=mockPool((sql,params)=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[{...invoice}]};
+    if(sql.startsWith('UPDATE tms.cartas_porte')){currentRevision+=1;invoice.revision=String(currentRevision);invoice.estado='BORRADOR';return {rows:[cp]};}
+    if(sql==='SELECT revision FROM tms.cfdi WHERE id=$1')return {rows:[{revision:String(currentRevision)}]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria')){auditData=JSON.parse(params[5]);return {rows:[{}]};}
+    if(sql==='SELECT * FROM tms.cartas_porte WHERE id=$1')return {rows:[cp]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[invoice]};
+    if(sql.includes("datos ? 'escenario_fiscal'"))return {rows:[]};
+    if(sql.startsWith('SELECT * FROM tms.'))return {rows:[]};
+    return {rows:[]};
+  });
+  const {res}=await invoke('patch','/carta-porte/:id',{params:{id:cpId},body:{expected_revision:'4',header:{orden_compra:'OC-RECHAZADO'}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,200);
+  assert.ok(pool.calls.some(call=>call.sql.startsWith('UPDATE tms.cartas_porte')));
+  assert.ok(!pool.calls.some(call=>call.sql.startsWith('UPDATE tms.cfdi')), 'el trigger de cartas_porte incrementa la revisión sin doble actualización');
+  assert.ok(pool.calls.some(call=>call.sql.startsWith('INSERT INTO tms.cp_auditoria')));
+  assert.deepEqual(auditData,{revision_anterior:4,revision_nueva:5});
+  assert.equal(res.body.data.cfdi.estado,'BORRADOR');
+  assert.equal(res.body.data.cfdi.revision,'5');
+});
+test('Si falla la auditoría de un guardado de detalles, la transacción revierte el cambio parcial',async()=>{
+  const pool=mockPool(sql=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]};
+    if(sql.startsWith('SELECT * FROM tms.cp_ubicaciones'))return {rows:[]};
+    if(sql.startsWith('INSERT INTO tms.cp_ubicaciones'))return {rows:[{id:operationId}]};
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria'))throw new Error('audit unavailable');
+    return {rows:[]};
+  });
+  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[{
+    id:operationId,tipo:'Origen',posicion:1,identificador_sat:'OR000001',
+  }],remove:[]}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,500);
+  assert.ok(pool.calls.some(call=>call.sql.startsWith('INSERT INTO tms.cp_ubicaciones')));
+  assert.ok(pool.calls.some(call=>call.sql==='ROLLBACK'));
+  assert.ok(!pool.calls.some(call=>call.sql==='COMMIT'));
+});
 test('Campos de pertenencia del lote no se aceptan desde el cliente',async()=>{
   const pool=mockPool(()=>({rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]}));
   await assert.rejects(()=>createCartaPorteService({pool}).group(cpId,'merchandise',{expected_revision:'4',merchandise:{upsert:[{carta_porte_id:actor,descripcion:'Ajeno'}]}},actor),e=>e.code==='UNKNOWN_FIELDS');

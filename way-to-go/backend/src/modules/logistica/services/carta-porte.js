@@ -31,6 +31,10 @@ async function update(db, table, data, where, params) {
   return rows[0];
 }
 async function audit(db, actor, table, entity, action, cfdi = null, data = {}) {
+  if (cfdi) {
+    const current = (await db.query('SELECT revision FROM tms.cfdi WHERE id=$1',[cfdi])).rows[0];
+    if (current?.revision != null) data = { ...data, revision_nueva: Number(current.revision) };
+  }
   await insert(db,'cp_auditoria',{tabla:table,entidad_id:entity,accion:action,actor_id:actor,cfdi_id:cfdi,datos:json(data)});
 }
 function safeCatalog(c, row) {
@@ -427,7 +431,7 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
         if (Object.keys(cp).length) await update(db,'cartas_porte',cp,'id=$1',[cpId]);
         if (invoice.cliente_id) invoice.receptor_snapshot=json(fiscalCustomer(await source(db,'clientes',invoice.cliente_id)));
         if (Object.keys(invoice).length) await update(db,'cfdi',{...invoice,estado:'BORRADOR',solicitud_snapshot:null,solicitud_sha256:null},'id=$1',[f.id]);
-        await audit(db,actor,'cartas_porte',cpId,Object.keys(auditMetadata).length?'DECLARAR_ESCENARIO_FISCAL':'EDITAR',f.id,auditMetadata); return aggregate(db,cpId);
+        await audit(db,actor,'cartas_porte',cpId,Object.keys(auditMetadata).length?'DECLARAR_ESCENARIO_FISCAL':'EDITAR',f.id,{...auditMetadata,revision_anterior:Number(f.revision)}); return aggregate(db,cpId);
       });
     },
     async group(cpId,group,body,actor) {
@@ -437,7 +441,7 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
           const cp=(await db.query('SELECT sat_version_id FROM tms.cartas_porte WHERE id=$1 FOR UPDATE',[cpId])).rows[0];
           if(cp&&!cp.sat_version_id)await update(db,'cartas_porte',{sat_version_id:CARTA_PORTE_31_CATALOG_VERSION},'id=$1',[cpId]);
         }
-        await changeGroup(db,cpId,f.id,group,body);await audit(db,actor,'cartas_porte',cpId,`EDITAR_${group}`,f.id);return aggregate(db,cpId);});
+        await changeGroup(db,cpId,f.id,group,body);await audit(db,actor,'cartas_porte',cpId,`EDITAR_${group}`,f.id,{revision_anterior:Number(f.revision)});return aggregate(db,cpId);});
     },
     async reopen(cpId,body,actor) {
       only(body,['expected_revision']); revision(body.expected_revision);
