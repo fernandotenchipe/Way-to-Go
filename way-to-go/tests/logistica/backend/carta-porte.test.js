@@ -4,7 +4,7 @@ import cartaPorteRouter from '../../../backend/src/modules/logistica/routes/cart
 import { createCartaPorteService } from '../../../backend/src/modules/logistica/services/carta-porte.js';
 import { createFiscalOperations, processFiscalOperation } from '../../../backend/src/modules/logistica/services/carta-porte-operations.js';
 import { fields, decimal, formatDecimal, multiplyDecimal } from '../../../backend/src/modules/logistica/services/carta-porte-input.js';
-import { validateCartaPorte } from '../../../backend/src/modules/logistica/services/carta-porte-validation.js';
+import { validateCartaPorte, validateCartaPorteDetailed } from '../../../backend/src/modules/logistica/services/carta-porte-validation.js';
 import { createCartaPorteStorage } from '../../../backend/src/modules/logistica/services/carta-porte-storage.js';
 
 const actor='11111111-1111-4111-8111-111111111111';
@@ -16,6 +16,17 @@ test('la validación detecta RFC malformados y acepta RFC de 12 y 13 caracteres'
   assert.equal(validateCartaPorte(base).some(issue=>issue.code==='RFC_FORMAT_INVALID'),false);
   const invalid={...base,cfdi:{...base.cfdi,emisor_snapshot:{rfc:'RFC-INCORRECTO'}}};
   assert.ok(validateCartaPorte(invalid).some(issue=>issue.path==='invoice.emisor_snapshot.rfc'&&issue.code==='RFC_FORMAT_INVALID'));
+});
+test('la validación acepta recorridos con múltiples orígenes y destinos en orden temporal',()=>{
+  const locations=[
+    {id:'o1',posicion:1,tipo:'Origen',fecha_hora:'2026-11-01T08:00:00Z'},
+    {id:'d1',posicion:2,tipo:'Destino',fecha_hora:'2026-11-01T10:00:00Z'},
+    {id:'o2',posicion:3,tipo:'Origen',fecha_hora:'2026-11-01T11:00:00Z'},
+    {id:'d2',posicion:4,tipo:'Destino',fecha_hora:'2026-11-01T12:00:00Z'},
+  ];
+  const issues=validateCartaPorteDetailed({locations,merchandise:[],transport:[],figures:[],concepts:[],cfdi:{}}).errors;
+  assert.ok(!issues.some(issue=>issue.code==='ORIGIN_DESTINATION_REQUIRED'));
+  assert.ok(!issues.some(issue=>issue.code==='TIME_ORDER'));
 });
 const operationId='44444444-4444-4444-8444-444444444444';
 function mockPool(handler=()=>({rows:[]})) {
@@ -402,6 +413,56 @@ test('Editar mercancías recalcula solo número y peso total de carga',async()=>
   const cargoTotals=calls.find(c=>c.sql.startsWith('UPDATE tms.cartas_porte SET numero_total_mercancias='));
   assert.ok(cargoTotals);assert.deepEqual(cargoTotals.params.slice(1),[2,'45.000']);
   assert.ok(!calls.some(c=>c.sql.startsWith('UPDATE tms.cfdi')));
+});
+test('PUT de mercancías rechaza vacíos y cantidades o pesos cero antes de escribir',async()=>{
+  const invalid=[
+    [{id:operationId,posicion:1,descripcion:'Madera',cantidad:'0',peso_kg:'2'},422,'INVALID_QUANTITY'],
+    [{id:operationId,posicion:1,descripcion:'Madera',cantidad:'1',peso_kg:'0'},422,'INVALID_WEIGHT'],
+    [{id:operationId,posicion:1,descripcion:'   ',cantidad:'1',peso_kg:'2'},422,'MERCHANDISE_DESCRIPTION_REQUIRED'],
+    [{id:operationId,posicion:1,descripcion:'Madera',valor_mercancia:'-1'},400,'INVALID_FIELD'],
+  ];
+  for(const [row,status,code]of invalid){
+    const pool=mockPool(sql=>sql.startsWith('SELECT f.*')?{rows:[{id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO'}]}:{rows:[]});
+    const {res}=await invoke('put','/carta-porte/:id/merchandise',{params:{id:cpId},body:{expected_revision:'7',merchandise:{upsert:[row],remove:[]}},permission:'carta_porte.editar',pool});
+    assert.equal(res.statusCode,status);
+    assert.equal(res.body.code,code);
+    assert.ok(!pool.calls.some(call=>/^\s*(INSERT|UPDATE|DELETE)\s/i.test(call.sql)));
+  }
+});
+test('el mismo identificador de mercancía no se acepta dos veces en un lote',async()=>{
+  const pool=mockPool(sql=>sql.startsWith('SELECT f.*')?{rows:[{id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO'}]}:{rows:[]});
+  const row={id:operationId,posicion:1,descripcion:'Madera',cantidad:'1',peso_kg:'2'};
+  const {res}=await invoke('put','/carta-porte/:id/merchandise',{params:{id:cpId},body:{expected_revision:'7',merchandise:{upsert:[row,row],remove:[]}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,400);
+  assert.equal(res.body.code,'DUPLICATE_ROW_KEY');
+  assert.ok(!pool.calls.some(call=>/^\s*(INSERT|UPDATE|DELETE)\s/i.test(call.sql)));
+});
+test('dos mercancías distintas pueden repetir la misma clave SAT',async()=>{
+  const inserted=[];
+  const invoice={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO',tipo_comprobante:'I'};
+  const cp={id:cpId,cfdi_id:documentId,viaje_id:'55555555-5555-4555-8555-555555555555'};
+  const db={async query(sql,params=[]){
+    if(sql.startsWith('SELECT f.*'))return {rows:[invoice]};
+    if(sql.startsWith('SELECT * FROM tms.cp_mercancias WHERE carta_porte_id=$1 AND id=$2'))return {rows:[]};
+    if(sql.startsWith('INSERT INTO tms.cp_mercancias')){
+      const columns=sql.slice(sql.indexOf('(')+1,sql.indexOf(')')).split(',');
+      const row=Object.fromEntries(columns.map((key,index)=>[key,params[index]]));inserted.push(row);return {rows:[row]};
+    }
+    if(sql.startsWith('SELECT count(*)::int AS count'))return {rows:[{count:inserted.length,weight:'4'}]};
+    if(sql.startsWith('SELECT * FROM tms.cartas_porte WHERE id=$1'))return {rows:[cp]};
+    if(sql==='SELECT * FROM tms.cfdi WHERE id=$1')return {rows:[invoice]};
+    if(sql.includes("datos ? 'escenario_fiscal'"))return {rows:[]};
+    if(sql.startsWith('SELECT * FROM tms.cp_mercancias WHERE carta_porte_id=$1 ORDER BY'))return {rows:inserted};
+    if(sql.startsWith('SELECT * FROM tms.')&&sql.includes('ORDER BY created_at'))return {rows:[]};
+    return {rows:[]};
+  },release(){}};
+  await createCartaPorteService({pool:{query:db.query,connect:async()=>db}}).group(cpId,'merchandise',{expected_revision:'7',merchandise:{upsert:[
+    {id:actor,posicion:1,descripcion:'Madera',cantidad:'1',peso_kg:'2',bienes_transp_sat:'11121600'},
+    {id:operationId,posicion:2,descripcion:'Madera',cantidad:'1',peso_kg:'2',bienes_transp_sat:'11121600'},
+  ],remove:[]}},actor);
+  assert.equal(inserted.length,2);
+  assert.equal(inserted[0].bienes_transp_sat,inserted[1].bienes_transp_sat);
+  assert.notEqual(inserted[0].id,inserted[1].id);
 });
 test('PUT de mercancías rechaza claves Carta Porte inválidas antes de escribir',async()=>{
   const cfdi={id:documentId,revision:'7',estado:'BORRADOR',origen:'PROPIO'};

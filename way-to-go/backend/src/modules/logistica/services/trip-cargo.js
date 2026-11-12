@@ -9,7 +9,6 @@ const satFields = {
   clave_material_peligroso_sat: 'c_MaterialPeligroso',
   embalaje_sat: 'c_TipoEmbalaje',
 };
-const cartaPorteSatFields = Object.fromEntries(Object.entries(satFields).filter(([field])=>field!=='clave_unidad_sat'));
 const itemFields = {
   descripcion:'text', mercancia:'text', cantidad:'decimal', bienes_transp_sat:'text',
   clave_unidad_sat:'text', unidad:'text', peso_kg:'decimal', hazmat:'boolean',
@@ -27,8 +26,7 @@ export async function tripCargoModelReady(db) {
 
 export async function readTripCargoRows(db,tripId) {
   if(await tripCargoModelReady(db)) {
-    const {rows}=await db.query('SELECT * FROM tms.viaje_carga_mercancias WHERE viaje_id=$1 ORDER BY posicion,created_at,id',[tripId]);
-    if(rows.length)return rows;
+    return (await db.query('SELECT * FROM tms.viaje_carga_mercancias WHERE viaje_id=$1 ORDER BY posicion,created_at,id',[tripId])).rows;
   }
   return (await db.query('SELECT * FROM tms.viaje_carga WHERE viaje_id=$1 ORDER BY created_at',[tripId])).rows;
 }

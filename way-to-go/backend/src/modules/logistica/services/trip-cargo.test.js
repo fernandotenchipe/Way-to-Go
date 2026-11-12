@@ -62,6 +62,19 @@ test('Carta Porte lee varias partidas tras la migración y conserva el fallback 
   assert.equal(prefilled.descripcion_embalaje,'Caja');
 });
 
+test('una tabla moderna vacía no recupera mercancía obsoleta del resumen histórico',async()=>{
+  const calls=[];
+  const rows=await readTripCargoRows({query:async(sql)=>{
+    calls.push(sql);
+    if(sql.includes('information_schema.columns'))return {rows:[{found:14}]};
+    if(sql.includes('viaje_carga_mercancias'))return {rows:[]};
+    if(sql.includes('FROM tms.viaje_carga WHERE'))throw new Error('No debe usarse el resumen legado si el modelo moderno está disponible');
+    throw new Error(`Consulta no esperada: ${sql}`);
+  }},uuid(1));
+  assert.deepEqual(rows,[]);
+  assert.equal(calls.some(sql=>sql.includes('FROM tms.viaje_carga WHERE')),false);
+});
+
 test('reporta campos pendientes por renglón y condiciona embalaje a material peligroso',()=>{
   const missing=tripCargoMissingFields([
     {descripcion:'Pintura',peso_kg:'4',hazmat:true},
@@ -167,6 +180,19 @@ test('actualización parcial conserva la descripción manual existente',async()=
   assert.equal(state.cargo[0].descripcion,'Descripción manual');
   assert.equal(state.cargo[0].cantidad,'3');
   assert.equal(saved.mercancias[0].descripcion,'Descripción manual');
+});
+
+test('rechaza cantidad cero o negativa y peso negativo antes de abrir una transacción',async()=>{
+  const {pool,state,catalogProvider}=memoryPool();
+  const service=createTripCargoService({pool,catalogProvider});
+  const cases=[
+    [{descripcion:'Carga',cantidad:'0',hazmat:false},'INVALID_QUANTITY'],
+    [{descripcion:'Carga',cantidad:'-1',hazmat:false},'INVALID_FIELD'],
+    [{descripcion:'Carga',peso_kg:'-1',hazmat:false},'INVALID_FIELD'],
+  ];
+  for(const [item,code] of cases)await assert.rejects(service.save('20',{updated_at:now,motivo:'Validar entrada',mercancias:[item]},uuid(30),actor),error=>error.code===code);
+  assert.equal(state.cargo.length,0);
+  assert.equal(state.calls.some(call=>call.sql==='BEGIN'),false);
 });
 
 test('una clave SAT inválida aborta la transacción antes de insertar mercancías',async()=>{

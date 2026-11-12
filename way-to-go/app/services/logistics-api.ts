@@ -1,4 +1,5 @@
 import type { CartaPorteFiscalScenario, CreateTripCartaPorteFiscalInput } from './carta-porte-fiscal';
+import { buildCartaPorteMerchandiseMutation } from './carta-porte-sync';
 
 export type LogisticsTripStatus =
   | 'BORRADOR' | 'CONFIRMADO' | 'PROGRAMADO' | 'EN_CAMINO_A_CARGA' | 'LLEGO_A_CARGA' | 'EN_CARGA'
@@ -521,8 +522,8 @@ class LogisticsApi {
   saveCartaPorteLocations(id: string, expected_revision: number, locations: CartaPorteLocationInput[]) {
     return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/locations`, { method: 'PUT', body: JSON.stringify({ expected_revision, locations: { upsert: locations, remove: [] } }) });
   }
-  saveCartaPorteMerchandise(id: string, expected_revision: number, merchandise: CartaPorteMerchandiseInput[]) {
-    return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/merchandise`, { method: 'PUT', body: JSON.stringify({ expected_revision, merchandise: { upsert: merchandise, remove: [] } }) });
+  saveCartaPorteMerchandise(id: string, expected_revision: number, merchandise: CartaPorteMerchandiseInput[], remove: string[] = []) {
+    return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/merchandise`, { method: 'PUT', body: JSON.stringify({ expected_revision, merchandise: buildCartaPorteMerchandiseMutation(merchandise, remove) }) });
   }
   saveCartaPorteFigures(id: string, expected_revision: number, figures: CartaPorteDocument['figures']) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/figures`, { method: 'PUT', body: JSON.stringify({ expected_revision, figures: { upsert: figures, remove: [] } }) }); }
   saveCartaPorteTransport(id: string, expected_revision: number, unidad_id: string) { return this.request<CartaPorteDocument>(`carta-porte/${encodeURIComponent(id)}/transport`, { method: 'PUT', body: JSON.stringify({ expected_revision, transport: { upsert: [{ unidad_id }], remove: [] } }) }); }

@@ -272,15 +272,31 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
   async function changeGroup(db, cpId, fId, group, input) {
     const names=groups[group]; if (!names) reject(404,'UNKNOWN_SECTION','Apartado inexistente');
     only(input,['expected_revision',...names]);
+    const prepared={};
+    for(const name of names){
+      if(!input[name])continue;
+      const c=children[name]; only(input[name],['upsert','remove']);
+      const upsert=input[name].upsert||[],remove=input[name].remove||[];
+      if(!Array.isArray(upsert)||!Array.isArray(remove)||upsert.length>100||remove.length>100)reject(400,'INVALID_BATCH','Envía hasta 100 filas por apartado');
+      const keySpec=Object.fromEntries(c.keys.map(k=>[k,c.fields[k]||'uuid']));
+      const removals=remove.map(entry=>fields(entry,keySpec,c.keys));
+      const updates=upsert.map(entry=>{
+        const parsed=fields(entry,{...c.fields,...Object.fromEntries(c.keys.map(k=>[k,c.fields[k]||'uuid']))});
+        if(c.keys.includes('id')&&!parsed.id)parsed.id=randomUUID();
+        for(const key of c.keys)if(parsed[key]===undefined)reject(400,'MISSING_KEY',`Falta ${key}`);
+        return parsed;
+      });
+      const identity=row=>JSON.stringify(c.keys.map(k=>row[k]));
+      const updateKeys=updates.map(identity),removeKeys=removals.map(identity);
+      if(new Set(updateKeys).size!==updateKeys.length||new Set(removeKeys).size!==removeKeys.length)reject(400,'DUPLICATE_ROW_KEY','No repitas la misma fila en el lote');
+      if(updateKeys.some(key=>removeKeys.includes(key)))reject(400,'CONFLICTING_ROW_ACTION','No actualices y elimines la misma fila');
+      prepared[name]={upsert:updates,remove:removals};
+    }
     // Borrar dependencias en orden inverso; insertar padres antes que sus relaciones.
     for (const name of [...names].reverse()) {
-      if (!input[name]) continue;
+      if (!prepared[name]) continue;
       const c=children[name], scope=c.scope==='cfdi_id'?fId:cpId;
-      only(input[name],['upsert','remove']);
-      if (!Array.isArray(input[name].upsert||[]) || !Array.isArray(input[name].remove||[]) || (input[name].upsert||[]).length>100 || (input[name].remove||[]).length>100) reject(400,'INVALID_BATCH','Envía hasta 100 filas por apartado');
-      for (const entry of input[name].remove||[]) {
-        const keySpec=Object.fromEntries(c.keys.map(k=>[k,c.fields[k]||'uuid']));
-        const key=fields(entry,keySpec,c.keys);
+      for (const key of prepared[name].remove) {
         const values=[scope,...c.keys.map(k=>key[k])];
         const result=await db.query(`DELETE FROM tms.${c.table} WHERE ${c.scope}=$1${c.keys.map((k,i)=>` AND ${k}=$${i+2}`).join('')} RETURNING *`,values);
         if (!result.rows.length) reject(404,'ROW_NOT_FOUND','Fila a eliminar no encontrada en este documento');
@@ -288,15 +304,17 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
     }
     for (const name of names) {
       const c=children[name], scope=c.scope==='cfdi_id'?fId:cpId;
-      for (const entry of input[name]?.upsert||[]) {
-        const parsed=fields(entry,{...c.fields,...Object.fromEntries(c.keys.map(k=>[k,c.fields[k]||'uuid']))});
-        if (c.keys.includes('id') && !parsed.id) parsed.id=randomUUID();
-        for (const key of c.keys) if (parsed[key]===undefined) reject(400,'MISSING_KEY',`Falta ${key}`);
+      for (const parsed of prepared[name]?.upsert||[]) {
         const params=[scope,...c.keys.map(k=>parsed[k])];
         const where=`${c.scope}=$1${c.keys.map((k,i)=>` AND ${k}=$${i+2}`).join('')}`;
         const existing=(await db.query(`SELECT * FROM tms.${c.table} WHERE ${where}`,params)).rows[0];
         const sourceKey={merchandise:'mercancia_id',transport:'unidad_id',trailers:'caja_id'}[name];
         let row=await snapshots(db,name,{...(existing||{}),...parsed},Boolean(sourceKey&&existing&&parsed[sourceKey]&&parsed[sourceKey]!==existing[sourceKey]));
+        if(name==='merchandise'){
+          if(!row.descripcion?.trim())reject(422,'MERCHANDISE_DESCRIPTION_REQUIRED','Cada mercancía requiere descripción');
+          if(row.cantidad!=null&&decimal(row.cantidad)<=0n)reject(422,'INVALID_QUANTITY','La cantidad debe ser mayor que cero');
+          if(row.peso_kg!=null&&decimal(row.peso_kg)<=0n)reject(422,'INVALID_WEIGHT','El peso de la mercancía debe ser mayor que cero');
+        }
         if(name==='merchandise'&&(!existing||['bienes_transp_sat','clave_unidad_sat','material_peligroso','clave_material_peligroso_sat','embalaje_sat'].some(key=>Object.hasOwn(parsed,key)))){
           if(row.clave_material_peligroso_sat&&row.material_peligroso!==true)reject(422,'HAZMAT_MISMATCH','La clave de material peligroso requiere material_peligroso=true');
           if(row.material_peligroso===true&&(!row.clave_material_peligroso_sat||!row.embalaje_sat))reject(422,'HAZMAT_FIELDS_REQUIRED','El material peligroso requiere clave SAT y embalaje SAT');

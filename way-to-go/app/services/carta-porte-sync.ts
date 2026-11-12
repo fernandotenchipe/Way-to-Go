@@ -1,5 +1,9 @@
 import type { CartaPorteMerchandise, TripCargoItem } from './logistics-api';
 
+export function buildCartaPorteMerchandiseMutation<T>(upsert: T[], remove: string[] = []) {
+  return { upsert, remove: remove.map(id => ({ id })) };
+}
+
 const normText = (value: unknown) => String(value ?? '').trim().toLocaleLowerCase('es-MX').replace(/\s+/g, ' ');
 const normNumber = (value: unknown) => value == null || value === '' ? '' : Number(value).toString();
 

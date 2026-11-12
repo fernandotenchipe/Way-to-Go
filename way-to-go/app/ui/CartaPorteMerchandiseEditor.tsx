@@ -33,6 +33,7 @@ export default function CartaPorteMerchandiseEditor({
 }: { trip: LogisticsTrip; document: CartaPorteDocument; onSaved: (document: CartaPorteDocument) => void }) {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<CartaPorteMerchandise[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [editRevision, setEditRevision] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -42,8 +43,13 @@ export default function CartaPorteMerchandiseEditor({
   const [syncTripUpdatedAt, setSyncTripUpdatedAt] = useState<string | null>(null);
 
   function beginEdit() {
-    setError(''); setNotice(''); setDrafts(document.merchandise.map(row => ({ ...row })));
+    setError(''); setNotice(''); setDrafts(document.merchandise.map(row => ({ ...row }))); setRemovedIds([]);
     setEditRevision(document.cfdi.revision); setEditing(true);
+  }
+
+  function removeDraft(id: string) {
+    setDrafts(rows => rows.filter(row => row.id !== id));
+    if (document.merchandise.some(row => row.id === id)) setRemovedIds(rows => rows.includes(id) ? rows : [...rows, id]);
   }
 
   function addDraft() {
@@ -99,7 +105,7 @@ export default function CartaPorteMerchandiseEditor({
         onSaved(fresh.data); setEditRevision(fresh.data.cfdi.revision); setDrafts(fresh.data.merchandise.map(row => ({ ...row })));
         throw new Error('El borrador cambió mientras editabas. Recargué su revisión; revisa los datos y vuelve a guardar.');
       }
-      if (!drafts.length) throw new Error('No hay mercancías que guardar. Para agregar, usa la sincronización controlada del viaje.');
+      if (!drafts.length && !removedIds.length) throw new Error('No hay cambios de mercancías que guardar.');
       for (const [index, row] of drafts.entries()) {
         if (!row.descripcion?.trim()) throw new Error(`La mercancía ${index + 1} requiere descripción.`);
         if (row.cantidad == null || Number(row.cantidad) <= 0) throw new Error(`La cantidad de la mercancía ${index + 1} debe ser mayor que cero.`);
@@ -118,7 +124,7 @@ export default function CartaPorteMerchandiseEditor({
         valor_mercancia: decimalString(row.valor_mercancia), moneda_sat: row.moneda_sat || null,
         fraccion_arancelaria: row.fraccion_arancelaria || null, uuid_comercio_exterior: row.uuid_comercio_exterior || null,
       }));
-      const updated = await logisticsApi.saveCartaPorteMerchandise(document.id, fresh.data.cfdi.revision, upsert);
+      const updated = await logisticsApi.saveCartaPorteMerchandise(document.id, fresh.data.cfdi.revision, upsert, removedIds);
       onSaved(updated.data); setEditing(false); setNotice('Mercancías guardadas. Se conservaron los IDs y el orden; los conceptos fiscales del CFDI no se modificaron.');
     } catch (reason) { setError(errorText(reason)); }
     finally { setBusy(false); }
@@ -209,8 +215,9 @@ export default function CartaPorteMerchandiseEditor({
       </div>
       <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(row.material_peligroso)} onChange={event => setDrafts(current => current.map(item => item.id === row.id ? { ...item, material_peligroso: event.target.checked, clave_material_peligroso_sat: event.target.checked ? item.clave_material_peligroso_sat : null, embalaje_sat: event.target.checked ? item.embalaje_sat : null, descripcion_embalaje: event.target.checked ? item.descripcion_embalaje : null } : item))} />Material peligroso</label>
       {row.material_peligroso && <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs">Clave material peligroso SAT<input className={inputClass} value={row.clave_material_peligroso_sat || ''} onChange={event => change(row.id, 'clave_material_peligroso_sat', event.target.value || null)} /></label><label className="text-xs">Embalaje SAT<input className={inputClass} value={row.embalaje_sat || ''} onChange={event => change(row.id, 'embalaje_sat', event.target.value || null)} /></label></div>}
+      <button type="button" className="mt-3 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-800" disabled={busy} onClick={() => removeDraft(row.id)}>Quitar mercancía</button>
     </article>)}
-      <div className="flex flex-wrap justify-between gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#0b1f3b]" disabled={busy} onClick={addDraft}>Agregar mercancía</button><div className="flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm" disabled={busy} onClick={() => setEditing(false)}>Cancelar</button><button type="button" className={button} disabled={busy || !drafts.length} onClick={() => void save()}>{busy ? 'Validando y guardando…' : 'Guardar mercancías'}</button></div></div>
+      <div className="flex flex-wrap justify-between gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#0b1f3b]" disabled={busy} onClick={addDraft}>Agregar mercancía</button><div className="flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm" disabled={busy} onClick={() => setEditing(false)}>Cancelar</button><button type="button" className={button} disabled={busy || (!drafts.length && !removedIds.length)} onClick={() => void save()}>{busy ? 'Validando y guardando…' : 'Guardar mercancías'}</button></div></div>
     </div> : <div className="mt-3 space-y-3">{document.merchandise.length ? document.merchandise.slice().sort((a,b)=>a.posicion-b.posicion).map((row,index)=><article key={row.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-medium">{row.posicion || index+1}. {row.descripcion}</p><p className="text-slate-600">{row.cantidad ?? '—'} {row.unidad || ''} · {row.peso_kg ?? '—'} kg</p><p className="text-xs text-slate-500">ProdServCP {row.bienes_transp_sat || 'pendiente'} · Unidad CFDI {row.clave_unidad_sat || 'pendiente'}{row.material_peligroso ? ` · Material peligroso ${row.clave_material_peligroso_sat || 'pendiente'} · Embalaje ${row.embalaje_sat || 'pendiente'}` : ''}</p></article>) : <p className="text-sm text-amber-800">No hay mercancías en Carta Porte.</p>}</div>}
 
     {!editing && canEdit && <div className="mt-4 border-t border-slate-200 pt-4">

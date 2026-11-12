@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error Node executes this TypeScript test directly.
-import { findUnmatchedTripCargo } from '../../../app/services/carta-porte-sync.ts';
+import { buildCartaPorteMerchandiseMutation, findUnmatchedTripCargo } from '../../../app/services/carta-porte-sync.ts';
 
 const cargo = (id: string, overrides: Record<string, unknown> = {}) => ({
   id, posicion: 1, descripcion: 'Caja de piezas', mercancia: 'Caja de piezas', cantidad: '2.000000',
@@ -21,4 +21,12 @@ test('la sincronización compara repetidos como conjunto y agrega solo la ocurre
 test('un cambio de cantidad o clave SAT se presenta como mercancía distinta', () => {
   const missing = findUnmatchedTripCargo([cargo('trip-1', { cantidad: '3.000000' })], [{ ...cargo('cp-1'), id: 'cp-1' }]);
   assert.deepEqual(missing.map(row => row.id), ['trip-1']);
+});
+
+test('la mutación conserva partidas SAT repetidas y expresa eliminaciones por id', () => {
+  const repeated = [cargo('cp-1'), cargo('cp-2')];
+  assert.deepEqual(buildCartaPorteMerchandiseMutation(repeated, ['cp-3']), {
+    upsert: repeated,
+    remove: [{ id: 'cp-3' }],
+  });
 });
