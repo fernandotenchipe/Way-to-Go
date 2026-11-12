@@ -9,6 +9,13 @@ test('el servicio de transporte explícito se envía como CFDI I', () => {
   });
 });
 
+test('la marca QA solo se envía cuando se selecciona expresamente', () => {
+  assert.deepEqual(buildTripCartaPorteFiscalInput('issuer-1', 'SERVICIO_TRANSPORTE', false, true), {
+    empresa_emisora_id: 'issuer-1', tipo_comprobante: 'I', escenario_fiscal: 'SERVICIO_TRANSPORTE', datos_qa: true,
+  });
+  assert.equal('datos_qa' in buildTripCartaPorteFiscalInput('issuer-1', 'SERVICIO_TRANSPORTE', false), false);
+});
+
 test('el traslado propio requiere confirmación explícita y se envía como CFDI T', () => {
   assert.throws(() => resolveTripCartaPorteFiscalSelection('TRASLADO_BIENES_PROPIOS', false), /Confirma expresamente/);
   assert.deepEqual(buildTripCartaPorteFiscalInput('issuer-1', 'TRASLADO_BIENES_PROPIOS', true), {

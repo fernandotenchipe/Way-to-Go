@@ -3,7 +3,7 @@ import { catalogs, children, groups, headerFields, invoiceFields } from './carta
 import { reject, uuid, fields, only, object, revision, decimal, formatDecimal, multiplyDecimal } from './carta-porte-input.js';
 import { createFiscalOperations } from './carta-porte-operations.js';
 import { createOperatorService } from './operators.js';
-import { findInvalidTripCargoSatKeys, mapTripCargoToCartaPorte, readTripCargoRows, tripPrefillMissing } from './trip-cargo.js';
+import { CARTA_PORTE_31_CATALOG_VERSION, findInvalidTripCargoSatKeys, mapTripCargoToCartaPorte, readTripCargoRows, tripPrefillMissing } from './trip-cargo.js';
 import { createCfdiCatalogProvider } from './cfdi-catalogs.js';
 import { validateFiscalCreation, validateCfdiCatalogKeys } from './carta-porte-fiscal.js';
 
@@ -137,7 +137,7 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
     let operator=null;
     if (t.operador_id) {
       operator=(await db.query('SELECT * FROM tms.operadores WHERE id=$1 AND activo=true',[t.operador_id])).rows[0]||null;
-      if(operator) await insert(db,'cp_figuras',await snapshots(db,'figures',{tipo_figura_sat:'01',operador_id:operator.id}));
+      if(operator) await insert(db,'cp_figuras',await snapshots(db,'figures',{carta_porte_id:cp.id,tipo_figura_sat:'01',operador_id:operator.id}));
     }
     for(const item of mapTripCargoToCartaPorte(cargoRows,cp.id))await insert(db,'cp_mercancias',item);
     const firstDescribedCargo=cargoRows.find(cargo=>cargo.descripcion||cargo.mercancia);
@@ -389,7 +389,7 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
           emisor_snapshot:json({rfc:issuer.rfc,nombre:issuer.razon_social,regimen_fiscal_sat:issuer.regimen_fiscal_sat,domicilio:issuer.domicilio}),receptor_snapshot:json(fiscalCustomer(customer)),lugar_expedicion_cp:issuer.lugar_expedicion_cp,uso_cfdi_sat:customer.uso_cfdi,
           forma_pago_sat:input.tipo_comprobante==='T'?null:customer.forma_pago,metodo_pago_sat:input.tipo_comprobante==='T'?null:customer.metodo_pago,
           ...(input.tipo_comprobante==='T'?{total:'0.000000'}:{})});
-        const cp=await insert(db,'cartas_porte',{cfdi_id:f.id,viaje_id:t.id});
+        const cp=await insert(db,'cartas_porte',{cfdi_id:f.id,viaje_id:t.id,sat_version_id:CARTA_PORTE_31_CATALOG_VERSION});
         let transport=null;
         if (t.unidad_id) {
           transport=await snapshots(db,'transport',{unidad_id:t.unidad_id});
@@ -432,7 +432,12 @@ export function createCartaPorteService({pool, provider = null, files = null, cf
     },
     async group(cpId,group,body,actor) {
       revision(body.expected_revision);
-      return transaction(async db=>{const f=await header(db,cpId,body.expected_revision,true);await changeGroup(db,cpId,f.id,group,body);await audit(db,actor,'cartas_porte',cpId,`EDITAR_${group}`,f.id);return aggregate(db,cpId);});
+      return transaction(async db=>{const f=await header(db,cpId,body.expected_revision,true);
+        if(group==='merchandise'){
+          const cp=(await db.query('SELECT sat_version_id FROM tms.cartas_porte WHERE id=$1 FOR UPDATE',[cpId])).rows[0];
+          if(cp&&!cp.sat_version_id)await update(db,'cartas_porte',{sat_version_id:CARTA_PORTE_31_CATALOG_VERSION},'id=$1',[cpId]);
+        }
+        await changeGroup(db,cpId,f.id,group,body);await audit(db,actor,'cartas_porte',cpId,`EDITAR_${group}`,f.id);return aggregate(db,cpId);});
     },
     async reopen(cpId,body,actor) {
       only(body,['expected_revision']); revision(body.expected_revision);

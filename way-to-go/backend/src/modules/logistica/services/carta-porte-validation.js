@@ -6,10 +6,13 @@ export function validateCartaPorteDetailed(data, options = {}) {
   const errors=[];
   const add=(path,code,message)=>errors.push({category:'ESTRUCTURA',path,code,message});
   const required=(obj,key,path)=>{if(obj?.[key]===null||obj?.[key]===undefined||obj?.[key]==='')add(`${path}.${key}`,'REQUIRED',`Falta ${key}`);};
+  const validRfc=value=>/^(?:[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}|[A-ZÑ&]{4}\d{6}[A-Z0-9]{3})$/.test(String(value||'').trim().toUpperCase());
+  const checkRfc=(value,path)=>{if(value!=null&&value!==''&&!validRfc(value))add(path,'RFC_FORMAT_INVALID','El RFC no tiene un formato válido de persona física o moral');};
   const positive=(value,path)=>{try{if(decimal(String(value))<=0n)throw new Error();}catch{add(path,'POSITIVE_DECIMAL','Indica un valor positivo');}};
   const f=data.cfdi||{};
   for(const key of ['fecha_expedicion','lugar_expedicion_cp','moneda','exportacion_sat','uso_cfdi_sat'])required(f,key,'invoice');
   for(const side of ['emisor_snapshot','receptor_snapshot'])for(const key of ['rfc','nombre','regimen_fiscal_sat'])required(f[side],key,`invoice.${side}`);
+  for(const side of ['emisor_snapshot','receptor_snapshot'])checkRfc(f[side]?.rfc,`invoice.${side}.rfc`);
   required(f.receptor_snapshot,'domicilio_fiscal_cp','invoice.receptor_snapshot');
   required(data,'sat_version_id','header');
   if(typeof data.transporte_internacional!=='boolean')add('header.transporte_internacional','REQUIRED','Define transporte nacional o internacional');
@@ -22,6 +25,7 @@ export function validateCartaPorteDetailed(data, options = {}) {
   for(const [i,l]of locations.entries()){
     required(l,'fecha_hora',`locations[${i}]`);
     required(l.participante_snapshot,'rfc',`locations[${i}].participant`);
+    checkRfc(l.participante_snapshot?.rfc,`locations[${i}].participant.rfc`);
     for(const key of ['pais_sat','estado_sat','codigo_postal'])required(l.domicilio_snapshot,key,`locations[${i}].address`);
   }
   const ordered=[...locations].sort((a,b)=>a.posicion-b.posicion);
@@ -42,6 +46,7 @@ export function validateCartaPorteDetailed(data, options = {}) {
   if(!data.figures?.some(fig=>fig.tipo_figura_sat==='01'))add('figures','OPERATOR_REQUIRED','Selecciona al operador');
   for(const [i,fig]of (data.figures||[]).entries()){
     required(fig,'nombre',`figures[${i}]`);
+    checkRfc(fig.rfc,`figures[${i}].rfc`);
     if(fig.tipo_figura_sat==='01')required(fig,'numero_licencia',`figures[${i}]`);
     if(!fig.rfc&&!fig.numero_registro_tributario)add(`figures[${i}]`,'TAX_ID_REQUIRED','Falta la identificación fiscal');
   }

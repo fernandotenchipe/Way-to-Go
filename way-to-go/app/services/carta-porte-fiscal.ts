@@ -5,6 +5,7 @@ export interface CreateTripCartaPorteFiscalInput {
   tipo_comprobante: 'I' | 'T';
   escenario_fiscal: CartaPorteFiscalScenario;
   mercancias_propias?: true;
+  datos_qa?: boolean;
 }
 
 /** Resolves only from the user's explicit scenario; fleet ownership is never consulted. */
@@ -28,7 +29,8 @@ export function buildTripCartaPorteFiscalInput(
   issuerId: string,
   scenario: CartaPorteFiscalScenario | '',
   ownGoodsConfirmed: boolean,
+  datosQa = false,
 ): CreateTripCartaPorteFiscalInput {
   if (!issuerId) throw new Error('Selecciona una empresa emisora activa.');
-  return { empresa_emisora_id: issuerId, ...resolveTripCartaPorteFiscalSelection(scenario, ownGoodsConfirmed) };
+  return { empresa_emisora_id: issuerId, ...resolveTripCartaPorteFiscalSelection(scenario, ownGoodsConfirmed), ...(datosQa ? { datos_qa: true } : {}) };
 }

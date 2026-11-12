@@ -75,6 +75,21 @@ test('El CFDI I detecta importes de concepto y total que no cuadran',()=>{
   assert.ok(codes.includes('TOTAL_MISMATCH'));
 });
 
+test('La tasa/cuota debe estar vigente en SAT y corresponder al impuesto y movimiento',async()=>{
+  const provider={listCatalogs:async()=>[{catalogo:'c_Impuesto'},{catalogo:'c_TipoFactor'},{catalogo:'c_TasaOCuota'}],
+    getByKey:async(_catalog,key)=>({clave:key}),search:async()=>({resultados:[
+      {clave_contexto:{Impuesto:'IVA',Factor:'Tasa','Traslado':'Sí','Retención':'No','Rango o fijo':'Fijo','Valor mínimo':null,'Valor máximo':'0.16'}},
+      {clave_contexto:{Impuesto:'IVA',Factor:'Tasa','Traslado':'No','Retención':'Sí','Rango o fijo':'Rango','Valor mínimo':'0.0','Valor máximo':'0.16'}},
+    ]})};
+  const data={cfdi:{fecha_expedicion:'2026-11-12'},taxes:[
+    {impuesto_sat:'002',tipo_factor_sat:'Tasa',movimiento:'TRASLADO',tasa_cuota:'0.16'},
+    {impuesto_sat:'002',tipo_factor_sat:'Tasa',movimiento:'RETENCION',tasa_cuota:'0.04'},
+    {impuesto_sat:'002',tipo_factor_sat:'Tasa',movimiento:'RETENCION',tasa_cuota:'0.17'},
+  ]};
+  const errors=await validateCfdiCatalogKeys(data,provider);
+  assert.deepEqual(errors.map(error=>[error.path,error.code]),[['taxes[2].tasa_cuota','INVALID_SAT_TAX_RATE']]);
+});
+
 test('Se validan las claves de concepto CFDI contra los catálogos vigentes',async()=>{
   const catalogs=['c_UsoCFDI','c_Exportacion','c_Moneda','c_FormaPago','c_MetodoPago','c_RegimenFiscal','c_ClaveProdServ','c_ClaveUnidad','c_ObjetoImp','c_Impuesto','c_TipoFactor'];
   const provider={listCatalogs:async()=>catalogs.map(catalogo=>({catalogo})),getByKey:async(_catalog,key)=>key==='INVALID'?null:{clave:key}};
@@ -94,6 +109,27 @@ test('El concepto de CFDI tipo T se valida con c_ClaveProdServCP',async()=>{
     concepts:[{clave_producto_servicio_sat:'10101500',clave_unidad_sat:'H87',objeto_impuesto_sat:'01'}],taxes:[]};
   assert.deepEqual(await validateCfdiCatalogKeys(data,provider),[]);
   assert.ok(calls.some(([catalog,key])=>catalog==='c_ClaveProdServCP'&&key==='10101500'));
+});
+
+test('La validación previa comprueba catálogos SAT propios de Carta Porte',async()=>{
+  const catalogs=['c_ClaveProdServCP','c_ClaveUnidad','c_MaterialPeligroso','c_TipoEmbalaje','c_ConfigAutotransporte','c_TipoPermiso','c_FiguraTransporte'];
+  const provider={listCatalogs:async()=>catalogs.map(catalogo=>({catalogo})),getByKey:async(catalog,key)=>key==='INVALID'?null:{catalogo:catalog,clave:key}};
+  const data={cfdi:{tipo_comprobante:'I',fecha_expedicion:'2026-11-11T10:00:00Z'},
+    merchandise:[{bienes_transp_sat:'11121600',clave_unidad_sat:'H87',clave_material_peligroso_sat:'INVALID',embalaje_sat:'1A1'}],
+    transport:[{configuracion_vehicular_sat:'C2',permiso_sict_sat:'TPAF01'}],figures:[{tipo_figura_sat:'01'}]};
+  const errors=await validateCfdiCatalogKeys(data,provider);
+  assert.deepEqual(errors.map(({path,code})=>({path,code})),[
+    {path:'merchandise[0].clave_material_peligroso_sat',code:'INVALID_SAT_KEY'},
+  ]);
+});
+
+test('La falta de fecha no oculta claves SAT inexistentes en la validación preliminar',async()=>{
+  const catalogs=['c_ClaveProdServ'];
+  const calls=[];
+  const provider={listCatalogs:async()=>catalogs.map(catalogo=>({catalogo})),getByKey:async(catalog,key,options)=>{calls.push({catalog,key,options});return null;}};
+  const errors=await validateCfdiCatalogKeys({cfdi:{},concepts:[{clave_producto_servicio_sat:'INVALID'}]},provider);
+  assert.equal(errors[0]?.code,'INVALID_SAT_KEY');
+  assert.deepEqual(calls[0].options,{vigente:false});
 });
 
 test('Los datos QA generan advertencia diferenciada de errores fiscales',()=>{

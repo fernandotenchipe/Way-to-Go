@@ -1,10 +1,11 @@
 'use client';
 
 import type { CartaPorteAddressSnapshot, CartaPorteDocument } from '../services/logistics-api';
+import { formatMetricTonnes } from '../services/weight-units';
 import { useRef, useState } from 'react';
 
 const panel = 'rounded-lg border border-slate-200 bg-white p-3';
-const missing = (value: unknown) => value === null ? 'Pendiente · NULL' : value === undefined || value === '' ? 'Faltante' : String(value);
+const missing = (value: unknown) => value === null || value === undefined || value === '' ? 'Pendiente' : String(value);
 const show = (value: unknown) => value === true ? 'Sí' : value === false ? 'No' : missing(value);
 const dateTime = (value?: string | null) => {
   if (!value) return missing(value);
@@ -76,7 +77,7 @@ function MerchandiseTable({ document }: { document: CartaPorteDocument }) {
   </tr>)}</tbody></table></div>;
 }
 
-export function CartaPortePreviewDocument({ document, approvedTransportConditions = [] }: { document: CartaPorteDocument; approvedTransportConditions?: string[] }) {
+export function CartaPortePreviewDocument({ document, unitNumber, approvedTransportConditions = [] }: { document: CartaPorteDocument; unitNumber?: string | null; approvedTransportConditions?: string[] }) {
   const invoice = document.cfdi;
   const transport = document.transport?.[0];
   const insurance = [
@@ -153,17 +154,20 @@ export function CartaPortePreviewDocument({ document, approvedTransportCondition
       </section>
 
       <section className={`${panel} mt-3 carta-porte-card`}>
-        <SectionTitle>Mercancías transportadas</SectionTitle>
-        <MerchandiseTable document={document}/>
-        <dl className="mt-2 grid grid-cols-2 gap-3 border-t border-slate-200 pt-2 sm:grid-cols-4"><Field label="Total de mercancías" value={document.numero_total_mercancias}/><Field label="Peso bruto total" value={document.peso_bruto_total}/></dl>
-        {!!document.merchandise?.some(row => row.valor_mercancia != null || row.moneda_sat || row.fraccion_arancelaria || row.uuid_comercio_exterior) && <div className="mt-2 border-t border-slate-100 pt-2"><h4 className="mb-1 text-[9px] font-bold uppercase text-slate-500">Datos de comercio exterior guardados</h4><dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">{document.merchandise.filter(row => row.valor_mercancia != null || row.moneda_sat || row.fraccion_arancelaria || row.uuid_comercio_exterior).map(row => <div key={row.id} className="contents"><Field label={`Fracción · mercancía ${row.posicion}`} value={row.fraccion_arancelaria}/><Field label={`Valor · mercancía ${row.posicion}`} value={row.valor_mercancia}/><Field label={`Moneda · mercancía ${row.posicion}`} value={row.moneda_sat}/><Field label={`UUID comercio exterior · mercancía ${row.posicion}`} value={row.uuid_comercio_exterior}/></div>)}</dl></div>}
+        <div className="carta-porte-merchandise-block">
+          <SectionTitle>Mercancías transportadas</SectionTitle>
+          <MerchandiseTable document={document}/>
+          <dl className="carta-porte-merchandise-summary mt-2 grid grid-cols-2 gap-3 border-t border-slate-200 pt-2 sm:grid-cols-4"><Field label="Total de mercancías" value={document.numero_total_mercancias}/><Field label="Peso bruto total" value={document.peso_bruto_total}/></dl>
+          {!!document.merchandise?.some(row => row.valor_mercancia != null || row.moneda_sat || row.fraccion_arancelaria || row.uuid_comercio_exterior) && <div className="mt-2 border-t border-slate-100 pt-2"><h4 className="mb-1 text-[9px] font-bold uppercase text-slate-500">Datos de comercio exterior guardados</h4><dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">{document.merchandise.filter(row => row.valor_mercancia != null || row.moneda_sat || row.fraccion_arancelaria || row.uuid_comercio_exterior).map(row => <div key={row.id} className="contents"><Field label={`Fracción · mercancía ${row.posicion}`} value={row.fraccion_arancelaria}/><Field label={`Valor · mercancía ${row.posicion}`} value={row.valor_mercancia}/><Field label={`Moneda · mercancía ${row.posicion}`} value={row.moneda_sat}/><Field label={`UUID comercio exterior · mercancía ${row.posicion}`} value={row.uuid_comercio_exterior}/></div>)}</dl></div>}
+        </div>
       </section>
 
       <section className={`${panel} mt-3 carta-porte-card`}>
         <SectionTitle>Autotransporte federal</SectionTitle>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-          <Field label="Unidad ID" value={transport?.unidad_id}/><Field label="Configuración vehicular SAT" value={transport?.configuracion_vehicular_sat}/><Field label="Placas" value={transport?.placas}/>
-          <Field label="Permiso SICT" value={transport?.permiso_sict_sat}/><Field label="Número de permiso" value={transport?.numero_permiso_sict}/><Field label="Peso bruto vehicular (t)" value={transport?.peso_bruto_vehicular_t}/>
+          <Field label="Número económico" value={unitNumber}/><Field label="Placas" value={transport?.placas}/><Field label="Configuración vehicular SAT" value={transport?.configuracion_vehicular_sat}/>
+          <Field label="Permiso SICT" value={transport?.permiso_sict_sat}/><Field label="Número de permiso" value={transport?.numero_permiso_sict}/><Field label="Peso bruto vehicular" value={transport?.peso_bruto_vehicular_t == null ? null : formatMetricTonnes(transport.peso_bruto_vehicular_t)}/>
+          <Field label="ID interno de unidad" value={transport?.unidad_id}/>
         </dl>
         <div className="mt-3 border-t border-slate-100 pt-2"><h4 className="mb-2 text-[10px] font-bold uppercase tracking-wide">Figuras de transporte</h4>
           {document.figures?.length ? <div className="grid gap-2 sm:grid-cols-2">{document.figures.map((figure, index) => <article key={figure.id || `${figure.tipo_figura_sat}-${index}`} className="carta-porte-card rounded border border-slate-200 p-2"><p className="mb-1 text-[10px] font-bold">Figura {missing(figure.tipo_figura_sat)}</p><dl className="grid grid-cols-2 gap-2"><Field label="Nombre" value={figure.nombre}/><Field label="RFC" value={figure.rfc}/><Field label="Licencia" value={figure.numero_licencia}/><Field label="Residencia fiscal" value={figure.residencia_fiscal_sat}/><Field label="Registro tributario" value={figure.numero_registro_tributario}/></dl>{figure.domicilio_snapshot && <div className="mt-2 border-t border-slate-100 pt-2"><AddressFields address={figure.domicilio_snapshot}/></div>}</article>)}</div> : <p className="text-[10px] italic text-amber-800">No hay figuras de transporte guardadas.</p>}
@@ -172,27 +176,34 @@ export function CartaPortePreviewDocument({ document, approvedTransportCondition
       </section>
       {!!approvedTransportConditions.length && <section className={`${panel} mt-3 carta-porte-conditions carta-porte-card`}><SectionTitle>Condiciones de transporte</SectionTitle><ol className="list-decimal space-y-1 pl-4 text-[10px]">{approvedTransportConditions.map((condition, index) => <li key={`${index}-${condition}`}>{condition}</li>)}</ol></section>}
     </section>
-    {!!document.precarga?.faltantes?.length && <section className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 carta-porte-card"><h3 className="text-[11px] font-bold text-amber-950">Campos pendientes reportados</h3><ul className="mt-1 list-disc pl-4 text-[10px] text-amber-900">{document.precarga.faltantes.map((item,index)=><li key={`${item}-${index}`}>{item}</li>)}</ul></section>}
     <footer className="carta-porte-document-footer mt-3 border-t border-slate-200 pt-2 text-center text-[9px] text-slate-500">Documento de trabajo basado en datos guardados · No genera XML, sellos, UUID fiscal ni QR</footer>
   </article>;
 }
 
 const printStyles = `
-  @page { size: letter; margin: 0.74in 0.48in 0.55in; }
-  @page { @bottom-center { content: "WAY TO GO · PÁGINA " counter(page); color: #64748b; font: 8pt Arial, sans-serif; } }
+  @page {
+    size: letter;
+    margin: 0.88in 0.48in 0.82in;
+    @top-center { content: "BORRADOR — SIN VALIDEZ FISCAL"; color: #111827; background: #fff; border-bottom: 2px solid #f4c430; padding: 0 0 5px; font: 800 8pt Arial, Helvetica, sans-serif; letter-spacing: .08em; }
+    @bottom-center { content: "WAY TO GO · PÁGINA " counter(page); color: #64748b; font: 8pt Arial, Helvetica, sans-serif; }
+  }
   html, body { margin: 0; padding: 0; background: #fff; color: #111827; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-size: 8pt; line-height: 1.28; overflow-wrap: anywhere; }
   .carta-porte-document { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; }
   .carta-porte-pdf-running-banner { display: none; }
   .carta-porte-document-footer { display: none; }
   .carta-porte-sheet { display: block; }
-  .carta-porte-complement-sheet { break-before: page; page-break-before: always; margin-top: 0 !important; }
+  .carta-porte-complement-sheet { break-before: auto; page-break-before: auto; margin-top: 0 !important; }
   .carta-porte-card { break-inside: auto; box-shadow: none !important; }
   .carta-porte-brand, .carta-porte-parties > *, .carta-porte-card > article { break-inside: avoid; page-break-inside: avoid; }
-  .carta-porte-conditions { break-before: page; page-break-before: always; }
+  .carta-porte-card h3, .carta-porte-card h4 { break-after: avoid-page; page-break-after: avoid; }
+  .carta-porte-merchandise-block { break-inside: auto; page-break-inside: auto; }
+  .carta-porte-merchandise-summary { break-inside: avoid; page-break-inside: avoid; }
+  .carta-porte-conditions { break-before: auto; page-break-before: auto; }
   .carta-porte-parties { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
   .carta-porte-table { min-width: 0 !important; table-layout: fixed; font-size: 7pt !important; }
   .carta-porte-table thead { display: table-header-group; }
+  .carta-porte-table tfoot { display: table-footer-group; }
   .carta-porte-table tr { break-inside: avoid; page-break-inside: avoid; }
   .carta-porte-table th { background: #f3f4f6; color: #111827; font-weight: 700; }
   .carta-porte-table th, .carta-porte-table td { border: 1px solid #d1d5db; padding: 4px 3px; vertical-align: top; overflow-wrap: anywhere; }
@@ -201,7 +212,8 @@ const printStyles = `
   .carta-porte-document .text-amber-800 { color: #854d0e !important; }
   .carta-porte-document .border-slate-200, .carta-porte-document .border-slate-300 { border-color: #d1d5db !important; }
   .carta-porte-document .text-slate-500 { color: #4b5563 !important; }
-  .carta-porte-pdf-running-banner { display: block; position: fixed; top: -0.54in; left: 0; right: 0; padding: 5px 0; border-bottom: 2px solid #f4c430; background: #fff; color: #111827; text-align: center; font-size: 8pt; font-weight: 800; letter-spacing: .08em; }
+  .carta-porte-document h2, .carta-porte-document h3, .carta-porte-document h4 { orphans: 3; widows: 3; }
+  .carta-porte-pdf-running-banner { display: none !important; }
   @media screen {
     .carta-porte-complement-sheet { border-top: 2px solid #f4c430; padding-top: 18px; }
     .carta-porte-pdf-running-banner { display: none; }
@@ -210,13 +222,14 @@ const printStyles = `
 
 type PreviewProps = {
   document: CartaPorteDocument;
+  unitNumber?: string | null;
   onClose: () => void;
   loadLatest: () => Promise<CartaPorteDocument>;
   onLatestLoaded: (document: CartaPorteDocument) => void;
   fileName: string;
 };
 
-export default function CartaPortePreview({ document, onClose, loadLatest, onLatestLoaded, fileName }: PreviewProps) {
+export default function CartaPortePreview({ document, unitNumber, onClose, loadLatest, onLatestLoaded, fileName }: PreviewProps) {
   const [activeDocument, setActiveDocument] = useState(document);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -257,7 +270,7 @@ export default function CartaPortePreview({ document, onClose, loadLatest, onLat
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3"><p className="text-sm font-semibold text-[#0b1f3b]">Vista previa · revisión {activeDocument.cfdi.revision}</p><div className="flex items-center gap-2"><button type="button" onClick={() => void downloadPdf()} disabled={generating} className="rounded-lg bg-[#0b1f3b] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">{generating ? 'Preparando PDF…' : 'Descargar PDF'}</button><button type="button" autoFocus onClick={onClose} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cerrar</button></div></div>
       {error && <p role="alert" className="shrink-0 bg-rose-50 px-4 py-2 text-sm text-rose-800">{error}</p>}
       <p className="shrink-0 bg-slate-50 px-4 py-2 text-xs text-slate-500">El navegador abrirá el diálogo de impresión. Selecciona «Guardar como PDF» para descargarlo.</p>
-      <div ref={printContent} className="overflow-y-auto"><CartaPortePreviewDocument document={activeDocument}/></div>
+      <div ref={printContent} className="overflow-y-auto"><CartaPortePreviewDocument document={activeDocument} unitNumber={unitNumber}/></div>
     </section>
   </div>;
 }

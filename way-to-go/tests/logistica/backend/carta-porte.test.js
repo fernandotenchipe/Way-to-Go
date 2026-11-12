@@ -10,6 +10,13 @@ import { createCartaPorteStorage } from '../../../backend/src/modules/logistica/
 const actor='11111111-1111-4111-8111-111111111111';
 const cpId='22222222-2222-4222-8222-222222222222';
 const documentId='33333333-3333-4333-8333-333333333333';
+
+test('la validación detecta RFC malformados y acepta RFC de 12 y 13 caracteres',()=>{
+  const base={cfdi:{tipo_comprobante:'I',emisor_snapshot:{rfc:'AAA010101AAA'},receptor_snapshot:{rfc:'XAXX010101000'}},locations:[],merchandise:[],transport:[],figures:[],concepts:[]};
+  assert.equal(validateCartaPorte(base).some(issue=>issue.code==='RFC_FORMAT_INVALID'),false);
+  const invalid={...base,cfdi:{...base.cfdi,emisor_snapshot:{rfc:'RFC-INCORRECTO'}}};
+  assert.ok(validateCartaPorte(invalid).some(issue=>issue.path==='invoice.emisor_snapshot.rfc'&&issue.code==='RFC_FORMAT_INVALID'));
+});
 const operationId='44444444-4444-4444-8444-444444444444';
 function mockPool(handler=()=>({rows:[]})) {
   const calls=[];const db={async query(sql,params){calls.push({sql,params});return handler(sql,params);},release(){calls.push({sql:'RELEASE'});}};
@@ -115,6 +122,79 @@ test('La migración pendiente se informa como 503 sin sustituirla por demostraci
   const pool=mockPool(()=>{throw Object.assign(new Error('missing'),{code:'42P01'});});
   const {res}=await invoke('get','/carta-porte/catalogs/summary',{pool,permission:'carta_porte.catalogos.ver'});
   assert.equal(res.statusCode,503);assert.equal(res.body.code,'SCHEMA_NOT_READY');
+});
+test('Los errores internos Carta Porte registran excepción PostgreSQL sin exponer detalle al cliente',async()=>{
+  const original=console.error,logs=[];
+  console.error=(...args)=>logs.push(args.join(' '));
+  try {
+    const databaseError=Object.assign(new Error('regla de integridad CP'),{code:'P0001',detail:'valor de fila sensible'});
+    const pool=mockPool(sql=>{
+      if(sql==='BEGIN'||sql==='ROLLBACK')return {rows:[]};
+      throw databaseError;
+    });
+    const {res}=await invoke('post','/trips/:folio/carta-porte',{
+      pool,permission:'carta_porte.editar',params:{folio:'7'},
+      body:{empresa_emisora_id:cpId,tipo_comprobante:'I',escenario_fiscal:'SERVICIO_TRANSPORTE',datos_qa:true},
+    });
+    assert.equal(res.statusCode,500);
+    assert.equal(res.body.error,'No se pudo completar la operación');
+    assert.ok(logs.some(line=>line.includes('P0001')&&line.includes('regla de integridad CP')));
+    assert.ok(logs.some(line=>line.includes('stack')));
+    assert.ok(logs.every(line=>!line.includes('valor de fila sensible')));
+  } finally { console.error=original; }
+});
+test('Crear CFDI tipo I enlaza figura y detalles al padre Carta Porte y conserva BORRADOR',async()=>{
+  const tripId='55555555-5555-4555-8555-555555555555';
+  const issuerId='66666666-6666-4666-8666-666666666666';
+  const customerId='77777777-7777-4777-8777-777777777777';
+  const operatorId='88888888-8888-4888-8888-888888888888';
+  const originId='99999999-9999-4999-8999-999999999999';
+  const destinationId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const participantId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const addressId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const invoice={id:documentId,estado:'BORRADOR',revision:'1',tipo_comprobante:'I',origen:'PROPIO',
+    emisor_snapshot:{rfc:'AAA010101AAA'},receptor_snapshot:{rfc:'BBB010101BBB',regimen_fiscal_sat:'601',domicilio_fiscal_cp:'64000'},
+    uso_cfdi_sat:'G03',forma_pago_sat:'99',metodo_pago_sat:'PUE'};
+  const cp={id:cpId,cfdi_id:documentId,viaje_id:tripId};
+  const inserted=[];
+  const pool=mockPool((sql,params=[])=>{
+    if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return {rows:[]};
+    if(sql.startsWith('SELECT * FROM tms.viajes WHERE folio::text'))return {rows:[{id:tripId,folio:7,estado_operativo:'CONFIRMADO',cliente_id:customerId,origen_id:originId,destino_id:destinationId,operador_id:operatorId}]};
+    if(sql.includes("SELECT id FROM tms.cfdi WHERE viaje_id=$1 AND origen='PROPIO'"))return {rows:[]};
+    if(sql.startsWith('SELECT * FROM tms.empresas_emisoras'))return {rows:[{id:issuerId,rfc:'AAA010101AAA',razon_social:'Emisor QA',regimen_fiscal_sat:'601',lugar_expedicion_cp:'64000',domicilio:{}}]};
+    if(sql.startsWith('SELECT * FROM tms.clientes'))return {rows:[{id:customerId,rfc:'BBB010101BBB',razon_social:'Cliente QA',regimen_fiscal:'601',domicilio_legal_codigo_postal:'64000',uso_cfdi:'G03',forma_pago:'99',metodo_pago:'PUE'}]};
+    if(sql.startsWith('INSERT INTO tms.cfdi ')){inserted.push({table:'cfdi',columns:[...sql.matchAll(/([a-z_]+),?/g)].map(m=>m[1]),params});return {rows:[invoice]};}
+    if(sql.startsWith('INSERT INTO tms.cartas_porte')){inserted.push({table:'cartas_porte',params});return {rows:[cp]};}
+    if(sql.includes('information_schema.columns'))return {rows:[{found:0}]};
+    if(sql.startsWith('SELECT * FROM tms.viaje_carga'))return {rows:[]};
+    if(sql.startsWith('SELECT salida_programada_at'))return {rows:[]};
+    if(sql.includes('FROM (VALUES (\'Origen\''))return {rows:[
+      {tipo:'Origen',posicion:1,cliente_id:customerId,id:originId,fecha_hora:'2026-11-12T09:00:00Z',nombre:'Origen QA',calle:'Calle QA',ciudad:'Monterrey',municipio:'Monterrey',estado:'NL',pais:'MX',codigo_postal:'64000',pais_sat:'MEX',estado_sat:'NLE',municipio_sat:'039',participante_id:participantId,cp_direccion_id:addressId},
+      {tipo:'Destino',posicion:2,cliente_id:customerId,id:destinationId,fecha_hora:'2026-11-12T12:00:00Z',nombre:'Destino QA',calle:'Calle QA',ciudad:'Saltillo',municipio:'Saltillo',estado:'COAH',pais:'MX',codigo_postal:'25000',pais_sat:'MEX',estado_sat:'COA',municipio_sat:'030',participante_id:participantId,cp_direccion_id:addressId},
+    ]};
+    if(sql.startsWith('SELECT * FROM tms.cp_participantes'))return {rows:[{id:participantId,cliente_id:customerId}]};
+    if(sql.startsWith('SELECT * FROM tms.cp_direcciones'))return {rows:[{id:addressId,participante_id:participantId,cliente_direccion_id:originId,calle:'Calle QA',ciudad:'Monterrey',municipio:'Monterrey',estado:'NL',pais:'MX',codigo_postal:'64000',pais_sat:'MEX',estado_sat:'NLE',municipio_sat:'039',zona_horaria:'America/Monterrey'}]};
+    if(sql.startsWith('SELECT * FROM tms.cliente_direcciones'))return {rows:[{id:originId,cliente_id:customerId,calle:'Calle QA',ciudad:'Monterrey',municipio:'Monterrey',estado:'NL',pais:'MX',codigo_postal:'64000'}]};
+    if(sql.startsWith('SELECT * FROM tms.operadores'))return {rows:[{id:operatorId,activo:true,nombre:'Operador QA',rfc:'CCC010101CCC',numero_licencia:'QA-LIC'}]};
+    if(sql.startsWith('INSERT INTO tms.cp_ubicaciones')){const row={id:`location-${inserted.length}`,carta_porte_id:params[0],posicion:params[1],tipo:params[2]};inserted.push({table:'cp_ubicaciones',params,row});return {rows:[row]};}
+    if(sql.startsWith('INSERT INTO tms.cp_figuras')){const columns=sql.slice(sql.indexOf('(')+1,sql.indexOf(')')).split(',');const row=Object.fromEntries(columns.map((key,i)=>[key,params[i]]));row.id='figure-qa';inserted.push({table:'cp_figuras',columns,params,row});return {rows:[row]};}
+    if(sql.startsWith('INSERT INTO tms.cp_auditoria')){const row={id:'audit-qa',datos:JSON.parse(params[5]||'{}')};inserted.push({table:'cp_auditoria',row});return {rows:[row]};}
+    if(sql.startsWith('SELECT * FROM tms.cartas_porte WHERE id=$1'))return {rows:[cp]};
+    if(sql.startsWith('SELECT * FROM tms.cfdi WHERE id=$1'))return {rows:[invoice]};
+    if(sql.includes('FROM tms.cp_auditoria'))return {rows:[{datos:{escenario_fiscal:'SERVICIO_TRANSPORTE',mercancias_propias:false}}]};
+    const child=sql.match(/SELECT \* FROM tms\.(\w+) WHERE (?:carta_porte_id|cfdi_id)=/);
+    if(child)return {rows:inserted.filter(item=>item.table===child[1]).map(item=>item.row).filter(Boolean)};
+    return {rows:[]};
+  });
+  const service=createCartaPorteService({pool,cfdiCatalogProvider:{listCatalogs:async()=>[],getByKey:async()=>null}});
+  const result=await service.create('7',{empresa_emisora_id:issuerId,tipo_comprobante:'I',escenario_fiscal:'SERVICIO_TRANSPORTE',datos_qa:true},actor);
+  const figure=inserted.find(item=>item.table==='cp_figuras');
+  assert.equal(result.cfdi.estado,'BORRADOR');
+  assert.ok(figure.columns.includes('carta_porte_id'));
+  assert.equal(figure.row.carta_porte_id,cpId);
+  for(const detail of inserted.filter(item=>['cp_ubicaciones','cp_figuras'].includes(item.table)))
+    assert.ok(detail.params[0]||detail.row?.carta_porte_id,'No se debe insertar detalle sin su Carta Porte padre');
+  assert.ok(inserted.some(item=>item.table==='cartas_porte'&&item.params[0]===documentId&&item.params.includes('edf31d04-86e4-4780-9bbb-6121bc6b5d38')));
 });
 test('Editar Flota exige también el permiso propietario y no permite saltarse sus bloqueos',async()=>{
   const {res,pool}=await invoke('post','/carta-porte/catalogs/:resource',{params:{resource:'units'},permission:'carta_porte.catalogos.editar',body:{numero_economico:'DEMO-1',tipo_unidad:'Tracto'}});

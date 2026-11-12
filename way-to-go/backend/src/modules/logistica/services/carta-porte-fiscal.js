@@ -143,14 +143,16 @@ export function validateFiscalModel(data, { scenario = null, qaDeclared = false,
 /** Validate only keys the backend actually consumes from CFDI 4.0 catalogs. */
 export async function validateCfdiCatalogKeys(data, catalogProvider) {
   const errors=[];
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(data.cfdi?.fecha_expedicion||'').slice(0,10)))return errors;
+  const invoiceDate=String(data.cfdi?.fecha_expedicion||'').slice(0,10);
+  const parsedInvoiceDate=new Date(`${invoiceDate}T00:00:00Z`);
+  const hasInvoiceDate=/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)&&!Number.isNaN(parsedInvoiceDate.valueOf())&&parsedInvoiceDate.toISOString().slice(0,10)===invoiceDate;
   const catalogues=await catalogProvider.listCatalogs();
   const known=new Set(catalogues.map(row=>row.catalogo));
   const check=async(catalog,key,path)=>{
     if(!key)return;
     if(!known.has(catalog)){errors.push({category:'FISCAL',path,code:'CFDI_CATALOG_MISSING',message:`No está disponible el catálogo ${catalog}`});return;}
     try {
-      const row=await catalogProvider.getByKey(catalog,key,{vigente:true,fecha:String(data.cfdi.fecha_expedicion).slice(0,10)});
+      const row=await catalogProvider.getByKey(catalog,key,hasInvoiceDate?{vigente:true,fecha:invoiceDate}:{vigente:false});
       if(!row)errors.push({category:'FISCAL',path,code:'INVALID_SAT_KEY',message:`La clave ${key} no está vigente en ${catalog}`});
     } catch(error) {
       if(error.code==='AMBIGUOUS_KEY') errors.push({category:'FISCAL',path,code:'SAT_KEY_CONTEXT_REQUIRED',message:`La clave ${key} requiere contexto en ${catalog}`});
@@ -168,8 +170,39 @@ export async function validateCfdiCatalogKeys(data, catalogProvider) {
     ['clave_producto_servicio_sat',f.tipo_comprobante==='T'?'c_ClaveProdServCP':'c_ClaveProdServ',concept.clave_producto_servicio_sat],
     ['clave_unidad_sat','c_ClaveUnidad',concept.clave_unidad_sat],['objeto_impuesto_sat','c_ObjetoImp',concept.objeto_impuesto_sat],
   ]) await check(catalog,key,`concepts[${i}].${field}`);
+  for(const [i,item] of (data.merchandise||[]).entries())for(const [field,catalog,key] of [
+    ['bienes_transp_sat','c_ClaveProdServCP',item.bienes_transp_sat],['clave_unidad_sat','c_ClaveUnidad',item.clave_unidad_sat],
+    ['clave_material_peligroso_sat','c_MaterialPeligroso',item.clave_material_peligroso_sat],['embalaje_sat','c_TipoEmbalaje',item.embalaje_sat],
+  ]) await check(catalog,key,`merchandise[${i}].${field}`);
+  for(const [i,item] of (data.transport||[]).entries())for(const [field,catalog,key] of [
+    ['configuracion_vehicular_sat','c_ConfigAutotransporte',item.configuracion_vehicular_sat],['permiso_sict_sat','c_TipoPermiso',item.permiso_sict_sat],
+  ]) await check(catalog,key,`transport[${i}].${field}`);
+  for(const [i,item] of (data.figures||[]).entries()) await check('c_FiguraTransporte',item.tipo_figura_sat,`figures[${i}].tipo_figura_sat`);
   for(const [i,tax] of (data.taxes||[]).entries())for(const [field,catalog,key] of [
     ['impuesto_sat','c_Impuesto',tax.impuesto_sat],['tipo_factor_sat','c_TipoFactor',tax.tipo_factor_sat],
   ]) await check(catalog,key,`taxes[${i}].${field}`);
+  const rateTaxes=(data.taxes||[]).map((tax,index)=>({tax,index})).filter(({tax})=>tax.tipo_factor_sat!=='Exento'&&tax.tasa_cuota!=null);
+  if(rateTaxes.length){
+    if(!known.has('c_TasaOCuota')) errors.push({category:'FISCAL',path:'taxes',code:'CFDI_CATALOG_MISSING',message:'No está disponible el catálogo c_TasaOCuota'});
+    else if(typeof catalogProvider.search!=='function') errors.push({category:'FISCAL',path:'taxes',code:'TAX_RATE_CATALOG_UNAVAILABLE',message:'No se pudo comprobar la tasa o cuota contra el catálogo SAT'});
+    else {
+      const {resultados=[]}=await catalogProvider.search('c_TasaOCuota',{page:1,limit:100,vigente:hasInvoiceDate,fecha:hasInvoiceDate?invoiceDate:undefined});
+      const taxNames={'001':'ISR','002':'IVA','003':'IEPS'};
+      for(const {tax,index} of rateTaxes){
+        const rate=Number(tax.tasa_cuota),ctxMovement=tax.movimiento==='RETENCION'?'Retención':'Traslado';
+        const allowed=resultados.some(row=>{
+          const context=row.clave_contexto||{};
+          if(context.Impuesto!==taxNames[tax.impuesto_sat]||context.Factor!==tax.tipo_factor_sat
+            ||context[ctxMovement]!=='Sí'||context[ctxMovement==='Retención'?'Traslado':'Retención']!=='No') return false;
+          const min=context['Valor mínimo']==null?null:Number(context['Valor mínimo']);
+          const max=context['Valor máximo']==null?null:Number(context['Valor máximo']);
+          if(context['Rango o fijo']==='Fijo') return max===rate;
+          if(context['Rango o fijo']==='Rango') return Number.isFinite(rate)&&(min===null||rate>=min)&&(max===null||rate<=max);
+          return false;
+        });
+        if(!allowed) errors.push({category:'FISCAL',path:`taxes[${index}].tasa_cuota`,code:'INVALID_SAT_TAX_RATE',message:'La tasa o cuota no coincide con una combinación vigente de c_TasaOCuota para el impuesto, factor y tipo de movimiento indicados'});
+      }
+    }
+  }
   return errors;
 }

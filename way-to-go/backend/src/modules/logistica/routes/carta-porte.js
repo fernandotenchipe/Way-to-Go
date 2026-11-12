@@ -21,7 +21,19 @@ export default function cartaPorteRouter({pool,provider=null,files=null,cfdiCata
       else if(['ECONNREFUSED','ECONNRESET','ETIMEDOUT','57P01'].includes(error.code)||/connection.*timeout|timeout expired/i.test(error.message)){status=503;code='DATABASE_UNAVAILABLE';message='No se pudo consultar la base de datos';}
       else if(error.code==='23505'){status=409;code='DUPLICATE';message='El registro o la operación ya existe';}
       else if(['23503','23514','23502','22007','22008','22003','22P02'].includes(error.code)){status=422;code='INVALID_DATA';message='Revisa los datos y sus relaciones';}
-      if(status===500)console.error('Carta Porte error:',error.code||error.name);
+      if(status>=500){
+        // Log the original server-side exception for diagnosis without exposing it to the client.
+        // PostgreSQL detail/hint/SQL text are intentionally omitted because they can contain row data.
+        console.error('Carta Porte internal error:',JSON.stringify({
+          method:req.method,
+          route:req.route?.path,
+          status,
+          code:error.code||null,
+          name:error.name||'Error',
+          message:String(error.message||'').slice(0,500),
+          stack:String(error.stack||'').split('\n').slice(0,8).join('\n'),
+        }));
+      }
       res.status(status).json({success:false,error:message,code,...(error.fields?.length?{fields:error.fields}:{}),...(error.warnings?.length?{warnings:error.warnings}:{})});
     }
   };

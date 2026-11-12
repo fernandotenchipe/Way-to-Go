@@ -11,6 +11,7 @@ import { findUnmatchedTripCargo } from '../services/carta-porte-sync';
 const button = 'rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
 const editable = (document: CartaPorteDocument) => ['BORRADOR', 'RECHAZADO'].includes(document.cfdi.estado);
 const inputClass = 'mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm';
+const cartaPorte31CatalogVersion = 'edf31d04-86e4-4780-9bbb-6121bc6b5d38';
 const decimalString = (value: string | number | null | undefined) => {
   if (value == null || value === '') return null;
   const text = String(value);
@@ -45,8 +46,16 @@ export default function CartaPorteMerchandiseEditor({
     setEditRevision(document.cfdi.revision); setEditing(true);
   }
 
+  function addDraft() {
+    setDrafts(rows => [...rows, {
+      id: crypto.randomUUID(), posicion: rows.length ? Math.max(...rows.map(row => row.posicion)) + 1 : 1,
+      descripcion: '', cantidad: null, unidad: null, peso_kg: null, bienes_transp_sat: null,
+      clave_unidad_sat: null, material_peligroso: false,
+    }]);
+  }
+
   async function validateSatKeys(rows: Array<Partial<CartaPorteMerchandise>>, allowIncomplete = false) {
-    const versionId = document.sat_version_id;
+    const versionId = document.sat_version_id || cartaPorte31CatalogVersion;
     for (const [index, row] of rows.entries()) {
       const keyMessage = (catalog: string, key: string) => `La clave “${key}” de la mercancía ${index + 1} no se encontró vigente en ${catalog}.`;
       if (row.clave_unidad_sat) {
@@ -197,7 +206,7 @@ export default function CartaPorteMerchandiseEditor({
       <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(row.material_peligroso)} onChange={event => setDrafts(current => current.map(item => item.id === row.id ? { ...item, material_peligroso: event.target.checked, clave_material_peligroso_sat: event.target.checked ? item.clave_material_peligroso_sat : null, embalaje_sat: event.target.checked ? item.embalaje_sat : null, descripcion_embalaje: event.target.checked ? item.descripcion_embalaje : null } : item))} />Material peligroso</label>
       {row.material_peligroso && <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs">Clave material peligroso SAT<input className={inputClass} value={row.clave_material_peligroso_sat || ''} onChange={event => change(row.id, 'clave_material_peligroso_sat', event.target.value || null)} /></label><label className="text-xs">Embalaje SAT<input className={inputClass} value={row.embalaje_sat || ''} onChange={event => change(row.id, 'embalaje_sat', event.target.value || null)} /></label></div>}
     </article>)}
-      <div className="flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm" disabled={busy} onClick={() => setEditing(false)}>Cancelar</button><button type="button" className={button} disabled={busy || !drafts.length} onClick={() => void save()}>{busy ? 'Validando y guardando…' : 'Guardar mercancías'}</button></div>
+      <div className="flex flex-wrap justify-between gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#0b1f3b]" disabled={busy} onClick={addDraft}>Agregar mercancía</button><div className="flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm" disabled={busy} onClick={() => setEditing(false)}>Cancelar</button><button type="button" className={button} disabled={busy || !drafts.length} onClick={() => void save()}>{busy ? 'Validando y guardando…' : 'Guardar mercancías'}</button></div></div>
     </div> : <div className="mt-3 space-y-3">{document.merchandise.length ? document.merchandise.slice().sort((a,b)=>a.posicion-b.posicion).map((row,index)=><article key={row.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-medium">{row.posicion || index+1}. {row.descripcion}</p><p className="text-slate-600">{row.cantidad ?? '—'} {row.unidad || ''} · {row.peso_kg ?? '—'} kg</p><p className="text-xs text-slate-500">ProdServCP {row.bienes_transp_sat || 'pendiente'} · Unidad CFDI {row.clave_unidad_sat || 'pendiente'}{row.material_peligroso ? ` · Material peligroso ${row.clave_material_peligroso_sat || 'pendiente'} · Embalaje ${row.embalaje_sat || 'pendiente'}` : ''}</p></article>) : <p className="text-sm text-amber-800">No hay mercancías en Carta Porte.</p>}</div>}
 
     {!editing && canEdit && <div className="mt-4 border-t border-slate-200 pt-4">

@@ -38,6 +38,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
   const [issuerId, setIssuerId] = useState('');
   const [fiscalScenario, setFiscalScenario] = useState<CartaPorteFiscalScenario | ''>('');
   const [ownGoodsConfirmed, setOwnGoodsConfirmed] = useState(false);
+  const [qaDocument, setQaDocument] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -111,7 +112,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
         await saveFigure(created);
         setDocuments(rows.map(row => ({ id: row.id, cfdi_id: row.cfdi_id, estado: row.cfdi.estado, origen: row.cfdi.origen, revision: row.cfdi.revision, uuid_fiscal: null, created_at: new Date().toISOString() })));
       } else {
-        const created = await logisticsApi.createTripCartaPorte(trip.folio, buildTripCartaPorteFiscalInput(issuerId, fiscalScenario, ownGoodsConfirmed));
+        const created = await logisticsApi.createTripCartaPorte(trip.folio, buildTripCartaPorteFiscalInput(issuerId, fiscalScenario, ownGoodsConfirmed, qaDocument));
         await saveFigure(created.data);
         await load();
       }
@@ -174,7 +175,7 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
     {loading ? <p role="status" className="mt-4 text-sm text-slate-500">Consultando documentos…</p> : <>
       {documents.length > 0 && <div className="mt-4 space-y-4">
         <div className="rounded-lg border border-slate-200 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Documento más reciente · {invoice?.estado || documents[0].estado}</p>{document && invoice?.estado === 'BORRADOR' && !invoice.uuid_fiscal && <button type="button" className={button} onClick={() => setPreviewOpen(true)}>Vista previa</button>}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Documento más reciente · {invoice?.estado || documents[0].estado}</p><div className="flex flex-wrap gap-2">{!demo && <button type="button" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-[#0b1f3b] disabled:opacity-50" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Actualizando…' : 'Actualizar datos'}</button>}{document && invoice?.estado === 'BORRADOR' && !invoice.uuid_fiscal && <button type="button" className={button} onClick={() => setPreviewOpen(true)}>Vista previa</button>}</div></div>
           <p className="mt-1 text-xs text-slate-500">CFDI tipo {invoice?.tipo_comprobante || '—'} · {scenarioLabel} · Revisión {invoice?.revision ?? documents[0].revision}</p>
           {!document?.escenario_fiscal && <p className="mt-2 text-xs text-amber-800">El backend no devuelve el escenario fiscal auditado para este borrador; no se infiere a partir del tipo ni de la unidad.</p>}
           <p className="mt-2 text-xs text-slate-600">UUID fiscal: {display(invoice?.uuid_fiscal)} · Emisor: {display(issuer?.nombre)} ({display(issuer?.rfc)}) · Receptor: {display(receiver?.nombre)} ({display(receiver?.rfc)})</p>
@@ -200,13 +201,14 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
           {!demo && <label className="text-sm">Empresa emisora<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={issuerId} onChange={event => setIssuerId(event.target.value)}><option value="">Seleccionar</option>{issuers.map(row => <option key={row.id} value={row.id}>{row.razon_social || row.nombre}</option>)}</select></label>}
           <label className="text-sm">Escenario fiscal<select className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" value={fiscalScenario} onChange={event => { const value = event.target.value as CartaPorteFiscalScenario | ''; setFiscalScenario(value); if (value !== 'TRASLADO_BIENES_PROPIOS') setOwnGoodsConfirmed(false); }}><option value="">Selecciona explícitamente</option><option value="SERVICIO_TRANSPORTE">Servicio de transporte a terceros · CFDI tipo I</option><option value="TRASLADO_BIENES_PROPIOS">Traslado de bienes propios · CFDI tipo T</option></select><span className="mt-1 block text-xs text-slate-500">El tipo de comprobante se determina por este escenario, no por la modalidad de la unidad.</span></label>
           {fiscalScenario === 'TRASLADO_BIENES_PROPIOS' && <label className="sm:col-span-2 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><input type="checkbox" className="mt-1" checked={ownGoodsConfirmed} onChange={event => setOwnGoodsConfirmed(event.target.checked)} /><span>Confirmo expresamente que las mercancías transportadas son propiedad del emisor. El tipo T requiere además que emisor y receptor tengan el mismo RFC.</span></label>}
+            {!demo && <label className="sm:col-span-2 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><input type="checkbox" className="mt-1" checked={qaDocument} onChange={event => setQaDocument(event.target.checked)} /><span>Documento QA con datos sintéticos. El backend guardará esta marca en la auditoría y advertirá que no debe usarse en operación fiscal ni timbrarse.</span></label>}
         </div>
         {demo && <p className="mt-4 text-xs text-amber-800">Modo demostración: el borrador, el operador y la referencia de unidad se guardan solo en este navegador.</p>}
         <button type="button" className={`${button} mt-4`} disabled={busy || !trip.operador_id || !fiscalScenario || (fiscalScenario === 'TRASLADO_BIENES_PROPIOS' && !ownGoodsConfirmed) || (!demo && (!issuerId || !issuers.length))} onClick={() => void createDraft()}>{busy ? 'Creando borrador…' : `Crear borrador${invoiceType === '—' ? '' : ` · CFDI tipo ${invoiceType}`}`}</button>
       </>}
       {documents.length > 1 && <p className="mt-3 text-xs text-slate-500">Este viaje tiene {documents.length} documentos de Carta Porte.</p>}
     </>}
-    {previewOpen && document && <CartaPortePreview document={document} fileName={`Carta-Porte-viaje-${trip.folio}`} onClose={() => setPreviewOpen(false)} onLatestLoaded={acceptDocumentUpdate} loadLatest={async () => {
+    {previewOpen && document && <CartaPortePreview document={document} unitNumber={trip.unidad} fileName={`Carta-Porte-viaje-${trip.folio}`} onClose={() => setPreviewOpen(false)} onLatestLoaded={acceptDocumentUpdate} loadLatest={async () => {
       if (demo) {
         const latest = localDocuments(trip.folio).find(row => row.id === document.id);
         if (!latest) throw new Error('El borrador local ya no está disponible.');
