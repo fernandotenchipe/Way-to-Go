@@ -206,6 +206,13 @@ export default function TripCartaPortePanel({ trip, demo }: { trip: LogisticsTri
       </>}
       {documents.length > 1 && <p className="mt-3 text-xs text-slate-500">Este viaje tiene {documents.length} documentos de Carta Porte.</p>}
     </>}
-    {previewOpen && document && <CartaPortePreview document={document} onClose={() => setPreviewOpen(false)}/>}
+    {previewOpen && document && <CartaPortePreview document={document} fileName={`Carta-Porte-viaje-${trip.folio}`} onClose={() => setPreviewOpen(false)} onLatestLoaded={acceptDocumentUpdate} loadLatest={async () => {
+      if (demo) {
+        const latest = localDocuments(trip.folio).find(row => row.id === document.id);
+        if (!latest) throw new Error('El borrador local ya no está disponible.');
+        return latest;
+      }
+      return (await logisticsApi.getCartaPorte(document.id)).data;
+    }}/ >}
   </section>;
 }

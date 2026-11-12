@@ -8,6 +8,7 @@ import { saveDemoTrip } from '../services/logistics-demo-trips';
 import { emptyDemoRecord, findDemoTrip, nextTripStatus, tripStatusLabels, tripTimeKeys } from '../services/trip-record';
 import TripCartaPortePanel from './TripCartaPortePanel';
 import { tripDateToIso } from '../services/trip-dates';
+import { loadTripViewTrip } from '../services/trip-view';
 import { LogisticsFormField as Field, logisticsFieldClassName as input } from './LogisticsCatalogComponents';
 
 const tabs = ['Resumen', 'Asignación', 'Carta Porte', 'Avances', 'Evidencias', 'Historial'] as const;
@@ -16,27 +17,17 @@ const card = 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6';
 const primary = 'inline-flex items-center justify-center rounded-lg bg-[#0b1f3b] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50';
 const secondary = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50';
 const demoTypes = [{ id: 'demo-loading', nombre: 'Fotos de carga' }, { id: 'demo-seal', nombre: 'Sello de la unidad' }, { id: 'demo-delivery', nombre: 'Comprobante de entrega firmado' }];
+const emptyTripRecord = (): LogisticsTripRecord => ({ tiempos: {}, eventos: [], unidades: [], operadores: [], cajas: [], proveedores: [] });
 function localInput(zone: string, value?: string | null) {
   if (value === null) return "";
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(value ? new Date(value) : new Date()).map(part => [part.type, part.value]));
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
-async function getTripView(folio: string, demo: boolean) {
-  if (demo) {
-    const trip = findDemoTrip(folio);
-    if (!trip) throw new Error('Este viaje demo no está guardado en este navegador.');
-    const session: LogisticsTripSession = { nombre: 'Usuario demo', canEdit: true, canEditFleet: false, canAdvance: true, validActor: true };
-    return { trip, record: trip.demo_record || emptyDemoRecord(), session, evidence: trip.demo_evidence || [], types: demoTypes };
-  }
-  const [trip, record, session, evidence, catalogs] = await Promise.all([logisticsApi.getTrip(folio), logisticsApi.getTripRecord(folio), logisticsApi.getTripSession(), logisticsApi.getTripEvidence(folio), logisticsApi.getCatalogs()]);
-  return { trip: trip.data, record: record.data, session: session.data, evidence: evidence.data, types: catalogs.data.evidencias };
-}
-
 export default function CreatedTripSummary({ folio }: { folio: string }) {
   const [trip, setTrip] = useState<LogisticsTrip | null>(null);
-  const [record, setRecord] = useState<LogisticsTripRecord | null>(null);
-  const [session, setSession] = useState<LogisticsTripSession | null>(null);
+  const [record, setRecord] = useState<LogisticsTripRecord>(emptyTripRecord());
+  const [session, setSession] = useState<LogisticsTripSession>({ nombre: 'Permisos pendientes', canEdit: false, canEditFleet: false, canAdvance: false, validActor: false });
   const [evidence, setEvidence] = useState<LogisticsEvidence[]>([]);
   const [types, setTypes] = useState<Array<{ id: string; nombre: string }>>([]);
   const [tab, setTab] = useState<Tab>('Resumen');
@@ -46,21 +37,48 @@ export default function CreatedTripSummary({ folio }: { folio: string }) {
   const [notice, setNotice] = useState('');
   const [mode, setMode] = useState('PROPIO');
   const [provider, setProvider] = useState('');
+  const [sessionWarning, setSessionWarning] = useState(false);
+  const [recordWarning, setRecordWarning] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string; type: string } | null>(null);
   const localFiles = useRef(new Map<string, File>());
   const requestVersion = useRef(0);
   const tabId = useId();
   const demo = folio.startsWith('DEMO-') || /^VJ-105[4-8]$/.test(folio);
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     const version = ++requestVersion.current;
-    return getTripView(folio, demo).then((view) => {
+    await Promise.resolve();
+    setSessionWarning(false); setRecordWarning(false);
+    if (demo) {
+      const trip = findDemoTrip(folio);
+      if (!trip) { setError('Este viaje demo no está guardado en este navegador.'); return; }
+      const session: LogisticsTripSession = { nombre: 'Usuario demo', canEdit: true, canEditFleet: false, canAdvance: true, validActor: true };
+      setTrip(trip); setRecord(trip.demo_record || emptyDemoRecord()); setSession(session); setEvidence(trip.demo_evidence || []); setTypes(demoTypes);
+      setMode(trip.proveedor_id ? 'PROVEEDOR' : 'PROPIO'); setProvider(trip.proveedor_id || '');
+      return;
+    }
+    setSession({ nombre: 'Permisos pendientes', canEdit: false, canEditFleet: false, canAdvance: false, validActor: false });
+    setRecord(emptyTripRecord());
+    void logisticsApi.getTripRecord(folio).then(result => {
+      if (version === requestVersion.current) setRecord(result.data);
+    }).catch(() => { if (version === requestVersion.current) setRecordWarning(true); });
+    void logisticsApi.getTripSession().then(result => {
+      if (version === requestVersion.current) setSession(result.data);
+    }).catch(() => { if (version === requestVersion.current) setSessionWarning(true); });
+    void logisticsApi.getTripEvidence(folio).then(result => {
+      if (version === requestVersion.current) setEvidence(result.data);
+    }).catch(() => { if (version === requestVersion.current) setEvidence([]); });
+    void logisticsApi.getCatalogs().then(result => {
+      if (version === requestVersion.current) setTypes(result.data.evidencias);
+    }).catch(() => { if (version === requestVersion.current) setTypes([]); });
+    try {
+      const trip = await loadTripViewTrip(folio, logisticsApi);
       if (version !== requestVersion.current) return;
-      setTrip(view.trip); setRecord(view.record); setSession(view.session); setEvidence(view.evidence); setTypes(view.types);
-      setMode(view.trip.proveedor_id ? 'PROVEEDOR' : 'PROPIO'); setProvider(view.trip.proveedor_id || '');
-    }).catch((reason: unknown) => { if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : 'No se pudo consultar la ficha.'); });
+      setTrip(trip);
+      setMode(trip.proveedor_id ? 'PROVEEDOR' : 'PROPIO'); setProvider(trip.proveedor_id || '');
+    } catch (reason) { if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : 'No se pudo consultar la ficha.'); }
   }, [demo, folio]);
-  useEffect(() => { const requests = requestVersion; void load(); return () => { requests.current++; }; }, [load]);
+  useEffect(() => { const requests = requestVersion; let active = true; queueMicrotask(() => { if (active) void load(); }); return () => { active = false; requests.current++; }; }, [load]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
   const zone = String(trip?.origen_snapshot?.zona_horaria || 'America/Mexico_City');
   const destinationZone = String(trip?.destino_snapshot?.zona_horaria || zone);
@@ -89,7 +107,7 @@ export default function CreatedTripSummary({ folio }: { folio: string }) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo abrir el archivo.'); }
   }
   const changeTab = (value: Tab) => { if (busy) return; setTab(value); setError(''); setNotice(''); setEdit(false); };
-  if (!trip || !record || !session) return <div className="space-y-4 p-6"><Link href="/logistica/viajes" className={secondary}>← Volver a viajes</Link>{error ? <><p role="alert" className="text-rose-700">{error}</p><button className={secondary} onClick={() => { setError(''); void load(); }}>Reintentar</button></> : <p role="status">Consultando ficha del viaje…</p>}</div>;
+  if (!trip) return <div className="space-y-4 p-6"><Link href="/logistica/viajes" className={secondary}>← Volver a viajes</Link>{error ? <><p role="alert" className="text-rose-700">{error}</p><button className={secondary} onClick={() => { setError(''); void load(); }}>Reintentar</button></> : <p role="status">Consultando ficha del viaje…</p>}</div>;
   const next = nextTripStatus[trip.estado_operativo];
   const resources = (rows: LogisticsResource[]) => rows.filter(row => mode === 'PROPIO' ? !row.proveedor_id : row.proveedor_id === provider);
   const times = record.tiempos;
@@ -103,6 +121,8 @@ export default function CreatedTripSummary({ folio }: { folio: string }) {
     </header>
     {demo && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demostración: cambios solo en este navegador. Los archivos no se suben a la base.</p>}
     {!demo && !session.validActor && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Consulta disponible. Para guardar necesitas una sesión de usuario TMS válida; el acceso local temporal no permite registrar al responsable.</p>}
+    {!demo && sessionWarning && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">No se pudieron confirmar los permisos. La ficha está en modo de consulta hasta recuperar la sesión.</p>}
+    {!demo && recordWarning && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">No se pudo cargar el registro operativo. El resto del expediente permanece disponible; vuelve a cargar la ficha para reintentar.</p>}
     {error && <div role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}<button className="ml-3 underline" disabled={busy} onClick={() => { setError(''); void load(); }}>Recargar ficha</button></div>}
     {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{notice}{demo && ' Solo en demo.'}</p>}
     <div role="tabpanel" id={`${tabId}-panel`} aria-labelledby={`${tabId}-tab-${tabs.indexOf(tab)}`}>
