@@ -373,6 +373,36 @@ test('la API no permite quitar el último origen o destino',async()=>{
   assert.ok(!pool.calls.some(call=>call.sql.startsWith('DELETE FROM tms.cp_ubicaciones')));
   assert.ok(pool.calls.some(call=>call.sql==='ROLLBACK'));
 });
+test('la API no permite quitar el último destino',async()=>{
+  const originId='55555555-5555-4555-8555-555555555555';
+  const destinationId='66666666-6666-4666-8666-666666666666';
+  const pool=mockPool(sql=>{
+    if(sql.startsWith('SELECT f.*'))return {rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]};
+    if(sql.startsWith('SELECT id,tipo,posicion,identificador_sat,fecha_hora FROM tms.cp_ubicaciones'))return {rows:[
+      {id:originId,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},
+      {id:destinationId,tipo:'Destino',posicion:2,identificador_sat:'DE000001'},
+    ]};
+    return {rows:[]};
+  });
+  const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[],remove:[{id:destinationId}]}},permission:'carta_porte.editar',pool});
+  assert.equal(res.statusCode,422);assert.equal(res.body.code,'ORIGIN_DESTINATION_REQUIRED');
+  assert.ok(!pool.calls.some(call=>call.sql.startsWith('DELETE FROM tms.cp_ubicaciones')));
+});
+test('la API rechaza posiciones duplicadas, saltos, fechas invertidas y distancias negativas',async()=>{
+  const origin='55555555-5555-4555-8555-555555555555',destination='66666666-6666-4666-8666-666666666666';
+  const invalidRoutes=[
+    {code:'INVALID_LOCATION_ORDER',upsert:[{id:origin,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},{id:destination,tipo:'Destino',posicion:1,identificador_sat:'DE000001'}]},
+    {code:'INVALID_LOCATION_ORDER',upsert:[{id:origin,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},{id:destination,tipo:'Destino',posicion:3,identificador_sat:'DE000001'}]},
+    {code:'LOCATION_TIME_ORDER',upsert:[{id:origin,tipo:'Origen',posicion:1,identificador_sat:'OR000001',fecha_hora:'2026-11-01T12:00:00Z'},{id:destination,tipo:'Destino',posicion:2,identificador_sat:'DE000001',fecha_hora:'2026-11-01T08:00:00Z'}]},
+    {code:'INVALID_FIELD',upsert:[{id:origin,tipo:'Origen',posicion:1,identificador_sat:'OR000001'},{id:destination,tipo:'Destino',posicion:2,identificador_sat:'DE000001',distancia_recorrida_km:'-1'}]},
+  ];
+  for(const invalid of invalidRoutes){
+    const pool=mockPool(sql=>sql.startsWith('SELECT f.*')?{rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]}:{rows:[]});
+    const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:invalid.upsert,remove:[]}},permission:'carta_porte.editar',pool});
+    assert.equal(res.body.code,invalid.code);
+    assert.ok(!pool.calls.some(call=>call.sql.startsWith('INSERT INTO tms.cp_ubicaciones')||call.sql.startsWith('UPDATE tms.cp_ubicaciones')||call.sql.startsWith('DELETE FROM tms.cp_ubicaciones')));
+  }
+});
 test('la API rechaza distancias con precisión que la columna numeric(16,2) redondearía',async()=>{
   const pool=mockPool(sql=>sql.startsWith('SELECT f.*')?{rows:[{id:documentId,revision:'4',estado:'BORRADOR',origen:'PROPIO'}]}:{rows:[]});
   const {res}=await invoke('put','/carta-porte/:id/locations',{params:{id:cpId},body:{expected_revision:'4',locations:{upsert:[
